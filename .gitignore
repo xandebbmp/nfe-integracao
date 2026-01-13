@@ -1,0 +1,24 @@
+# Dependências
+/vendor/
+
+# Certificados (NUNCA versionar)
+storage/certs/*.pfx
+storage/certs/*.pem
+
+# Dados sensíveis
+config/*.local.php
+
+# XMLs e PDFs gerados (runtime)
+storage/xml/
+storage/pdf/
+
+# Logs
+storage/logs/
+
+# Cache / temporários
+*.log
+*.tmp
+
+# IDE
+.vscode/
+.idea/

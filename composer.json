@@ -1,0 +1,22 @@
+{
+    "name": "xande/nfe-integracao",
+    "description": "Projeto da NfePhp",
+    "type": "project",
+    "license": "Alexandre Oliveira Corporation",
+    "autoload": {
+        "psr-4": {
+            "Xande\\NfeIntegracao\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Alexandre Oliveira"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "nfephp-org/sped-nfe": "^5.2",
+        "nfephp-org/sped-da": "^1.1",
+        "nfephp-org/sped-common": "^5.1"
+    }
+}
