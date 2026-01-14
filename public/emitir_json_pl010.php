@@ -61,12 +61,9 @@ $o->natOp   = (string)$ide['natOp'];
 $o->mod     = (int)$ide['mod'];
 $o->serie   = (int)$ide['serie'];
 
-// >>> NÃO força His se o JSON trouxe nNF
-if (isset($ide['nNF'])) {
-    $o->nNF = (int)date('His');//$o->nNF = (int)$ide['nNF'];
-} else {
-    $o->nNF = (int)date('His'); // fallback (melhor você trocar depois por numeração persistida)
-}
+$o->nNF = (int)($ide['nNF'] ?? 0);
+if ($o->nNF <= 0) dieMsg("JSON sem ide.nNF válido (precisa ser > 0)");
+
 
 $o->dhEmi   = (string)$ide['dhEmi'];
 $o->tpNF    = (int)$ide['tpNF'];

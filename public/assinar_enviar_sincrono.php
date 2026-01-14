@@ -122,7 +122,7 @@ echo "Retorno salvo: {$retPath}\n";
 
 if ($cStat !== '104') {
     echo "NF-e NÃO finalizada. (cStat do lote != 104). Veja o retorno salvo.\n";
-    exit(0);
+    exit(2);
 }
 
 // protNFe pode vir como objeto ou lista
@@ -147,7 +147,7 @@ echo "Protocolo: cStat={$cStatProt} xMotivo={$xMotivoProt}\n";
 $ok = in_array($cStatProt, ['100', '110', '301', '302'], true);
 if (!$ok) {
     echo "NF-e não autorizada/denegada. Verifique retorno: {$retPath}\n";
-    exit(0);
+    exit(2);
 }
 
 // ===== 5) MONTA NFEPROC E SALVA =====

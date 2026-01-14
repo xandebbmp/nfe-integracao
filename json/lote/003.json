@@ -1,0 +1,157 @@
+{
+  "ide": {
+    "cUF": 29,
+    "natOp": "VENDA TESTE",
+    "mod": 55,
+    "serie": 1,
+    "nNF": 7,
+    "dhEmi": "2026-01-12T10:00:00-03:00",
+    "tpNF": 1,
+    "idDest": 1,
+    "cMunFG": 2927408,
+    "tpImp": 1,
+    "tpEmis": 1,
+    "finNFe": 1,
+    "indFinal": 1,
+    "indPres": 1,
+    "procEmi": 0,
+    "verProc": "PL_010_V1.30",
+    "tpAmb": 2
+  },
+
+  "emit": {
+    "CNPJ": "41986662000160",
+    "xNome": "LEBRE TECNOLOGIA E INFORMATICA LTDA",
+    "xFant": "EMPRESA TESTE",
+    "IE": "31638351",
+    "IM": "",
+    "CNAE": "",
+    "CRT": 3,
+
+    "enderEmit": {
+      "xLgr": "RUA X",
+      "nro": "100",
+      "xCpl": "",
+      "xBairro": "CENTRO",
+      "cMun": 2927408,
+      "xMun": "SALVADOR",
+      "UF": "BA",
+      "CEP": "40000000",
+      "cPais": 1058,
+      "xPais": "BRASIL",
+      "fone": ""
+    }
+  },
+
+  "dest": {
+    "CPF": "05101812528",
+    "CNPJ": "",
+    "xNome": "ALEXANDRE AZEVEDO DE OLIVEIRA",
+    "indIEDest": 9,
+    "IE": "",
+    "email": "",
+
+    "enderDest": {
+      "xLgr": "RUA Y",
+      "nro": "200",
+      "xCpl": "",
+      "xBairro": "CENTRO",
+      "cMun": 2927408,
+      "xMun": "SALVADOR",
+      "UF": "BA",
+      "CEP": "40000000",
+      "cPais": 1058,
+      "xPais": "BRASIL",
+      "fone": ""
+    }
+  },
+
+  "autXML": [
+    {
+      "CNPJ": "13937073000156"
+    }
+  ],
+
+  "itens": [
+    {
+      "nItem": 1,
+
+      "prod": {
+        "cProd": "001",
+        "cEAN": "SEM GTIN",
+        "xProd": "PRODUTO TESTE",
+        "NCM": "61091000",
+        "CFOP": "5102",
+        "uCom": "UN",
+        "qCom": 1,
+        "vUnCom": 10.00,
+        "vProd": 10.00,
+        "cEANTrib": "SEM GTIN",
+        "uTrib": "UN",
+        "qTrib": 1,
+        "vUnTrib": 10.00,
+        "vFrete": 0,
+        "vSeg": 0,
+        "vDesc": 0,
+        "vOutro": 0,
+        "indTot": 1
+      },
+
+      "imposto": {
+        "vTotTrib": 0,
+
+        "ICMS": {
+          "orig": 0,
+          "CST": "00",
+          "modBC": 3,
+          "vBC": 10.00,
+          "pICMS": 18.00,
+          "vICMS": 1.80
+        },
+
+        "PIS": {
+          "CST": "01",
+          "vBC": 10.00,
+          "pPIS": 1.65,
+          "vPIS": 0.17
+        },
+
+        "COFINS": {
+          "CST": "01",
+          "vBC": 10.00,
+          "pCOFINS": 7.60,
+          "vCOFINS": 0.76
+        }
+      }
+    }
+  ],
+
+  "totais": {
+    "ICMSTot": {
+      "vBC": 10.00,
+      "vICMS": 1.80,
+      "vProd": 10.00,
+      "vPIS": 0.17,
+      "vCOFINS": 0.76,
+      "vNF": 10.00
+    }
+  },
+
+  "transp": {
+    "modFrete": 9
+  },
+
+  "pag": {
+    "detPag": [
+      {
+        "indPag": 0,
+        "tPag": "01",
+        "vPag": 10.00
+      }
+    ]
+  },
+
+  "infAdic": {
+    "infCpl": ""
+  }
+}
