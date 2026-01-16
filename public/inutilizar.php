@@ -47,16 +47,14 @@ $retDir     = rtrim((string)$cfg['pathXml'], "/\\") . DIRECTORY_SEPARATOR . 'ret
 Io::ensureDir($xmlDirInut);
 Io::ensureDir($retDir);
 
-// Tag p/ arquivos (determinística e legível)
+// Tag p/ arquivos de retorno
 $tag = sprintf('A%s-S%03d-%09d-%09d', $ano, $serie, $ini, $fim);
-$tag = Io::safeName($tag);
 
 // ========================
 // Execução
 // ========================
 try {
     $tools = $svc->tools();
-    $ts = Io::ts();
 
     /**
      * Assinatura varia entre versões.
@@ -73,6 +71,60 @@ try {
     }
 
     // salva retorno bruto
-    $retPath = Io::save($retDir, "ret-inut-{$tag}-{$ts}.xml", (string)$response);
+    $retPath = $retDir . DIRECTORY_SEPARATOR . "ret-inut-{$tag}-" . date('Ymd_His') . ".xml";
+    @file_put_contents($retPath, $response);
 
     // request (lastRequest) é essencial pra montar procInut via Complements
+    $req = $tools->lastRequest ?? '';
+    if (trim((string)$req) === '') {
+        throw new RuntimeException("tools->lastRequest veio vazio. Não dá pra montar procInut. Retorno salvo em: {$retPath}");
+    }
+
+    $reqPath = $retDir . DIRECTORY_SEPARATOR . "req-inut-{$tag}-" . date('Ymd_His') . ".xml";
+    @file_put_contents($reqPath, $req);
+
+    // monta procInut
+    $procInutXml = Complements::toAuthorize($req, $response);
+    if (trim((string)$procInutXml) === '' || mb_strlen((string)$procInutXml) < 80) {
+        $badPath = $retDir . DIRECTORY_SEPARATOR . "proc-inut-{$tag}-gerado-" . date('Ymd_His') . ".xml";
+        @file_put_contents($badPath, (string)$procInutXml);
+        throw new RuntimeException("procInut gerado vazio/pequeno. Debug salvo em retornos/.");
+    }
+
+    // extrai Id (infInut/@Id) pra nomear bonito
+    $idInut = '';
+    $sx = simplexml_load_string((string)$procInutXml);
+    if ($sx !== false) {
+        $idNode = $sx->xpath('//*[local-name()="infInut"]/@Id');
+        $idFull = isset($idNode[0]) ? (string)$idNode[0] : '';
+        if ($idFull !== '') {
+            $idInut = preg_replace('/^ID/i', '', $idFull) ?? '';
+        }
+    }
+
+    // fallback determinístico
+    if ($idInut === '') {
+        $idInut = $tag;
+    }
+    // sanitiza (Windows friendly)
+    $idInut = Io::safeName($idInut);
+
+    // salva procInut na árvore Opção A
+    $xmlFile = $xmlDirInut . DIRECTORY_SEPARATOR . "inut-{$idInut}-procInut.xml";
+    $bytes = file_put_contents($xmlFile, (string)$procInutXml);
+    if ($bytes === false || $bytes < 80) {
+        throw new RuntimeException("Falha ao salvar procInut em: {$xmlFile}");
+    }
+
+    // saída final
+    echo "Inutilização OK (XML).\n";
+    echo "idInut={$idInut}\n";
+    echo "XML gerado: {$xmlFile}\n";
+    echo "Retorno SEFAZ salvo: {$retPath}\n";
+    echo "Request salvo: {$reqPath}\n";
+    echo "Abrir via evento.php (XML): http://localhost/nfe-integracao/public/evento.php?tipo=inut&idInut={$idInut}\n";
+
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo "Erro: " . $e->getMessage() . "\n";
+}
