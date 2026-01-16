@@ -33,6 +33,17 @@ function onlyDigits(string $s): string {
     return preg_replace('/\D+/', '', $s) ?? '';
 }
 
+function ensureDir(string $dir): void {
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+}
+
+function fileOk(string $path, int $minBytes = 1024): bool {
+    return is_file($path) && filesize($path) >= $minBytes;
+}
+
+
 $chave = '';
 $texto = '';
 $seq = 1;
@@ -165,6 +176,57 @@ if ($has($output, 'CC-e OK') || $has($output, 'CC-e já existe')) {
 }
 
 $ok = ($status !== 'ERRO');
+
+// ===== GARANTE PDF (cache + geração) =====
+// Se o script fiscal não devolveu pdfPath, tenta inferir o caminho padrão e gerar via evento.php (Daevento) indiretamente.
+// Aqui a fonte de verdade é o procEvento.xml (xmlGerado).
+if (($pdfPath === null || trim((string)$pdfPath) === '') && is_string($xmlGerado) && trim($xmlGerado) !== '') {
+    // tenta montar o caminho do PDF esperado a partir do XML (padrão do seu script fiscal)
+    $seqStr = str_pad((string)$seq, 3, '0', STR_PAD_LEFT);
+
+    $cfgFile = $baseDir . '/config/nfe.php';
+    if (is_file($cfgFile)) {
+        $cfg = require $cfgFile;
+
+        $pdfDirCce = rtrim((string)($cfg['pathPdf'] ?? ($baseDir . '/storage/pdf')), "/\\")
+            . DIRECTORY_SEPARATOR . 'eventos' . DIRECTORY_SEPARATOR . 'cce';
+
+        ensureDir($pdfDirCce);
+
+        $expectedPdf = $pdfDirCce . DIRECTORY_SEPARATOR . "cce-{$chave}-{$seqStr}.pdf";
+
+        // Se já existe, usa
+        if (fileOk($expectedPdf, 1024)) {
+            $pdfPath = $expectedPdf;
+        } else {
+            // tenta gerar o PDF lendo o procEvento.xml e usando o mesmo serviço já homologado
+            try {
+                require_once $baseDir . '/vendor/autoload.php';
+
+                $procEventoXml = (string)@file_get_contents($xmlGerado);
+                if (trim($procEventoXml) !== '') {
+                    $svcCfg = $cfg;
+                    $svc = new \Xande\NfeIntegracao\NfeService($svcCfg);
+
+                    $configPdf = [
+                        'tipo'     => 'cce',
+                        'tpEvento' => '110110',
+                    ];
+
+                    $svc->gerarPdfEvento($procEventoXml, $configPdf, $expectedPdf);
+
+                    if (fileOk($expectedPdf, 1024)) {
+                        $pdfPath = $expectedPdf;
+                    }
+                }
+            } catch (Throwable $e) {
+                // não derruba o endpoint, apenas mantém pdfPath null
+            }
+        }
+    }
+}
+
+
 
 // Paths no padrão do emitir_padrao (sempre presentes)
 $paths = [

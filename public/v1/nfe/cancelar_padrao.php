@@ -33,6 +33,16 @@ function onlyDigits(string $s): string {
     return preg_replace('/\D+/', '', $s) ?? '';
 }
 
+function ensureDir(string $dir): void {
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+}
+
+function fileOk(string $path, int $minBytes = 1024): bool {
+    return is_file($path) && filesize($path) >= $minBytes;
+}
+
 $chave = '';
 $protocolo = '';
 $just = 'Cancelamento por solicitação do cliente.';
@@ -171,6 +181,51 @@ if ($has($output, 'Cancelamento OK') || $has($output, 'Cancelamento já existe')
 }
 
 $ok = ($status !== 'ERRO');
+
+// ===== GARANTE PDF (cache + geração) =====
+// Se o script fiscal não devolveu pdfPath, tenta inferir o caminho padrão e gerar via NfeService->gerarPdfEvento()
+// Fonte de verdade: procEvento.xml (xmlGerado)
+if (($pdfPath === null || trim((string)$pdfPath) === '') && is_string($xmlGerado) && trim($xmlGerado) !== '') {
+    $cfgFile = $baseDir . '/config/nfe.php';
+    if (is_file($cfgFile)) {
+        $cfg = require $cfgFile;
+
+        $pdfDirCanc = rtrim((string)($cfg['pathPdf'] ?? ($baseDir . '/storage/pdf')), "/\\")
+            . DIRECTORY_SEPARATOR . 'eventos' . DIRECTORY_SEPARATOR . 'canc';
+
+        ensureDir($pdfDirCanc);
+
+        $expectedPdf = $pdfDirCanc . DIRECTORY_SEPARATOR . "canc-{$chave}.pdf";
+
+        // Se já existe, usa
+        if (fileOk($expectedPdf, 1024)) {
+            $pdfPath = $expectedPdf;
+        } else {
+            // tenta gerar o PDF lendo o procEvento.xml e usando o mesmo serviço já homologado
+            try {
+                require_once $baseDir . '/vendor/autoload.php';
+
+                $procEventoXml = (string)@file_get_contents($xmlGerado);
+                if (trim($procEventoXml) !== '') {
+                    $svc = new \Xande\NfeIntegracao\NfeService($cfg);
+
+                    $configPdf = [
+                        'tipo'     => 'canc',
+                        'tpEvento' => '110111',
+                    ];
+
+                    $svc->gerarPdfEvento($procEventoXml, $configPdf, $expectedPdf);
+
+                    if (fileOk($expectedPdf, 1024)) {
+                        $pdfPath = $expectedPdf;
+                    }
+                }
+            } catch (Throwable $e) {
+                // não derruba o endpoint, apenas mantém pdfPath null
+            }
+        }
+    }
+}
 
 // Paths no padrão do emitir_padrao (sempre presentes)
 $paths = [
