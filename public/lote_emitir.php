@@ -142,6 +142,24 @@ foreach ($files as $file) {
     [$c2, $out2] = run("php {$sendScript} {$xmlArg}");
 
     if ($c2 !== 0) {
+    // Se o script de envio falhar mas tiver Protocolo cStat=100/150, considera AUTORIZADA
+        $cStatProt = '';
+        if (preg_match('/Protocolo:\s*cStat=(\d+)/', $out2, $m)) {
+            $cStatProt = $m[1];
+        }
+
+        if (in_array($cStatProt, ['100', '150'], true)) {
+            $ok++;
+            echo "OK ✅ (autorizada apesar do exitCode)\n{$out2}\n\n";
+            $report[] = [
+                'json' => basename($file),
+                'status' => 'OK_AUTORIZADA_EXITCODE',
+                'xml' => $xmlPath,
+                'detalhe' => $out2
+            ];
+            continue;
+        }
+
         $fail++;
         echo "ERRO no envio.\n{$out2}\n\n";
         $report[] = [

@@ -8,16 +8,12 @@ header('Content-Type: application/json; charset=utf-8');
 /**
  * POST /v1/nfe/emitir_padrao
  *
- * Entrada:
- *  - JSON body: objeto de nota (1) OU array de notas
- *
- * Execução (CAIXA-PRETA):
- *  - Para cada nota, executa o fluxo existente via CLI (public/lote_emitir.php)
- *  - Não altera lógica fiscal
- *
  * Saída:
- *  - Retorno estruturado por nota + raw (exitCode/output)
- *  - Gera DANFE PDF automaticamente quando AUTORIZADO (cStat=100) e existir nfeProc
+ *  - status padronizado + cStat/xMotivo + raw
+ *  - AUTORIZADO: cStat 100/150 (gera DANFE se existir nfeProc)
+ *  - DENEGADO:  cStat 110/301/302 (ok=false, NÃO pode usar, NÃO reenviar, NÃO gera PDF)
+ *  - REJEITADO: outros cStat (ok=false, pode corrigir e reenviar)
+ *  - ERRO:      falha técnica (exitCode != 0 / fatal / exception)
  */
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -62,13 +58,6 @@ function pickLast(string $pattern, string $text): ?string {
     return null;
 }
 
-function pickFirst(string $pattern, string $text): ?string {
-    if (preg_match($pattern, $text, $m)) {
-        return trim((string)$m[1]);
-    }
-    return null;
-}
-
 function pickLastPair(string $pattern, string $text): array {
     if (preg_match_all($pattern, $text, $all, PREG_SET_ORDER)) {
         $last = $all[count($all) - 1];
@@ -105,7 +94,6 @@ function gerarDanfePdfFromProc(string $nfeProcPath, string $pdfDir, string $chav
         return null;
     }
 
-    // Carrega Danfe somente aqui (evita fatal caso lib não esteja disponível por algum motivo)
     if (!class_exists(\NFePHP\DA\NFe\Danfe::class)) {
         return null;
     }
@@ -134,7 +122,7 @@ function gerarDanfePdfFromProc(string $nfeProcPath, string $pdfDir, string $chav
 
 // ===================== Bootstrap =====================
 
-$baseDir = dirname(__DIR__, 3);              // public/v1/nfe -> raiz do projeto
+$baseDir = dirname(__DIR__, 3);
 $autoload = $baseDir . '/vendor/autoload.php';
 $configFile = $baseDir . '/config/nfe.php';
 
@@ -179,11 +167,7 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 $notas = [];
 if (is_array($decoded)) {
     $isList = array_keys($decoded) === range(0, count($decoded) - 1);
-    if ($isList) {
-        $notas = $decoded;
-    } else {
-        $notas = [$decoded];
-    }
+    $notas = $isList ? $decoded : [$decoded];
 } else {
     jsonOut(400, ['error' => 'JSON deve ser objeto ou array de objetos']);
 }
@@ -197,6 +181,8 @@ if (count($notas) < 1) {
 $summary = [
     'total' => count($notas),
     'autorizados' => 0,
+    'denegados' => 0,
+    'rejeitados' => 0,
     'falhas' => 0,
     'erros' => 0,
 ];
@@ -220,7 +206,11 @@ for ($i = 0; $i < count($notas); $i++) {
     ensureDir($loteDir);
 
     $jsonPath = $loteDir . DIRECTORY_SEPARATOR . 'nota.json';
-    $jsonOk = @file_put_contents($jsonPath, json_encode($notaObj, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_PRETTY_PRINT));
+    $jsonOk = @file_put_contents(
+        $jsonPath,
+        json_encode($notaObj, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_PRETTY_PRINT)
+    );
+
     if ($jsonOk === false) {
         $summary['falhas']++;
         $summary['erros']++;
@@ -231,6 +221,10 @@ for ($i = 0; $i < count($notas); $i++) {
             'cStat' => null,
             'xMotivo' => 'Falha ao salvar JSON temporário',
             'chave' => null,
+            'bloqueio' => [
+                'tipo' => 'erro_tecnico',
+                'mensagem' => 'Falha interna ao preparar a emissão.',
+            ],
             'paths' => [
                 'xmlGerado' => null,
                 'xmlAssinado' => null,
@@ -250,24 +244,20 @@ for ($i = 0; $i < count($notas); $i++) {
     $cmd = sprintf('php %s %s', escapeshellarg($cliLote), escapeshellarg($loteDir));
     [$exitCode, $output] = runCmd($cmd);
 
-    // ===== Parse derivado (somente leitura do output) =====
-    // cStat/xMotivo (pega o último)
+    // ===== Parse derivado =====
     [$cStatA, $xMotA] = pickLastPair('/cStat\s*=\s*(\d+)\s*xMotivo\s*=\s*([^\r\n]+)/i', $output);
     [$cStatB, $xMotB] = pickLastPair('/cStat\s*:\s*(\d+)\s*xMotivo\s*:\s*([^\r\n]+)/i', $output);
 
     $cStat = $cStatA ?: $cStatB;
     $xMotivo = $xMotA ?: $xMotB;
 
-    // chave (44 dígitos)
     $chave = pickLast('/\b(\d{44})\b/', $output);
 
-    // paths do output
-    $xmlGerado  = pickLast('/^XML gerado:\s*(.+)$/im', $output);
+    $xmlGerado   = pickLast('/^XML gerado:\s*(.+)$/im', $output);
     $xmlAssinado = pickLast('/^XML Assinado:\s*(.+)$/im', $output);
-    $nfeProc    = pickLast('/^nfeProc salvo:\s*(.+)$/im', $output);
-    $relatorio  = pickLast('/^Relatório salvo:\s*(.+)$/im', $output);
+    $nfeProc     = pickLast('/^nfeProc salvo:\s*(.+)$/im', $output);
+    $relatorio   = pickLast('/^Relatório salvo:\s*(.+)$/im', $output);
 
-    // "Retorno salvo:" aparece mais de uma vez; preferir o ret_envio
     $retEnvio = null;
     if (preg_match_all('/^Retorno salvo:\s*(.+)$/im', $output, $mRet)) {
         $cands = $mRet[1] ?? [];
@@ -283,44 +273,79 @@ for ($i = 0; $i < count($notas); $i++) {
         }
     }
 
-    // status/ok
+    // ===== Classificação fiscal (CLARA pro usuário) =====
     $status = 'DESCONHECIDO';
     $ok = true;
+    $bloqueio = null;
 
-    if ($exitCode !== 0 || hasText($output, 'FATAL') || hasText($output, 'Fatal error') || hasText($output, 'Exception')) {
+    // ERRO técnico
+    if ($exitCode !== 0 || hasText($output, 'Fatal error') || hasText($output, 'FATAL') || hasText($output, 'Exception')) {
         $ok = false;
         $status = 'ERRO';
-    } elseif (hasText($output, 'ERRO') && !hasText($output, 'ERRO no envio.') && !hasText($output, 'ERRO ao gerar XML.') && !hasText($output, 'ERRO no envio')) {
-        // fallback conservador
-        $ok = false;
-        $status = 'ERRO';
-    }
-
-    if (($cStat ?? '') === '100') {
-        $status = 'AUTORIZADO';
-    } elseif (($cStat ?? '') !== null && $cStat !== '') {
-        $status = $ok ? 'OK' : 'ERRO';
+        $bloqueio = [
+            'tipo' => 'erro_tecnico',
+            'mensagem' => 'Falha técnica no processamento. Verifique o retorno bruto (raw.output).',
+        ];
     } else {
-        if (hasText($output, 'ERRO')) {
-            $status = 'ERRO';
+        $c = (string)($cStat ?? '');
+
+        $isAut = in_array($c, ['100', '150'], true);
+        $isDen = in_array($c, ['110', '301', '302'], true);
+
+        if ($isAut) {
+            $status = 'AUTORIZADO';
+            $ok = true;
+        } elseif ($isDen) {
+            $status = 'DENEGADO';
             $ok = false;
+            $bloqueio = [
+                'tipo' => 'denegada',
+                'mensagem' => 'NF-e DENEGADA: não pode ser utilizada e não pode ser corrigida/reemitida com a mesma chave.',
+            ];
+        } elseif ($c !== '') {
+            $status = 'REJEITADO';
+            $ok = false;
+            $bloqueio = [
+                'tipo' => 'rejeicao',
+                'mensagem' => 'NF-e REJEITADA: corrija os dados e reenvie a nota.',
+            ];
+        } else {
+            // Sem cStat: decide por texto
+            if (hasText($output, 'ERRO')) {
+                $status = 'ERRO';
+                $ok = false;
+                $bloqueio = [
+                    'tipo' => 'erro_tecnico',
+                    'mensagem' => 'Falha técnica no processamento. Verifique o retorno bruto (raw.output).',
+                ];
+            } else {
+                $status = 'OK';
+                $ok = true;
+            }
         }
     }
 
-    // ===== DANFE PDF (OPÇÃO B) =====
+    // ===== DANFE PDF (somente se AUTORIZADO) =====
     $pdfPath = null;
-    if (($cStat ?? '') === '100' && is_string($nfeProc) && $nfeProc !== '' && is_string($chave) && $chave !== '') {
+    if ($status === 'AUTORIZADO'
+        && is_string($nfeProc) && $nfeProc !== ''
+        && is_string($chave) && $chave !== '') {
         $pdfPath = gerarDanfePdfFromProc($nfeProc, $danfeDir, $chave);
     }
 
-    // contadores
-    if (($cStat ?? '') === '100' && $ok) {
+    // ===== Contadores =====
+    $c = (string)($cStat ?? '');
+    if ($status === 'AUTORIZADO') {
         $summary['autorizados']++;
-    } elseif (!$ok || $status === 'ERRO') {
+    } elseif ($status === 'DENEGADO') {
+        $summary['denegados']++;
         $summary['falhas']++;
-        if ($exitCode !== 0) {
-            $summary['erros']++;
-        }
+    } elseif ($status === 'REJEITADO') {
+        $summary['rejeitados']++;
+        $summary['falhas']++;
+    } elseif ($status === 'ERRO') {
+        $summary['falhas']++;
+        $summary['erros']++;
     }
 
     $itens[] = [
@@ -330,6 +355,7 @@ for ($i = 0; $i < count($notas); $i++) {
         'cStat' => $cStat,
         'xMotivo' => $xMotivo,
         'chave' => $chave,
+        'bloqueio' => $bloqueio, // <<< AQUI fica explícito para o usuário
         'paths' => [
             'xmlGerado' => $xmlGerado,
             'xmlAssinado' => $xmlAssinado,

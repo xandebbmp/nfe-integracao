@@ -144,10 +144,21 @@ $xMotivoProt = (string)($infProt->xMotivo ?? '');
 
 echo "Protocolo: cStat={$cStatProt} xMotivo={$xMotivoProt}\n";
 
-$ok = in_array($cStatProt, ['100', '110', '301', '302'], true);
-if (!$ok) {
-    echo "NF-e não autorizada/denegada. Verifique retorno: {$retPath}\n";
+// ===== CORREÇÃO AQUI =====
+// Autorizada: 100/150
+// Denegada: 110/301/302
+$autorizada = in_array($cStatProt, ['100', '150'], true);
+$denegada   = in_array($cStatProt, ['110', '301', '302'], true);
+
+if (!$autorizada && !$denegada) {
+    echo "NF-e REJEITADA / NÃO AUTORIZADA. Verifique retorno: {$retPath}\n";
     exit(2);
+}
+
+if ($denegada) {
+    echo "NF-e DENEGADA. Verifique retorno: {$retPath}\n";
+    // Se você quiser tratar denegada como falha operacional, descomente:
+    // exit(2);
 }
 
 // ===== 5) MONTA NFEPROC E SALVA =====
@@ -156,7 +167,7 @@ try {
         // versões que têm addProt
         $nfeProc = $tools->addProt($xmlAssinado, $response);
     } else {
-        // sua versão: usa Complements
+        // fallback: usa Complements
         $nfeProc = Complements::toAuthorize($xmlAssinado, $response);
     }
 } catch (Throwable $e) {
