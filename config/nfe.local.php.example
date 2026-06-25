@@ -1,0 +1,14 @@
+<?php
+declare(strict_types=1);
+
+return [
+    // Copie este arquivo para config/nfe.local.php e preencha apenas no ambiente local/servidor.
+    'certPfxPath' => __DIR__ . '/../storage/certs/SEU_CERTIFICADO.pfx',
+    'certPassword' => 'SENHA_DO_CERTIFICADO_AQUI',
+
+    // Opcional: quando preenchido, os wrappers HTTP/JSON exigem o header X-NFE-API-TOKEN.
+    'apiToken' => 'TOKEN_INTERNO_FORTE_AQUI',
+
+    // Opcional: habilita raw.output apenas com token valido (ou local sem token configurado).
+    'debugRawOutput' => false,
+];

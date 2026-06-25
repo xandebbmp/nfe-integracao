@@ -5,6 +5,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
+require_once dirname(__DIR__, 3) . '/src/Support/HttpSecurity.php';
+$cfgSecurity = nfe_require_api_token();
+$debugRaw = nfe_debug_raw_enabled($cfgSecurity);
+
 /**
  * POST /v1/nfe/inutilizar_padrao
  * (Também aceita GET para facilitar testes)
@@ -93,7 +97,7 @@ if (!is_file($scriptWeb)) {
     http_response_code(500);
     echo json_encode([
         'error' => 'Script fiscal de inutilização não encontrado',
-        'expected' => $scriptWeb,
+        'expected' => $debugRaw ? $scriptWeb : null,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -157,7 +161,7 @@ if ($has($output, 'Inutilização OK')) {
 $ok = ($status !== 'ERRO');
 
 // Paths no padrão do emitir_padrao (sempre presentes) + extras
-$paths = [
+$paths = $debugRaw ? [
     'xmlGerado'   => $xmlGerado, // procInut
     'xmlAssinado' => null,
     'retEnvio'    => $retPath,   // retorno SEFAZ salvo
@@ -166,7 +170,7 @@ $paths = [
 
     // extras do evento
     'request'     => $reqPath,
-];
+] : [];
 
 http_response_code(200);
 echo json_encode([
@@ -177,10 +181,11 @@ echo json_encode([
         'xMotivo' => $xMotivo,
         'chave' => null,
         'idInut' => $idInut,
+        'message' => $status === 'ERRO' ? 'Falha ao processar inutilizacao.' : 'Inutilizacao processada.',
         'paths' => $paths,
-        'raw' => [
+        'raw' => nfe_maybe_raw([
             'exitCode' => $exitCode,
             'output' => $output,
-        ],
+        ], $cfgSecurity),
     ],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

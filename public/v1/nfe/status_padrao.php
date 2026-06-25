@@ -5,6 +5,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
+require_once dirname(__DIR__, 3) . '/src/Support/HttpSecurity.php';
+$cfgSecurity = nfe_require_api_token();
+
 /**
  * POST /v1/nfe/status_padrao
  * (Também aceita GET para facilitar testes)
@@ -19,7 +22,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $alreadyOutput = false;
 
-register_shutdown_function(static function () use (&$alreadyOutput): void {
+register_shutdown_function(static function () use (&$alreadyOutput, $cfgSecurity): void {
     if ($alreadyOutput) return;
 
     $err = error_get_last();
@@ -35,13 +38,11 @@ register_shutdown_function(static function () use (&$alreadyOutput): void {
                 'cStat' => null,
                 'xMotivo' => 'Fatal error',
                 'uf' => null,
-                'paths' => [
-                    'retEnvio' => null,
-                ],
-                'raw' => [
+                'paths' => [],
+                'raw' => nfe_maybe_raw([
                     'exitCode' => 1,
                     'output' => ($err['message'] ?? 'fatal') . ' in ' . ($err['file'] ?? '?') . ':' . ($err['line'] ?? '?'),
-                ],
+                ], $cfgSecurity),
             ],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $alreadyOutput = true;
@@ -87,11 +88,11 @@ if (!is_file($autoload)) {
             'cStat' => null,
             'xMotivo' => 'vendor/autoload.php não encontrado',
             'uf' => null,
-            'paths' => ['retEnvio' => null],
-            'raw' => [
+            'paths' => [],
+            'raw' => nfe_maybe_raw([
                 'exitCode' => 1,
                 'output' => 'expected: ' . $autoload,
-            ],
+            ], $cfgSecurity),
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $alreadyOutput = true;
@@ -107,11 +108,11 @@ if (!is_file($configFile)) {
             'cStat' => null,
             'xMotivo' => 'config/nfe.php não encontrado',
             'uf' => null,
-            'paths' => ['retEnvio' => null],
-            'raw' => [
+            'paths' => [],
+            'raw' => nfe_maybe_raw([
                 'exitCode' => 1,
                 'output' => 'expected: ' . $configFile,
-            ],
+            ], $cfgSecurity),
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $alreadyOutput = true;
@@ -125,6 +126,7 @@ use Xande\NfeIntegracao\Support\Io;
 
 $cfg = require $configFile;
 $svc = new NfeService($cfg);
+$debugRaw = nfe_debug_raw_enabled($cfg);
 
 $exitCode = 0;
 $output = '';
@@ -195,13 +197,14 @@ try {
             'cStat' => $cStat,
             'xMotivo' => $xMotivo,
             'uf' => $uf,
-            'paths' => [
+            'message' => 'Status de servico consultado.',
+            'paths' => $debugRaw ? [
                 'retEnvio' => $retPath,
-            ],
-            'raw' => [
+            ] : [],
+            'raw' => nfe_maybe_raw([
                 'exitCode' => 0,
                 'output' => $output,
-            ],
+            ], $cfg),
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $alreadyOutput = true;
@@ -214,15 +217,15 @@ try {
             'ok' => false,
             'status' => 'ERRO',
             'cStat' => null,
-            'xMotivo' => $e->getMessage(),
+            'xMotivo' => 'Falha ao consultar status do servico.',
             'uf' => ($ufIn !== '' ? $ufIn : null),
-            'paths' => [
+            'paths' => $debugRaw ? [
                 'retEnvio' => $retPath,
-            ],
-            'raw' => [
+            ] : [],
+            'raw' => nfe_maybe_raw([
                 'exitCode' => 1,
                 'output' => $output !== '' ? $output : ('Erro: ' . $e->getMessage()),
-            ],
+            ], $cfg),
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $alreadyOutput = true;
