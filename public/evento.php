@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../src/Support/HttpSecurity.php';
-$cfgSecurity = nfe_require_api_token();
+$cfgSecurity = nfe_require_fiscal_access();
 $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
 
 require __DIR__ . '/../vendor/autoload.php';

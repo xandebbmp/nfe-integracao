@@ -103,3 +103,40 @@ function nfe_maybe_raw(array $raw, ?array $cfg = null): ?array
 {
     return nfe_debug_raw_enabled($cfg) ? $raw : null;
 }
+
+function nfe_is_cli(): bool
+{
+    return PHP_SAPI === 'cli';
+}
+
+function nfe_is_internal_fiscal_call(): bool
+{
+    return defined('NFE_INTERNAL_FISCAL_CALL') && NFE_INTERNAL_FISCAL_CALL === true;
+}
+
+function nfe_mark_internal_fiscal_call(): void
+{
+    if (!defined('NFE_INTERNAL_FISCAL_CALL')) {
+        define('NFE_INTERNAL_FISCAL_CALL', true);
+    }
+}
+
+function nfe_require_fiscal_access(?array $cfg = null): array
+{
+    if (nfe_is_cli() || nfe_is_internal_fiscal_call()) {
+        return $cfg ?? nfe_load_config();
+    }
+
+    $cfg = $cfg ?? nfe_load_config();
+    if (nfe_request_has_valid_token($cfg)) {
+        return $cfg;
+    }
+
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'error' => 'Unauthorized',
+        'message' => 'Acesso fiscal direto nao autorizado.',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
