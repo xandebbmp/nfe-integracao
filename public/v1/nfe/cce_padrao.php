@@ -122,6 +122,7 @@ $_GET['seq']   = (string)$seq;
 
 ob_start();
 try {
+    nfe_mark_internal_fiscal_call();
     require $scriptWeb;
 } catch (Throwable $e) {
     echo "\n[WRAPPER_EXCEPTION] " . $e->getMessage();
