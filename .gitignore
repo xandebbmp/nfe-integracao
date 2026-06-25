@@ -3,21 +3,24 @@
 
 # Certificados (NUNCA versionar)
 storage/certs/*.pfx
+storage/certs/*.p12
 storage/certs/*.pem
 
 # Dados sensíveis
+config/nfe.local.php
 config/*.local.php
 
 # XMLs e PDFs gerados (runtime)
-storage/xml/
-storage/pdf/
+storage/xml/*
+storage/pdf/*
 
 # Logs
-storage/logs/
+storage/logs/*
 
 # Cache / temporários
 *.log
 *.tmp
+.DS_Store
 
 # IDE
 .vscode/

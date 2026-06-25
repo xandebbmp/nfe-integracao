@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../src/Support/HttpSecurity.php';
+$cfgSecurity = nfe_require_api_token();
+$debugRaw = nfe_debug_raw_enabled($cfgSecurity);
+
 require __DIR__ . '/../vendor/autoload.php';
 
 use Xande\NfeIntegracao\NfeService;
@@ -33,7 +37,7 @@ try {
 } catch (Throwable $e) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "Erro criando diretórios: " . $e->getMessage() . "\n";
+    echo $debugRaw ? ("Erro criando diretórios: " . $e->getMessage() . "\n") : "Erro criando diretórios.\n";
     exit;
 }
 
@@ -95,7 +99,7 @@ if ($tipo === 'inut') {
 if (!is_file($xmlFile)) {
     http_response_code(404);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "XML não encontrado: {$xmlFile}\n";
+    echo $debugRaw ? "XML não encontrado: {$xmlFile}\n" : "XML não encontrado.\n";
     exit;
 }
 
@@ -159,5 +163,5 @@ try {
 } catch (Throwable $e) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "Erro: " . $e->getMessage() . "\n";
+    echo $debugRaw ? ("Erro: " . $e->getMessage() . "\n") : "Erro ao gerar evento.\n";
 }

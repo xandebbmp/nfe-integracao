@@ -15,7 +15,7 @@ use Xande\NfeIntegracao\NfeService;
  */
 
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
 
 function fail(string $msg, int $code = 1): void {
     fwrite(STDERR, $msg . PHP_EOL);

@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 date_default_timezone_set('America/Bahia');
 
+require_once __DIR__ . '/../src/Support/HttpSecurity.php';
+$cfgSecurity = nfe_require_api_token();
+$debugRaw = nfe_debug_raw_enabled($cfgSecurity);
+
 require __DIR__ . '/../vendor/autoload.php';
 
 use NFePHP\DA\NFe\Danfe;
@@ -30,7 +34,7 @@ $xmlPath  = $xmlDir . DIRECTORY_SEPARATOR . $filename;
 if (!is_file($xmlPath)) {
     http_response_code(404);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "XML não encontrado: {$xmlPath}";
+    echo $debugRaw ? "XML não encontrado: {$xmlPath}" : "XML não encontrado.";
     exit;
 }
 
@@ -38,7 +42,7 @@ $xml = file_get_contents($xmlPath);
 if ($xml === false || trim($xml) === '') {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "Falha ao ler XML: {$xmlPath}";
+    echo $debugRaw ? "Falha ao ler XML: {$xmlPath}" : "Falha ao ler XML.";
     exit;
 }
 
@@ -68,5 +72,5 @@ try {
 } catch (Throwable $e) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "Erro gerando DANFE: " . $e->getMessage();
+    echo $debugRaw ? ("Erro gerando DANFE: " . $e->getMessage()) : "Erro gerando DANFE.";
 }

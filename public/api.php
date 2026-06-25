@@ -1,7 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/../vendor/autoload.php';
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+
+require_once __DIR__ . '/../src/Support/HttpSecurity.php';
 
 function jsonResponse(int $code, array $data): void {
     http_response_code($code);
@@ -149,6 +152,13 @@ function emitirUmaNota(array $nota, string $baseDir): array {
     }
 }
 
+function sanitizeApiResult(array $result): array {
+    foreach (['xmlGerado', 'xmlAssinado', 'nfeProc', 'retornoSalvo', 'detalhe'] as $key) {
+        unset($result[$key]);
+    }
+    return $result;
+}
+
 // =======================
 // Router mínimo
 // =======================
@@ -167,6 +177,11 @@ if ($method === 'GET' && $path === '/ping') {
  *  - {"notas":[...]} (wrapper)
  */
 if ($method === 'POST' && $path === '/nfe/emitir') {
+    $cfgSecurity = nfe_require_api_token();
+    $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
+
+    require __DIR__ . '/../vendor/autoload.php';
+
     $body = readJsonBody();
 
     if ($body === null) {
@@ -200,6 +215,9 @@ if ($method === 'POST' && $path === '/nfe/emitir') {
             continue;
         }
         $res = emitirUmaNota($nota, $baseDir);
+        if (!$debugRaw) {
+            $res = sanitizeApiResult($res);
+        }
         $res['idx'] = $i;
         $resultados[] = $res;
 

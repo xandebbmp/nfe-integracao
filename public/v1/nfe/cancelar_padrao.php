@@ -5,6 +5,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
+require_once dirname(__DIR__, 3) . '/src/Support/HttpSecurity.php';
+$cfgSecurity = nfe_require_api_token();
+$debugRaw = nfe_debug_raw_enabled($cfgSecurity);
+
 /**
  * POST /v1/nfe/cancelar_padrao
  * (Também aceita GET para facilitar testes)
@@ -98,7 +102,7 @@ if (!is_file($scriptWeb)) {
     http_response_code(500);
     echo json_encode([
         'error' => 'Script fiscal de cancelamento não encontrado',
-        'expected' => $scriptWeb,
+        'expected' => $debugRaw ? $scriptWeb : null,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -228,14 +232,14 @@ if (($pdfPath === null || trim((string)$pdfPath) === '') && is_string($xmlGerado
 }
 
 // Paths no padrão do emitir_padrao (sempre presentes)
-$paths = [
+$paths = $debugRaw ? [
     'xmlGerado'   => $xmlGerado,  // procEvento
     'retEnvio'    => $retPath,    // retorno SEFAZ salvo
 
     // extras do cancelamento
     'pdf'         => $pdfPath,
     'request'     => $reqPath,
-];
+] : [];
 
 http_response_code(200);
 echo json_encode([
@@ -245,10 +249,11 @@ echo json_encode([
         'cStat' => $cStatEvt,
         'xMotivo' => $xMotivo,
         'chave' => $chave,
+        'message' => $status === 'ERRO' ? 'Falha ao processar cancelamento.' : 'Cancelamento processado.',
         'paths' => $paths,
-        'raw' => [
+        'raw' => nfe_maybe_raw([
             'exitCode' => $exitCode,
             'output' => $output,
-        ],
+        ], $cfgSecurity),
     ],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

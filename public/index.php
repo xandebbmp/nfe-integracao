@@ -9,6 +9,8 @@ declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
+require_once dirname(__DIR__) . '/src/Support/HttpSecurity.php';
+
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 // Caminho puro (sem querystring)
@@ -57,5 +59,7 @@ if (!$target || !is_file($target)) {
     ]);
     exit;
 }
+
+nfe_require_api_token();
 
 require $target;

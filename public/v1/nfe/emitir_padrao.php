@@ -5,6 +5,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
+require_once dirname(__DIR__, 3) . '/src/Support/HttpSecurity.php';
+$cfgSecurity = nfe_require_api_token();
+$debugSecurity = nfe_debug_raw_enabled($cfgSecurity);
+
 /**
  * POST /v1/nfe/emitir_padrao
  *
@@ -127,22 +131,29 @@ $autoload = $baseDir . '/vendor/autoload.php';
 $configFile = $baseDir . '/config/nfe.php';
 
 if (!is_file($autoload)) {
-    jsonOut(500, ['error' => 'vendor/autoload.php não encontrado', 'expected' => $autoload]);
+    jsonOut(500, [
+        'error' => 'vendor/autoload.php não encontrado',
+        'expected' => $debugSecurity ? $autoload : null,
+    ]);
 }
 if (!is_file($configFile)) {
-    jsonOut(500, ['error' => 'config/nfe.php não encontrado', 'expected' => $configFile]);
+    jsonOut(500, [
+        'error' => 'config/nfe.php não encontrado',
+        'expected' => $debugSecurity ? $configFile : null,
+    ]);
 }
 
 require $autoload;
 
 $cfg = require $configFile;
+$debugRaw = nfe_debug_raw_enabled($cfg);
 
 // CLI CAIXA-PRETA homologado
 $cliLote = $baseDir . '/public/lote_emitir.php';
 if (!is_file($cliLote)) {
     jsonOut(500, [
         'error' => 'Script CLI de lote não encontrado',
-        'expected' => $cliLote,
+        'expected' => $debugRaw ? $cliLote : null,
     ]);
 }
 
@@ -225,18 +236,18 @@ for ($i = 0; $i < count($notas); $i++) {
                 'tipo' => 'erro_tecnico',
                 'mensagem' => 'Falha interna ao preparar a emissão.',
             ],
-            'paths' => [
+            'paths' => $debugRaw ? [
                 'xmlGerado' => null,
                 'xmlAssinado' => null,
                 'retEnvio' => null,
                 'nfeProc' => null,
                 'relatorio' => null,
                 'pdf' => null,
-            ],
-            'raw' => [
+            ] : [],
+            'raw' => nfe_maybe_raw([
                 'exitCode' => 1,
                 'output' => "Falha ao salvar: {$jsonPath}",
-            ],
+            ], $cfg),
         ];
         continue;
     }
@@ -284,7 +295,7 @@ for ($i = 0; $i < count($notas); $i++) {
         $status = 'ERRO';
         $bloqueio = [
             'tipo' => 'erro_tecnico',
-            'mensagem' => 'Falha técnica no processamento. Verifique o retorno bruto (raw.output).',
+            'mensagem' => 'Falha técnica no processamento.',
         ];
     } else {
         $c = (string)($cStat ?? '');
@@ -316,7 +327,7 @@ for ($i = 0; $i < count($notas); $i++) {
                 $ok = false;
                 $bloqueio = [
                     'tipo' => 'erro_tecnico',
-                    'mensagem' => 'Falha técnica no processamento. Verifique o retorno bruto (raw.output).',
+                    'mensagem' => 'Falha técnica no processamento.',
                 ];
             } else {
                 $status = 'OK';
@@ -356,18 +367,18 @@ for ($i = 0; $i < count($notas); $i++) {
         'xMotivo' => $xMotivo,
         'chave' => $chave,
         'bloqueio' => $bloqueio, // <<< AQUI fica explícito para o usuário
-        'paths' => [
+        'paths' => $debugRaw ? [
             'xmlGerado' => $xmlGerado,
             'xmlAssinado' => $xmlAssinado,
             'retEnvio' => $retEnvio,
             'nfeProc' => $nfeProc,
             'relatorio' => $relatorio,
             'pdf' => $pdfPath,
-        ],
-        'raw' => [
+        ] : [],
+        'raw' => nfe_maybe_raw([
             'exitCode' => $exitCode,
             'output' => $output,
-        ],
+        ], $cfg),
     ];
 }
 

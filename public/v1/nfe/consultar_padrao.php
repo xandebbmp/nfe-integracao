@@ -5,6 +5,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
+require_once dirname(__DIR__, 3) . '/src/Support/HttpSecurity.php';
+$cfg = nfe_require_api_token();
+$debugRaw = nfe_debug_raw_enabled($cfg);
+
 /**
  * /v1/nfe/consultar_padrao
  *
@@ -103,10 +107,10 @@ if (is_file($cliScript)) {
     http_response_code(500);
     echo json_encode([
         'error' => 'Nenhum script de consulta encontrado',
-        'expected' => [
+        'expected' => $debugRaw ? [
             $cliScript,
             $webScript,
-        ],
+        ] : null,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -173,12 +177,13 @@ echo json_encode([
         'xMotivo' => $xMotivo,
         'chave' => $chaveOut,
         'protocolo' => $nProt,
-        'paths' => [
+        'message' => $status === 'ERRO' ? 'Falha na consulta da NF-e.' : 'Consulta processada.',
+        'paths' => $debugRaw ? [
             'xml' => $xmlPath,
-        ],
-        'raw' => [
+        ] : [],
+        'raw' => nfe_maybe_raw([
             'exitCode' => $exitCode,
             'output' => $output,
-        ],
+        ], $cfg),
     ],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
