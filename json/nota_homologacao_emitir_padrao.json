@@ -1,0 +1,138 @@
+{
+  "schema": "PL_010_V1.30",
+  "ide": {
+    "cUF": 29,
+    "natOp": "VENDA",
+    "mod": 55,
+    "serie": 1,
+    "nNF": 999026,
+    "dhEmi": "2026-06-25T10:00:00-03:00",
+    "tpNF": 1,
+    "idDest": 1,
+    "cMunFG": 2927408,
+    "tpImp": 1,
+    "tpEmis": 1,
+    "tpAmb": 2,
+    "finNFe": 1,
+    "indFinal": 1,
+    "indPres": 1,
+    "procEmi": 0,
+    "verProc": "NfePHP-wrapper"
+  },
+  "emit": {
+    "CNPJ": "07047183000140",
+    "xNome": "IPQ TECNOLOGIA LTDA",
+    "xFant": "IPQ TECNOLOGIA",
+    "IE": "64810708",
+    "CRT": 3,
+    "enderEmit": {
+      "xLgr": "RUA TESTE",
+      "nro": "100",
+      "xBairro": "CENTRO",
+      "cMun": 2927408,
+      "xMun": "SALVADOR",
+      "UF": "BA",
+      "CEP": "40000000",
+      "cPais": 1058,
+      "xPais": "BRASIL"
+    }
+  },
+  "dest": {
+    "CPF": "00000000191",
+    "xNome": "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
+    "indIEDest": 9,
+    "enderDest": {
+      "xLgr": "RUA TESTE DEST",
+      "nro": "200",
+      "xBairro": "CENTRO",
+      "cMun": 2927408,
+      "xMun": "SALVADOR",
+      "UF": "BA",
+      "CEP": "40000000",
+      "cPais": 1058,
+      "xPais": "BRASIL"
+    }
+  },
+  "itens": [
+    {
+      "nItem": 1,
+      "prod": {
+        "cProd": "001",
+        "cEAN": "SEM GTIN",
+        "xProd": "PRODUTO TESTE HOMOLOGACAO",
+        "NCM": "61091000",
+        "CFOP": "5102",
+        "uCom": "UN",
+        "qCom": 1,
+        "vUnCom": 10,
+        "vProd": 10,
+        "cEANTrib": "SEM GTIN",
+        "uTrib": "UN",
+        "qTrib": 1,
+        "vUnTrib": 10,
+        "indTot": 1
+      },
+      "imposto": {
+        "ICMS": {
+          "orig": 0,
+          "CST": "00",
+          "modBC": 3,
+          "vBC": 10,
+          "pICMS": 0,
+          "vICMS": 0
+        },
+        "PIS": {
+          "CST": "01",
+          "vBC": 0,
+          "pPIS": 0,
+          "vPIS": 0
+        },
+        "COFINS": {
+          "CST": "01",
+          "vBC": 0,
+          "pCOFINS": 0,
+          "vCOFINS": 0
+        }
+      }
+    }
+  ],
+  "totais": {
+    "ICMSTot": {
+      "vBC": 10,
+      "vICMS": 0,
+      "vICMSDeson": 0,
+      "vFCP": 0,
+      "vBCST": 0,
+      "vST": 0,
+      "vFCPST": 0,
+      "vFCPSTRet": 0,
+      "vProd": 10,
+      "vFrete": 0,
+      "vSeg": 0,
+      "vDesc": 0,
+      "vII": 0,
+      "vIPI": 0,
+      "vIPIDevol": 0,
+      "vPIS": 0,
+      "vCOFINS": 0,
+      "vOutro": 0,
+      "vNF": 10,
+      "vTotTrib": 0
+    }
+  },
+  "transp": {
+    "modFrete": 9
+  },
+  "pag": {
+    "detPag": [
+      {
+        "indPag": 0,
+        "tPag": "01",
+        "vPag": 10
+      }
+    ]
+  },
+  "infAdic": {
+    "infCpl": "EMISSAO DE TESTE EM HOMOLOGACAO"
+  }
+}
