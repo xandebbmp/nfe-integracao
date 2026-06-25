@@ -25,3 +25,6 @@ storage/logs/*
 # IDE
 .vscode/
 .idea/
+
+# Certificados e arquivos locais de certificado
+storage/certs/*
