@@ -24,6 +24,14 @@ Esta fase nao deve:
 - descompactar `docZip`;
 - processar documentos retornados automaticamente.
 
+## Decisoes apos mapeamento tecnico
+
+- O projeto atualmente nao possui dependencia de banco, ORM, PDO, mysqli, pg_connect, SQL ou migrations identificadas.
+- Portanto, a Fase 2 nao deve implementar persistencia sem antes definir o padrao de banco do projeto.
+- O controle de NSU deve usar sempre o CNPJ efetivo da configuracao carregada por `config/nfe.php`, ja considerando sobrescrita de `config/nfe.local.php`.
+- O CNPJ usado como chave logica nao deve vir do payload da requisicao.
+- A chave logica planejada continua sendo: CNPJ efetivo + `tpAmb` + `fonte`.
+
 ## 3. Tabela proposta: dfe_controle_nsu
 
 Tabela para armazenar o estado atual da distribuicao por CNPJ, ambiente e fonte.
