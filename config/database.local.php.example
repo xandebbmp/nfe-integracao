@@ -1,0 +1,11 @@
+<?php
+
+return [
+    'driver' => 'pgsql',
+    'host' => '127.0.0.1',
+    'port' => 5432,
+    'database' => 'nfephp_dev',
+    'username' => 'nfephp_app',
+    'password' => '140299',
+    'charset' => 'utf8',
+];

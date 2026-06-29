@@ -28,3 +28,6 @@ storage/logs/*
 
 # Certificados e arquivos locais de certificado
 storage/certs/*
+
+# Configuração local de banco fiscal
+config/database.local.php
