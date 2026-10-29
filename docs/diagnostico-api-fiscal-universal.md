@@ -381,35 +381,33 @@ sobe para logo depois de E2.
 
 ---
 
-## 12. Decisões que precisam de aprovação
+## 12. Decisões
 
-**Já definidas pelo Prompt Mestre (não dependem de aprovação):**
+Todas as decisões levantadas neste diagnóstico já estão respondidas pelo Prompt Mestre.
+A única aprovação pendente é a **do plano** (seção 14, Etapa 5: "Somente após apresentação e
+aprovação do diagnóstico e da proposta, iniciar alterações").
 
-- **PHP puro, sem framework** (seção 2: "não imponha microsserviços, frameworks ou padrões desnecessários").
-- **Consumidores com credenciais e escopos próprios** (seções 4 e 11).
-- **Consultar o autorizador antes de reenviar em caso de incerteza** (seção 8): o comportamento atual da branch será ajustado.
-- **Webhook assinado + consulta** como canais de resultado (seção 10); o WebSocket do monitor pertence ao Financeiro Universal.
-- **Minimização de dados clínicos** (seção 6.1); só o texto modelo da descrição depende de aprovação (D12).
-
-**Pendentes de aprovação:**
-
-| # | Decisão | Recomendação |
+| Tema | Fundamento no Prompt Mestre | Decisão |
 |---|---|---|
-| D2 | Commits da branch (segurança, multiempresa, numeração, fila) | Manter como base, refatorar para o núcleo em E1 e E2 e homologar em E0 (alternativa: descartar e refazer) |
-| D4 | Contratos | v2 canônico + v1 mantido; compat PlugNotas só se a API Node depender dele (preciso de exemplos reais de payload) |
-| D5 | Seleção de canal | Política em tabela, com vigência, aprovada por um responsável fiscal; regra inicial da seção 9.2 |
-| D6 | Prioridade | NFS-e Nacional (E4 e E5) antes de completar a NF-e (E7) |
-| D8 | Pacotes | `agrupamento` com modelo `POR_ATENDIMENTO` ou `CONSOLIDADO` e unicidade por atendimento e por pacote; o modelo de cada prestador é configuração aprovada |
-| D10 | NFS-e Nacional | Adaptador próprio sobre o manual oficial, avaliando bibliotecas da comunidade só como referência |
-| D11 | Armazenamento | Disco por CNPJ + backup agora; abstração para armazenamento de objetos depois |
-| D12 | Texto da descrição de serviços de saúde | Aprovar o modelo (ex.: "Serviço de psicoterapia realizado em DD/MM/AAAA, duração de XX minutos, profissional responsável, CRP/UF nº XXXXX"), validado com contador e jurídico |
+| Framework | §2: "Não imponha microsserviços, frameworks ou padrões desnecessários" | PHP puro + Composer, camadas hexagonais em `src/` |
+| Código existente e branch | §1 e §14: preservar o que estiver correto, não reiniciar | Manter; ajustar escopo por consumidor e consulta antes de reenviar; homologar em E0 |
+| Identidades | §4 e §11 | Consumidor com credenciais e escopos por empresa e operação, separado de emitente, profissional e titular financeiro |
+| Contratos | §7 e §7.1; §14 (compatibilidade) | v2 canônico; v1 preservado; compat PlugNotas como adaptador isolado |
+| Seleção do autorizador | §3.3 (fatores, CGSN 191/2026); §9 (canal não determinado é pendência) | Seletor por política com vigência; sem regra aplicável ou com dado ausente, pendência |
+| Ordem de entrega | §14 (ordem de menor risco); §6 (primeiro caso: Fura Fila, serviços) | Plano da seção 10, com NFS-e Nacional antes da NF-e completa |
+| Incerteza na transmissão | §8 | Consultar o autorizador antes de qualquer nova transmissão |
+| Resultado aos consumidores | §10 | Consulta + webhook assinado com proteção contra replay; o WebSocket do monitor pertence ao Financeiro Universal |
+| Pacotes | §6.3 | API suporta emissão por atendimento e consolidada e impede duplicidade; o modelo vem da solicitação ou da política do prestador |
+| Bibliotecas | §3.1 | Usar bibliotecas confiáveis quando tecnicamente adequadas; a NFS-e Nacional é avaliada tecnicamente no início de E4 |
+| Armazenamento | §10; implantação em VPS | Disco por CNPJ, artefatos com hash e versão, backup, acesso por porta trocável |
+| Dados clínicos | §6.1 | Minimização; descrição pelo modelo do prompt, configurável por política; logs mascarados |
 
-**Informações necessárias para destravar etapas:**
+**Insumos por etapa (solicitados quando a etapa começar):**
 
-1. Regime tributário de cada emitente (Simples/MEI ou regime normal) e se algum emite mercadoria.
-2. Situação do Nota Salvador: manual atual, credenciais e ambiente de homologação.
-3. Exemplos reais dos payloads que a API Node.js envia hoje (formato PlugNotas).
-4. Liberar na rede desta sessão os domínios `www.gov.br`, `nfse.sefaz.salvador.ba.gov.br`,
-   `www2.sefaz.salvador.ba.gov.br` e `www.nfe.fazenda.gov.br`, para conferir manuais e versões
-   oficiais.
-5. Certificado A1 de homologação para a etapa E0.
+| Etapa | Insumo |
+|---|---|
+| E0 | Certificado A1 para homologação |
+| E4 | Acesso de rede da sessão aos portais oficiais (`www.gov.br`, `www.nfe.fazenda.gov.br`) para conferir manuais e XSD vigentes |
+| E5 | Cadastro dos prestadores (dados ausentes viram pendência, §9) |
+| E6 | Manual atual, credenciais e ambiente de homologação do Nota Salvador; acesso de rede a `nfse.sefaz.salvador.ba.gov.br` e `www2.sefaz.salvador.ba.gov.br` |
+| E9 | Exemplos reais dos payloads enviados pela API Node.js |
