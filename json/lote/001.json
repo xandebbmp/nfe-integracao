@@ -141,7 +141,7 @@
       {
         "nItem": 1,
         "IBSCBS": {
-          "CST": "00",
+          "CST": "000",
           "cClassTrib": "000000",
           "vBC": 10.00,
           "pIBSUF": 0.00,
@@ -152,7 +152,7 @@
           "vCBS": 0.00
         },
         "IS": {
-          "CSTIS": "00",
+          "CSTIS": "000",
           "cClassTribIS": "000000",
           "vBCIS": 0.00,
           "pIS": 0.00,
@@ -162,7 +162,7 @@
       {
         "nItem": 2,
         "IBSCBS": {
-          "CST": "00",
+          "CST": "000",
           "cClassTrib": "000000",
           "vBC": 40.00,
           "pIBSUF": 0.00,
@@ -173,7 +173,7 @@
           "vCBS": 0.00
         },
         "IS": {
-          "CSTIS": "00",
+          "CSTIS": "000",
           "cClassTribIS": "000000",
           "vBCIS": 0.00,
           "pIS": 0.00,
