@@ -91,6 +91,10 @@ try {
     $xmlAssinado = $tools->signNFe($xml);
 } catch (Throwable $e) {
     @file_put_contents($dirRet . DIRECTORY_SEPARATOR . 'erro_assinatura_' . date('Ymd_His') . '.txt', $e->getMessage());
+    // signNFe valida o XSD: erro nos dados, não foi enviada (número continua livre).
+    if ($e instanceof \NFePHP\Common\Exception\ValidatorException) {
+        $marcar('REJEITADO', null, mb_substr('Falha validação XSD: ' . $e->getMessage(), 0, 1000));
+    }
     fail("Erro ao assinar: " . $e->getMessage());
 }
 
@@ -104,6 +108,8 @@ if (method_exists($tools, 'validate')) {
         $tools->validate($xmlAssinado);
     } catch (Throwable $e) {
         @file_put_contents($dirRet . DIRECTORY_SEPARATOR . 'erro_xsd_' . date('Ymd_His') . '.txt', $e->getMessage());
+        // Erro nos dados: não foi enviada, o número continua livre para a versão corrigida.
+        $marcar('REJEITADO', null, mb_substr('Falha validação XSD: ' . $e->getMessage(), 0, 1000));
         fail("Falha validação XSD: " . $e->getMessage());
     }
 }
