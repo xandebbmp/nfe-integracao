@@ -96,7 +96,7 @@ function emitirUmaNota(array $nota, string $baseDir): array {
     try {
         // 1) gerar XML
         $tmpArg = escapeshellarg($tmpJson);
-        [$c1, $out1] = run("php {$emitScript} {$tmpArg}");
+        [$c1, $out1] = run(nfe_cmd_env() . "php {$emitScript} {$tmpArg}");
         if ($c1 !== 0) {
             return [
                 'status' => 'ERRO_GERAR_XML',
@@ -116,7 +116,7 @@ function emitirUmaNota(array $nota, string $baseDir): array {
 
         // 2) assinar + enviar
         $xmlArg = escapeshellarg($xmlPath);
-        [$c2, $out2] = run("php {$sendScript} {$xmlArg}");
+        [$c2, $out2] = run(nfe_cmd_env() . "php {$sendScript} {$xmlArg}");
 
         $parsed = parseEnvioOutput($out2);
 

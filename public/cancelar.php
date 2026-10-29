@@ -12,7 +12,7 @@ use Xande\NfeIntegracao\Support\Io;
 
 header('Content-Type: text/plain; charset=utf-8');
 
-$cfg = require __DIR__ . '/../config/nfe.php';
+$cfg = nfe_config();
 $svc = new NfeService($cfg);
 
 // ========================

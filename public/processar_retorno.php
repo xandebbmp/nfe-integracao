@@ -8,7 +8,7 @@ nfe_require_fiscal_access();
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$cfg = require __DIR__ . '/../config/nfe.php';
+$cfg = nfe_config();
 
 $xmlAssinadoPath = $cfg['pathXml'] . '/nfe-assinada.xml';
 $retEnvioPath    = $cfg['pathXml'] . '/ret-enviolote.xml';

@@ -8,7 +8,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Xande\NfeIntegracao\NfeService;
 
-$cfg = require __DIR__ . '/../config/nfe.php';
+$cfg = nfe_config();
 $svc = new NfeService($cfg);
 
 $tools = $svc->tools();

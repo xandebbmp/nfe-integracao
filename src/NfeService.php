@@ -40,8 +40,9 @@ final class NfeService
             throw new \RuntimeException('Falha ao montar JSON do Tools.');
         }
 
-        $pfx = file_get_contents($cfg['certPfxPath']);
-        if ($pfx === false) {
+        // Multiempresa: PFX vem decifrado do banco; senão, do arquivo da config.
+        $pfx = $cfg['certPfxContent'] ?? @file_get_contents((string)$cfg['certPfxPath']);
+        if ($pfx === false || $pfx === '') {
             throw new \RuntimeException('Não consegui ler o PFX em: ' . $cfg['certPfxPath']);
         }
 

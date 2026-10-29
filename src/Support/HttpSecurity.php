@@ -17,6 +17,60 @@ function nfe_load_config(): array
     return is_array($cfg) ? $cfg : [];
 }
 
+/**
+ * CNPJ da empresa solicitada: header X-NFE-EMPRESA (HTTP) ou NFE_EMPRESA_CNPJ (CLI).
+ */
+function nfe_empresa_solicitada(): string
+{
+    $raw = nfe_is_cli() ? (string)getenv('NFE_EMPRESA_CNPJ') : nfe_request_header('X-NFE-EMPRESA');
+    return strtoupper(preg_replace('/[^A-Za-z0-9]+/', '', $raw) ?? '');
+}
+
+/**
+ * Config efetiva: base (config/nfe.php) + empresa solicitada (banco).
+ * Chame somente depois da autenticacao.
+ */
+function nfe_config(): array
+{
+    static $cache = [];
+
+    $cnpj = nfe_empresa_solicitada();
+    if (isset($cache[$cnpj])) {
+        return $cache[$cnpj];
+    }
+
+    $cfg = nfe_load_config();
+    if ($cnpj !== '') {
+        require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
+        try {
+            $cfg = \Xande\NfeIntegracao\Empresa\EmpresaContexto::aplicar($cfg, $cnpj);
+        } catch (Throwable $e) {
+            if (nfe_is_cli()) {
+                fwrite(STDERR, 'Empresa: ' . $e->getMessage() . PHP_EOL);
+                exit(1);
+            }
+            http_response_code(422);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'error' => 'Empresa invalida',
+                'message' => $e->getMessage(),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+    }
+
+    return $cache[$cnpj] = $cfg;
+}
+
+/**
+ * Prefixo de ambiente para repassar a empresa a scripts CLI chamados via exec.
+ */
+function nfe_cmd_env(): string
+{
+    $cnpj = nfe_empresa_solicitada();
+    return $cnpj === '' ? '' : 'NFE_EMPRESA_CNPJ=' . escapeshellarg($cnpj) . ' ';
+}
+
 function nfe_request_header(string $name): string
 {
     $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));

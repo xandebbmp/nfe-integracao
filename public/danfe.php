@@ -12,7 +12,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use NFePHP\DA\NFe\Danfe;
 use Xande\NfeIntegracao\NfeService;
 
-$cfg = require __DIR__ . '/../config/nfe.php';
+$cfg = nfe_config();
 $nfe = new NfeService($cfg);
 
 // chave via GET ?chave=...

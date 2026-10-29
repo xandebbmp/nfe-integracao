@@ -124,7 +124,7 @@ require $autoload;
 use Xande\NfeIntegracao\NfeService;
 use Xande\NfeIntegracao\Support\Io;
 
-$cfg = require $configFile;
+$cfg = nfe_config();
 $svc = new NfeService($cfg);
 $debugRaw = nfe_debug_raw_enabled($cfg);
 

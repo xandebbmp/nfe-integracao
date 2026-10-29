@@ -6,7 +6,7 @@ nfe_require_fiscal_access();
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$cfg = require __DIR__ . '/../config/nfe.php';
+$cfg = nfe_config();
 
 $svc = new Xande\NfeIntegracao\NfeService($cfg);
 echo $svc->ping() . PHP_EOL;

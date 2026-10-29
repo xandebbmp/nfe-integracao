@@ -7,5 +7,5 @@
 
 Options -Indexes
 
-RedirectMatch 404 ^/(.*/)?(storage|config|vendor|src|database|docs|documentacao|json)(/|$)
+RedirectMatch 404 ^/(.*/)?(storage|config|vendor|src|bin|database|docs|documentacao|json)(/|$)
 RedirectMatch 404 ^/(.*/)?(composer\.(json|lock)|test_cli\.php|\.git.*)$

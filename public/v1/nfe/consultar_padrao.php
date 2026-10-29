@@ -78,7 +78,7 @@ $output = '';
  * - Senão, incluímos o script web existente (se existir).
  */
 if (is_file($cliScript)) {
-    $cmd = sprintf('php %s %s', escapeshellarg($cliScript), escapeshellarg($chave));
+    $cmd = nfe_cmd_env() . sprintf('php %s %s', escapeshellarg($cliScript), escapeshellarg($chave));
     $outLines = [];
     $code = 0;
     exec($cmd . ' 2>&1', $outLines, $code);

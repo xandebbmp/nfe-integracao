@@ -44,6 +44,14 @@ if (is_file($localConfigFile)) {
     $cfg = array_replace($cfg, $localCfg);
 }
 
+// VPS: segredos por variável de ambiente (SetEnv/PHP-FPM) têm precedência sobre arquivos.
+foreach (['apiToken' => 'NFE_API_TOKEN', 'cnfSecret' => 'NFE_CNF_SECRET', 'masterKey' => 'NFE_MASTER_KEY'] as $key => $env) {
+    $value = getenv($env);
+    if ($value !== false && $value !== '') {
+        $cfg[$key] = $value;
+    }
+}
+
 // dhEmi/dhEvento precisam do fuso da UF; servidor em UTC gera rejeicao 703.
 date_default_timezone_set((string)$cfg['timezone']);
 

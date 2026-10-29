@@ -9,7 +9,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use Xande\NfeIntegracao\NfeService;
 use Xande\NfeIntegracao\Support\Io;
 
-$cfg = require __DIR__ . '/../config/nfe.php';
+$cfg = nfe_config();
 $svc = new NfeService($cfg);
 
 header('Content-Type: text/plain; charset=utf-8');

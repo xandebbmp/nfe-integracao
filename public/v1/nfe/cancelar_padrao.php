@@ -186,7 +186,7 @@ $ok = ($status !== 'ERRO');
 if (($pdfPath === null || trim((string)$pdfPath) === '') && is_string($xmlGerado) && trim($xmlGerado) !== '') {
     $cfgFile = $baseDir . '/config/nfe.php';
     if (is_file($cfgFile)) {
-        $cfg = require $cfgFile;
+        $cfg = nfe_config();
 
         $pdfDirCanc = rtrim((string)($cfg['pathPdf'] ?? ($baseDir . '/storage/pdf')), "/\\")
             . DIRECTORY_SEPARATOR . 'eventos' . DIRECTORY_SEPARATOR . 'canc';

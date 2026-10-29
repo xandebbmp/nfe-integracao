@@ -184,7 +184,7 @@ if (($pdfPath === null || trim((string)$pdfPath) === '') && is_string($xmlGerado
 
     $cfgFile = $baseDir . '/config/nfe.php';
     if (is_file($cfgFile)) {
-        $cfg = require $cfgFile;
+        $cfg = nfe_config();
 
         $pdfDirCce = rtrim((string)($cfg['pathPdf'] ?? ($baseDir . '/storage/pdf')), "/\\")
             . DIRECTORY_SEPARATOR . 'eventos' . DIRECTORY_SEPARATOR . 'cce';
