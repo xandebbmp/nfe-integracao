@@ -1,0 +1,26 @@
+# /etc/apache2/sites-available/nfe-api.conf
+# Ajuste ServerName e o caminho do projeto. HTTPS: sudo certbot --apache -d nfe-api.seudominio.com.br
+
+<VirtualHost *:80>
+    ServerName nfe-api.seudominio.com.br
+
+    # Somente public/ é servido: storage/ (certificados e XMLs), config/ e vendor/ ficam fora da web.
+    DocumentRoot /var/www/nfe-integracao/public
+
+    <Directory /var/www/nfe-integracao/public>
+        AllowOverride None
+        Require all granted
+        Options -Indexes
+        FallbackResource /index.php
+    </Directory>
+
+    # Opcional: segredos por ambiente em vez de config/nfe.local.php.
+    # Se usar, deixe este arquivo com chmod 640 (root:root).
+    # SetEnv NFE_API_TOKEN  "..."
+    # SetEnv NFE_CNF_SECRET "..."
+    # SetEnv NFE_MASTER_KEY "..."
+
+    ServerSignature Off
+    ErrorLog ${APACHE_LOG_DIR}/nfe-api-error.log
+    CustomLog ${APACHE_LOG_DIR}/nfe-api-access.log combined
+</VirtualHost>
