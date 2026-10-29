@@ -7,6 +7,8 @@ nfe_require_fiscal_access();
 require __DIR__ . '/../vendor/autoload.php';
 
 use NFePHP\NFe\Make;
+use Xande\NfeIntegracao\Database\ConnectionFactory;
+use Xande\NfeIntegracao\Nfe\DocumentoStore;
 use Xande\NfeIntegracao\Support\ChaveAcesso;
 
 function dieMsg(string $msg, int $code = 1): void {
@@ -55,7 +57,7 @@ function add2(string $a, string $b): string {
     return number_format($fa + $fb, 2, '.', '');
 }
 
-$cfg = require __DIR__ . '/../config/nfe.php';
+$cfg = nfe_config();
 
 $argFile = $argv[1] ?? null;
 if (!$argFile) dieMsg("Informe o JSON. Ex: php public/emitir_json_pl010.php json/nota.json");
@@ -95,6 +97,79 @@ if (!$ide || !$emit || !$dest || !is_array($itens) || count($itens) === 0 || !$t
     dieMsg("JSON faltando blocos obrigatórios: ide/emit/dest/itens/totais.ICMSTot");
 }
 
+// O certificado é do emitente configurado (ou da empresa selecionada).
+$cnpjEmit = ChaveAcesso::normalizarCnpj((string)($emit['CNPJ'] ?? ''));
+$cnpjCfg = ChaveAcesso::normalizarCnpj((string)($cfg['cnpj'] ?? ''));
+if ($cnpjEmit !== '' && $cnpjEmit !== $cnpjCfg) {
+    dieMsg("emit.CNPJ={$cnpjEmit} diferente da empresa configurada ({$cnpjCfg}).");
+}
+
+$tpAmbCfg = (int)($cfg['tpAmb'] ?? 2);
+
+/**
+ * Numeração e idempotência (multiempresa / banco fiscal)
+ *
+ * - idIntegracao identifica a nota no sistema consumidor.
+ * - Mesma nota com envio pendente/incerto: devolve o MESMO XML (mesma chave, mesmo digest),
+ *   para o envio cair em duplicidade 204 e recuperar o protocolo.
+ * - Rejeitada: regera com o mesmo nNF (o número não foi consumido na SEFAZ).
+ */
+$store = null;
+$idIntegracao = trim((string)($data['idIntegracao'] ?? ''));
+$payloadHash = hash('sha256', json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION));
+
+if (!empty($cfg['empresaId'])) {
+    $store = new DocumentoStore(ConnectionFactory::make());
+    $store->pdo()->beginTransaction(); // commit só depois do XML salvo; dieMsg() aborta = rollback
+
+    $modDoc = (int)($ide['mod'] ?? 55);
+    $serieDoc = (int)($ide['serie'] ?? 1);
+    $nNFInformado = (int)($ide['nNF'] ?? 0);
+
+    $doc = null;
+    if ($idIntegracao !== '') {
+        $doc = $store->buscarPorIdIntegracao($cnpjCfg, $tpAmbCfg, $idIntegracao);
+    }
+    if ($doc === null && $nNFInformado > 0) {
+        $doc = $store->buscarPorNumero($cnpjCfg, $tpAmbCfg, $modDoc, $serieDoc, $nNFInformado);
+        if ($doc !== null && (string)($doc['id_integracao'] ?? '') !== $idIntegracao) {
+            dieMsg("nNF {$nNFInformado} (série {$serieDoc}) já pertence a outra nota (idIntegracao=" . ($doc['id_integracao'] ?? '-') . ").");
+        }
+    }
+
+    if ($doc !== null) {
+        $status = (string)$doc['status'];
+
+        if ($status === 'DENEGADO') {
+            dieMsg("Nota {$doc['chave']} foi DENEGADA: não pode ser reemitida.");
+        }
+
+        if ($status === 'AUTORIZADO' || in_array($status, DocumentoStore::STATUS_PENDENTES, true)) {
+            if ($status !== 'AUTORIZADO' && $doc['payload_hash'] !== $payloadHash) {
+                dieMsg("Nota {$doc['chave']} tem envio pendente ({$status}); reenvie o mesmo conteúdo ou consulte a chave antes de alterar.");
+            }
+            $xmlExistente = (string)($doc['xml_gerado_path'] ?? '');
+            if ($xmlExistente === '' || !is_file($xmlExistente)) {
+                dieMsg("Nota {$doc['chave']} ({$status}) sem XML gerado em disco: {$xmlExistente}");
+            }
+            $store->pdo()->commit();
+            echo $xmlExistente . PHP_EOL;
+            exit(0);
+        }
+
+        // REJEITADO: regera com o mesmo número
+        $ide['nNF'] = (int)$doc['nnf'];
+    } elseif ($nNFInformado > 0) {
+        $store->acompanharNumero($cnpjCfg, $tpAmbCfg, $modDoc, $serieDoc, $nNFInformado);
+    } else {
+        $ide['nNF'] = $store->reservarNumero($cnpjCfg, $tpAmbCfg, $modDoc, $serieDoc);
+    }
+
+    if (!isNonEmpty($ide['dhEmi'] ?? null)) {
+        $ide['dhEmi'] = date('c');
+    }
+}
+
 $schema = (string)($data['schema'] ?? 'PL_010_V1.30');
 $isPl010v130 = ($schema === 'PL_010_V1.30');
 
@@ -120,15 +195,13 @@ $o->mod      = (int)$ide['mod'];
 $o->serie    = (int)$ide['serie'];
 
 $o->nNF = (int)($ide['nNF'] ?? 0);
-if ($o->nNF <= 0) dieMsg("JSON sem ide.nNF válido (precisa ser > 0)");
+if ($o->nNF <= 0) dieMsg("JSON sem ide.nNF válido (precisa ser > 0; sem banco fiscal o número é obrigatório)");
 
 // O ambiente é o das Tools (config); divergência seria rejeitada pela SEFAZ (252).
-$tpAmbCfg = (int)($cfg['tpAmb'] ?? 2);
 if (isset($ide['tpAmb']) && isNonEmpty($ide['tpAmb']) && (int)$ide['tpAmb'] !== $tpAmbCfg) {
     dieMsg("ide.tpAmb={$ide['tpAmb']} diverge do ambiente configurado (tpAmb={$tpAmbCfg}).");
 }
 
-$cnpjEmit = ChaveAcesso::normalizarCnpj((string)($emit['CNPJ'] ?? ''));
 if (isset($ide['cNF']) && isNonEmpty($ide['cNF'])) {
     $o->cNF = (string)$ide['cNF'];
 } else {
@@ -205,7 +278,7 @@ $make->tagenderEmit($eeo);
  * autXML (BA exige)
  */
 $autXmlRows = is_array($autXml) ? $autXml : [];
-if (count($autXmlRows) === 0) {
+if (count($autXmlRows) === 0 && ($cfg['siglaUF'] ?? '') === 'BA') {
     $autXmlRows[] = ['CNPJ' => (string)($cfg['autxml_ba_cnpj'] ?? '13937073000156')];
 }
 foreach ($autXmlRows as $row) {
@@ -546,6 +619,25 @@ $path = $dir . DIRECTORY_SEPARATOR . "NFe-{$chaveGerada}.xml";
 
 if (file_put_contents($path, $xml) === false) {
     dieMsg("Não consegui salvar o XML em: {$path}");
+}
+
+if ($store !== null) {
+    $destDoc = ChaveAcesso::normalizarCnpj((string)($dest['CNPJ'] ?? $dest['CPF'] ?? ''));
+    $store->registrarGerado([
+        'cnpj' => $cnpjCfg,
+        'tp_amb' => $tpAmbCfg,
+        'modelo' => $o->mod,
+        'serie' => $o->serie,
+        'nnf' => $o->nNF,
+        'id_integracao' => $idIntegracao !== '' ? $idIntegracao : null,
+        'payload_hash' => $payloadHash,
+        'chave' => $chaveGerada,
+        'dh_emi' => $o->dhEmi,
+        'v_nf' => dec2($tot['vNF'] ?? 0),
+        'dest_documento' => $destDoc !== '' ? $destDoc : null,
+        'xml_gerado_path' => $path,
+    ]);
+    $store->pdo()->commit();
 }
 
 echo $path . PHP_EOL;

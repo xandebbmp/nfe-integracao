@@ -8,6 +8,8 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use NFePHP\NFe\Common\Standardize;
 use NFePHP\NFe\Complements;
+use Xande\NfeIntegracao\Database\ConnectionFactory;
+use Xande\NfeIntegracao\Nfe\DocumentoStore;
 use Xande\NfeIntegracao\NfeService;
 
 /**
@@ -60,12 +62,21 @@ if (!is_file($cfgPhpPath)) {
     fail("config/nfe.php não encontrado em: {$cfgPhpPath}");
 }
 
-$cfg = require $cfgPhpPath;
-if (!is_array($cfg)) {
-    fail("config/nfe.php não retornou array.");
-}
+$cfg = nfe_config();
 
 $nfe = new NfeService($cfg);
+
+// ===== ESTADO NO BANCO FISCAL (multiempresa) =====
+$chaveDoc = preg_match('/Id="NFe(\d{44})"/', $xml, $mkDoc) ? $mkDoc[1] : '';
+$store = (!empty($cfg['empresaId']) && $chaveDoc !== '') ? new DocumentoStore(ConnectionFactory::make()) : null;
+if ($store !== null && $store->buscarPorChave($chaveDoc) === null) {
+    $store = null; // XML gerado fora do fluxo com banco
+}
+$marcar = static function (string $status, ?string $cStat = null, ?string $xMotivo = null, ?string $nProt = null, ?string $proc = null) use ($store, $chaveDoc): void {
+    if ($store !== null) {
+        $store->atualizarStatus($chaveDoc, $status, $cStat, $xMotivo, $nProt, $proc);
+    }
+};
 $tools = $nfe->tools();
 
 // ===== DIRETÓRIOS (PADRÃO DO PROJETO) =====
@@ -101,10 +112,14 @@ if (method_exists($tools, 'validate')) {
 $idLote = str_pad((string)random_int(1, 999999999999999), 15, '0', STR_PAD_LEFT);
 $indSinc = 1;
 
+$marcar('ENVIADO');
+
 try {
     $response = $tools->sefazEnviaLote([$xmlAssinado], $idLote, $indSinc);
 } catch (Throwable $e) {
     @file_put_contents($dirRet . DIRECTORY_SEPARATOR . 'erro_envio_' . $idLote . '_' . date('Ymd_His') . '.txt', $e->getMessage());
+    // Resultado incerto (pode ter chegado na SEFAZ): reenviar o mesmo XML depois.
+    $marcar('ERRO_ENVIO', null, mb_substr($e->getMessage(), 0, 500));
     fail("Erro ao enviar para SEFAZ: " . $e->getMessage());
 }
 
@@ -124,6 +139,8 @@ echo "XML Assinado: {$assPath}\n";
 echo "Retorno salvo: {$retPath}\n";
 
 if ($cStat !== '104') {
+    // 108/109: serviço paralisado — não processou; demais: lote rejeitado (número livre).
+    $marcar(in_array($cStat, ['108', '109'], true) ? 'ERRO_ENVIO' : 'REJEITADO', $cStat, $xMotivo);
     echo "NF-e NÃO finalizada. (cStat do lote != 104). Veja o retorno salvo.\n";
     exit(2);
 }
@@ -144,6 +161,7 @@ if (!$infProt) {
 
 $cStatProt   = (string)($infProt->cStat ?? '');
 $xMotivoProt = (string)($infProt->xMotivo ?? '');
+$nProt       = (string)($infProt->nProt ?? '');
 
 echo "Protocolo: cStat={$cStatProt} xMotivo={$xMotivoProt}\n";
 
@@ -181,6 +199,7 @@ if ($cStatProt === '204') {
 
     $cStatProt   = (string)($infProtCons->cStat ?? '');
     $xMotivoProt = (string)($infProtCons->xMotivo ?? '');
+    $nProt       = (string)($infProtCons->nProt ?? '');
     $respostaProt = $retCons;
 
     echo "Situação consulta: cStat=" . (string)($stdCons->cStat ?? '') . " xMotivo=" . (string)($stdCons->xMotivo ?? '') . "\n";
@@ -193,6 +212,7 @@ $autorizada = in_array($cStatProt, ['100', '150'], true);
 $denegada   = in_array($cStatProt, ['110', '205', '301', '302', '303'], true);
 
 if (!$autorizada && !$denegada) {
+    $marcar('REJEITADO', $cStatProt, $xMotivoProt);
     echo "NF-e REJEITADA / NÃO AUTORIZADA. Verifique retorno: {$retPath}\n";
     exit(2);
 }
@@ -202,6 +222,9 @@ if ($denegada) {
     // Se você quiser tratar denegada como falha operacional, descomente:
     // exit(2);
 }
+
+// Resultado da SEFAZ já é definitivo: grava antes de montar o nfeProc.
+$marcar($autorizada ? 'AUTORIZADO' : 'DENEGADO', $cStatProt, $xMotivoProt, $nProt);
 
 // ===== 5) MONTA NFEPROC E SALVA =====
 try {
@@ -215,6 +238,8 @@ try {
 // Salva com padrão: NFe-CHAVE-procNFe.xml
 $autPath = $dirAut . DIRECTORY_SEPARATOR . basename($xmlPath, '.xml') . '-procNFe.xml';
 file_put_contents($autPath, $nfeProc);
+
+$marcar($autorizada ? 'AUTORIZADO' : 'DENEGADO', $cStatProt, $xMotivoProt, $nProt, $autPath);
 
 echo "nfeProc salvo: {$autPath}\n";
 echo "OK ✅\n";

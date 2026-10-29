@@ -145,7 +145,7 @@ if (!is_file($configFile)) {
 
 require $autoload;
 
-$cfg = require $configFile;
+$cfg = nfe_config();
 $debugRaw = nfe_debug_raw_enabled($cfg);
 
 // CLI CAIXA-PRETA homologado
@@ -252,7 +252,7 @@ for ($i = 0; $i < count($notas); $i++) {
         continue;
     }
 
-    $cmd = sprintf('php %s %s', escapeshellarg($cliLote), escapeshellarg($loteDir));
+    $cmd = nfe_cmd_env() . sprintf('php %s %s', escapeshellarg($cliLote), escapeshellarg($loteDir));
     [$exitCode, $output] = runCmd($cmd);
 
     // ===== Parse derivado =====

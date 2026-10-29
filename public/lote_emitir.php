@@ -67,7 +67,10 @@ $emitScript = escapeshellarg($baseDir . '/public/emitir_json_pl010.php');
 $sendScript = escapeshellarg($baseDir . '/public/assinar_enviar_sincrono.php');
 
 // caminhos padrão do seu projeto
-$dirAutorizados = $baseDir . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'xml' . DIRECTORY_SEPARATOR . 'autorizados';
+// (multiempresa: pathXml já aponta para a pasta da empresa)
+$cfg = nfe_config();
+$pathXml = rtrim((string)$cfg['pathXml'], "/\\");
+$dirAutorizados = $pathXml . DIRECTORY_SEPARATOR . 'autorizados';
 
 echo "=== LOTE NF-e (sequencial) ===\n";
 echo "Pasta: {$absDir}\n";
@@ -130,7 +133,13 @@ foreach ($files as $file) {
     if (is_file($procPath) && filesize($procPath) > 200) {
         $skipped++;
         echo "PULADO ✅ (já autorizada)\n";
-        echo "procNFe existente: {$procPath}\n\n";
+        echo "procNFe existente: {$procPath}\n";
+        // Repete o protocolo original para quem lê a saída (emitir_padrao/api.php) classificar.
+        $procXml = (string)@file_get_contents($procPath);
+        if (preg_match('~<infProt.*?<cStat>(\d+)</cStat>\s*<xMotivo>([^<]*)</xMotivo>~s', $procXml, $mp)) {
+            echo "Protocolo: cStat={$mp[1]} xMotivo={$mp[2]}\n";
+        }
+        echo "\n";
         $report[] = [
             'json' => basename($file),
             'status' => 'PULADO_JA_AUTORIZADA',
@@ -191,7 +200,7 @@ echo "PULADOS: {$skipped}\n";
 echo "FALHAS: {$fail}\n";
 
 // salva um report simples em storage/xml/retornos
-$reportDir = $baseDir . '/storage/xml/retornos';
+$reportDir = $pathXml . '/retornos';
 @mkdir($reportDir, 0775, true);
 
 $reportFile = $reportDir . '/ret-lote-' . date('Ymd_His') . '.txt';
