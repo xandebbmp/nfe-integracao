@@ -127,7 +127,7 @@ de artefatos com hash; reconciliação periódica com a SEFAZ; testes automatiza
 | 5 | Integração com o Financeiro por ACL | Ausente | [F] o contrato atual é o formato NFePHP, sem camada anticorrupção |
 | 6 | Fura Fila (serviços profissionais) | Ausente | sem contrato de serviço, profissional ou pacote |
 | 7 | Contrato canônico, idempotência validada no servidor | Ausente / Com ajustes | [F] `idIntegracao` existe; o contrato não é canônico |
-| 7.1 | Compatibilidade com PlugNotas e Node.js | Pendente de comprovação | formato do PlugNotas usado hoje não está no repositório |
+| 7.1 | Compatibilidade com consumidores existentes (API Node.js) | Com ajustes | [F] `idIntegracao` já aceito; v1 preservado. PlugNotas fora do escopo |
 | 8 | Ciclo de vida e histórico auditável | Com ajustes | [F] estados existem, mas são sobrescritos; sem "pendente de intervenção" |
 | 9 | Central de pendências | Ausente | |
 | 10 | Artefatos, versões, webhook assinado | Ausente / Com ajustes | [F] arquivos em disco por CNPJ, sem hash, sem índice, sem webhook |
@@ -247,8 +247,8 @@ de artefatos com hash; reconciliação periódica com a SEFAZ; testes automatiza
    lugar, sem histórico.
 6. **Logs e artefatos.** XML e saída completa vão para disco e para `emissao_fila.saida`. Não há
    política de mascaramento (LGPD) nem hash dos artefatos.
-7. **Pontos positivos:** `idIntegracao` já existe e é compatível com a API Node.js intermediária
-   e com o hábito do PlugNotas; PostgreSQL próprio; convenção de scripts SQL; documentação de
+7. **Pontos positivos:** `idIntegracao` já existe e é compatível com a API Node.js intermediária;
+   PostgreSQL próprio; convenção de scripts SQL; documentação de
    decisões.
 
 ---
@@ -271,7 +271,6 @@ src/
   Entrada/
     Http/v1/          endpoints atuais (compatibilidade)
     Http/v2/          contrato canônico
-    Http/Compat/      adaptador de formato PlugNotas (opcional, isolado)
     Cli/              worker, administração
 ```
 
@@ -326,7 +325,7 @@ src/
 - **Pacotes**: o campo `agrupamento` (id do pacote + modelo `POR_ATENDIMENTO` ou `CONSOLIDADO`)
   com regra de unicidade: o mesmo atendimento não pode ser documentado duas vezes, nem o pacote
   consolidado duas vezes.
-- **v1** mantido, delegando ao núcleo. **Compat PlugNotas** em um adaptador isolado, se aprovado.
+- **v1** mantido, delegando ao núcleo. **PlugNotas está fora do escopo**: não haverá camada de compatibilidade com esse formato.
 - **Resposta padrão**: id da solicitação, id do documento, tipo, status, código e motivo, número e
   série, chave ou id oficial, protocolo, links de XML e PDF, datas, histórico e próximos estados.
 
@@ -351,7 +350,6 @@ fila com `SKIP LOCKED`; convenção SQL; documentação de DF-e; guia da VPS.
 | E6 | NFS-e Salvador | Adaptador ABRASF com RPS e consulta por RPS | manual e credencial da prefeitura [NC] | autorizada e rejeitada em homologação municipal | manual desatualizado ou ambiente indisponível |
 | E7 | NF-e completa | CSOSN, ST, DIFAL, FCP, IPI, CEST, transporte, cobrança, `NFref`, contingência, totais calculados, grupos de IBS/CBS por vigência | E2 | uma emissão homologada por grupo tributário | enquadramento incorreto: virar pendência, não chute |
 | E8 | Recebidas e tomadas | DF-e completo (`docZip`, NSU, manifestação) e distribuição do ADN | E3 | NSU sem lacunas; bloqueio 656 respeitado | consumo indevido (656) |
-| E9 | Compat PlugNotas | Adaptador de formato, se aprovado | E3 | contrato reproduzindo os payloads reais da API Node | formato real ainda desconhecido |
 
 **[Rec] Justificativa da ordem.** E0 a E2 dão confiabilidade ao que já existe. E4 e E5 vêm antes
 de E7 porque o primeiro consumidor real (Fura Fila) emite **serviço**, e o prazo do Simples já
@@ -392,7 +390,7 @@ aprovação do diagnóstico e da proposta, iniciar alterações").
 | Framework | §2: "Não imponha microsserviços, frameworks ou padrões desnecessários" | PHP puro + Composer, camadas hexagonais em `src/` |
 | Código existente e branch | §1 e §14: preservar o que estiver correto, não reiniciar | Manter; ajustar escopo por consumidor e consulta antes de reenviar; homologar em E0 |
 | Identidades | §4 e §11 | Consumidor com credenciais e escopos por empresa e operação, separado de emitente, profissional e titular financeiro |
-| Contratos | §7 e §7.1; §14 (compatibilidade) | v2 canônico; v1 preservado; compat PlugNotas como adaptador isolado |
+| Contratos | §7 e §7.1; §14 (compatibilidade); orientação posterior do responsável | v2 canônico; v1 preservado; **sem camada PlugNotas** |
 | Seleção do autorizador | §3.3 (fatores, CGSN 191/2026); §9 (canal não determinado é pendência) | Seletor por política com vigência; sem regra aplicável ou com dado ausente, pendência |
 | Ordem de entrega | §14 (ordem de menor risco); §6 (primeiro caso: Fura Fila, serviços) | Plano da seção 10, com NFS-e Nacional antes da NF-e completa |
 | Incerteza na transmissão | §8 | Consultar o autorizador antes de qualquer nova transmissão |
@@ -410,4 +408,3 @@ aprovação do diagnóstico e da proposta, iniciar alterações").
 | E4 | Acesso de rede da sessão aos portais oficiais (`www.gov.br`, `www.nfe.fazenda.gov.br`) para conferir manuais e XSD vigentes |
 | E5 | Cadastro dos prestadores (dados ausentes viram pendência, §9) |
 | E6 | Manual atual, credenciais e ambiente de homologação do Nota Salvador; acesso de rede a `nfse.sefaz.salvador.ba.gov.br` e `www2.sefaz.salvador.ba.gov.br` |
-| E9 | Exemplos reais dos payloads enviados pela API Node.js |
