@@ -15,7 +15,7 @@ $debugSecurity = nfe_debug_raw_enabled($cfgSecurity);
  * Saída:
  *  - status padronizado + cStat/xMotivo + raw
  *  - AUTORIZADO: cStat 100/150 (gera DANFE se existir nfeProc)
- *  - DENEGADO:  cStat 110/301/302 (ok=false, NÃO pode usar, NÃO reenviar, NÃO gera PDF)
+ *  - DENEGADO:  cStat 110/205/301/302/303 (ok=false, NÃO pode usar, NÃO reenviar, NÃO gera PDF)
  *  - REJEITADO: outros cStat (ok=false, pode corrigir e reenviar)
  *  - ERRO:      falha técnica (exitCode != 0 / fatal / exception)
  */
@@ -301,7 +301,7 @@ for ($i = 0; $i < count($notas); $i++) {
         $c = (string)($cStat ?? '');
 
         $isAut = in_array($c, ['100', '150'], true);
-        $isDen = in_array($c, ['110', '301', '302'], true);
+        $isDen = in_array($c, ['110', '205', '301', '302', '303'], true);
 
         if ($isAut) {
             $status = 'AUTORIZADO';

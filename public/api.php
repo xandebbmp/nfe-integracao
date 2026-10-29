@@ -64,9 +64,11 @@ function parseEnvioOutput(string $out): array {
         $r['cStatLote'] = $m[1];
         $r['xMotivoLote'] = trim($m[2]);
     }
-    if (preg_match('/Protocolo:\s*cStat=([0-9]+)\s*xMotivo=(.+)\s*$/mi', $out, $m)) {
-        $r['cStatProt'] = $m[1];
-        $r['xMotivoProt'] = trim($m[2]);
+    // Último protocolo vale (em duplicidade 204 o protocolo recuperado vem depois).
+    if (preg_match_all('/Protocolo:\s*cStat=([0-9]+)\s*xMotivo=(.+)\s*$/mi', $out, $m, PREG_SET_ORDER)) {
+        $last = $m[count($m) - 1];
+        $r['cStatProt'] = $last[1];
+        $r['xMotivoProt'] = trim($last[2]);
     }
     if (preg_match('/^XML Assinado:\s*(.+)\s*$/mi', $out, $m)) {
         $r['xmlAssinado'] = trim($m[1], " \t\n\r\0\x0B\"'");
@@ -132,10 +134,10 @@ function emitirUmaNota(array $nota, string $baseDir): array {
             ];
         }
 
-        // “OK” aqui significa: script terminou com exit(0).
-        // Você ainda pode conferir cStatProt=100/110/301/302 se quiser ser mais rígido.
+        // exit(0) também acontece para denegada: classifica pelo cStat do protocolo.
+        $denegada = in_array((string)$parsed['cStatProt'], ['110', '205', '301', '302', '303'], true);
         return [
-            'status' => 'OK',
+            'status' => $denegada ? 'DENEGADO' : 'OK',
             'idIntegracao' => $idIntegracao,
             'xmlGerado' => $xmlPath,
             'xmlAssinado' => $parsed['xmlAssinado'],

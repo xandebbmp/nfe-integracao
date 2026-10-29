@@ -27,6 +27,12 @@ $cfg = [
   // Defina valores reais apenas em config/nfe.local.php.
   'apiToken' => '',
   'debugRawOutput' => false,
+
+  // Segredo usado para derivar o cNF de forma deterministica (mesma nota => mesma chave em retentativas).
+  // Vazio: usa o hash do certificado PFX como segredo.
+  'cnfSecret' => '',
+
+  'timezone' => 'America/Bahia',
 ];
 
 $localConfigFile = __DIR__ . '/nfe.local.php';
@@ -37,5 +43,8 @@ if (is_file($localConfigFile)) {
     }
     $cfg = array_replace($cfg, $localCfg);
 }
+
+// dhEmi/dhEvento precisam do fuso da UF; servidor em UTC gera rejeicao 703.
+date_default_timezone_set((string)$cfg['timezone']);
 
 return $cfg;

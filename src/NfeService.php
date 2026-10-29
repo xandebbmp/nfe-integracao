@@ -25,7 +25,7 @@ final class NfeService
             'tpAmb'       => (int)$cfg['tpAmb'],
             'razaosocial' => (string)$cfg['razao'],
             'siglaUF'     => (string)$cfg['siglaUF'],
-            'cnpj'        => preg_replace('/\D+/', '', (string)$cfg['cnpj']),
+            'cnpj'        => \Xande\NfeIntegracao\Support\ChaveAcesso::normalizarCnpj((string)$cfg['cnpj']),
             'ie'          => preg_replace('/\D+/', '', (string)($cfg['ie'] ?? '')),
             // >>> NÃO hardcode: usa do config, com default correto
             'schemes'     => (string)($cfg['schemes'] ?? 'PL_010_V1.30'),

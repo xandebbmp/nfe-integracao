@@ -147,8 +147,8 @@ foreach ($files as $file) {
     if ($c2 !== 0) {
     // Se o script de envio falhar mas tiver Protocolo cStat=100/150, considera AUTORIZADA
         $cStatProt = '';
-        if (preg_match('/Protocolo:\s*cStat=(\d+)/', $out2, $m)) {
-            $cStatProt = $m[1];
+        if (preg_match_all('/Protocolo:\s*cStat=(\d+)/', $out2, $m)) {
+            $cStatProt = $m[1][count($m[1]) - 1];
         }
 
         if (in_array($cStatProt, ['100', '150'], true)) {

@@ -147,11 +147,50 @@ $xMotivoProt = (string)($infProt->xMotivo ?? '');
 
 echo "Protocolo: cStat={$cStatProt} xMotivo={$xMotivoProt}\n";
 
-// ===== CORREÇÃO AQUI =====
+// XML que contém o protNFe usado para montar o nfeProc
+$respostaProt = $response;
+
+// ===== 4.1) DUPLICIDADE (204): a nota já foi recebida antes (ex.: timeout na 1ª tentativa) =====
+// Com cNF determinístico a chave é a mesma; recupera o protocolo pela consulta.
+if ($cStatProt === '204') {
+    $chave = preg_match('/Id="NFe(\d{44})"/', $xmlAssinado, $mk) ? $mk[1] : '';
+    if ($chave === '') {
+        fail("Duplicidade (204), mas não consegui extrair a chave do XML assinado.");
+    }
+
+    try {
+        $retCons = $tools->sefazConsultaChave($chave);
+    } catch (Throwable $e) {
+        fail("Duplicidade (204) e falha ao consultar a chave {$chave}: " . $e->getMessage());
+    }
+
+    $consPath = $dirRet . DIRECTORY_SEPARATOR . 'ret_consulta_' . $chave . '_' . date('Ymd_His') . '.xml';
+    file_put_contents($consPath, $retCons);
+    echo "Duplicidade (204): consulta da chave salva: {$consPath}\n";
+
+    $stdCons = (new Standardize())->toStd($retCons);
+    $protCons = $stdCons->protNFe ?? null;
+    if (is_array($protCons)) {
+        $protCons = $protCons[0] ?? null;
+    }
+    $infProtCons = $protCons->infProt ?? null;
+    if (!$infProtCons) {
+        echo "Consulta sem protocolo: cStat=" . (string)($stdCons->cStat ?? '') . " xMotivo=" . (string)($stdCons->xMotivo ?? '') . "\n";
+        exit(2);
+    }
+
+    $cStatProt   = (string)($infProtCons->cStat ?? '');
+    $xMotivoProt = (string)($infProtCons->xMotivo ?? '');
+    $respostaProt = $retCons;
+
+    echo "Situação consulta: cStat=" . (string)($stdCons->cStat ?? '') . " xMotivo=" . (string)($stdCons->xMotivo ?? '') . "\n";
+    echo "Protocolo: cStat={$cStatProt} xMotivo={$xMotivoProt}\n";
+}
+
 // Autorizada: 100/150
-// Denegada: 110/301/302
+// Denegada: 110/205/301/302/303
 $autorizada = in_array($cStatProt, ['100', '150'], true);
-$denegada   = in_array($cStatProt, ['110', '301', '302'], true);
+$denegada   = in_array($cStatProt, ['110', '205', '301', '302', '303'], true);
 
 if (!$autorizada && !$denegada) {
     echo "NF-e REJEITADA / NÃO AUTORIZADA. Verifique retorno: {$retPath}\n";
@@ -166,13 +205,8 @@ if ($denegada) {
 
 // ===== 5) MONTA NFEPROC E SALVA =====
 try {
-    if (method_exists($tools, 'addProt')) {
-        // versões que têm addProt
-        $nfeProc = $tools->addProt($xmlAssinado, $response);
-    } else {
-        // fallback: usa Complements
-        $nfeProc = Complements::toAuthorize($xmlAssinado, $response);
-    }
+    // Valida chave + digest: se a 1ª tentativa tinha XML diferente, falha aqui (tratar manualmente).
+    $nfeProc = Complements::toAuthorize($xmlAssinado, $respostaProt);
 } catch (Throwable $e) {
     @file_put_contents($dirRet . DIRECTORY_SEPARATOR . 'erro_addProt_' . date('Ymd_His') . '.txt', $e->getMessage());
     fail("Erro ao montar nfeProc: " . $e->getMessage());

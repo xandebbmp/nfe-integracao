@@ -7,6 +7,7 @@ nfe_require_fiscal_access();
 require __DIR__ . '/../vendor/autoload.php';
 
 use NFePHP\NFe\Make;
+use Xande\NfeIntegracao\Support\ChaveAcesso;
 
 function dieMsg(string $msg, int $code = 1): void {
     fwrite(STDERR, $msg . PHP_EOL);
@@ -114,18 +115,37 @@ $make->taginfNFe($inf);
 $o = new stdClass();
 $o->cUF = (int)$ide['cUF'];
 
-if (isset($ide['cNF']) && isNonEmpty($ide['cNF'])) {
-    $o->cNF = (string)$ide['cNF'];
-} else {
-    $o->cNF = str_pad((string)random_int(1, 99999999), 8, '0', STR_PAD_LEFT);
-}
-
 $o->natOp    = (string)$ide['natOp'];
 $o->mod      = (int)$ide['mod'];
 $o->serie    = (int)$ide['serie'];
 
 $o->nNF = (int)($ide['nNF'] ?? 0);
 if ($o->nNF <= 0) dieMsg("JSON sem ide.nNF válido (precisa ser > 0)");
+
+// O ambiente é o das Tools (config); divergência seria rejeitada pela SEFAZ (252).
+$tpAmbCfg = (int)($cfg['tpAmb'] ?? 2);
+if (isset($ide['tpAmb']) && isNonEmpty($ide['tpAmb']) && (int)$ide['tpAmb'] !== $tpAmbCfg) {
+    dieMsg("ide.tpAmb={$ide['tpAmb']} diverge do ambiente configurado (tpAmb={$tpAmbCfg}).");
+}
+
+$cnpjEmit = ChaveAcesso::normalizarCnpj((string)($emit['CNPJ'] ?? ''));
+if (isset($ide['cNF']) && isNonEmpty($ide['cNF'])) {
+    $o->cNF = (string)$ide['cNF'];
+} else {
+    // Determinístico: reenviar o mesmo JSON gera a mesma chave (evita nota autorizada "perdida").
+    try {
+        $o->cNF = ChaveAcesso::cnfDeterministico(
+            ChaveAcesso::segredo($cfg),
+            $cnpjEmit !== '' ? $cnpjEmit : onlyDigits((string)($emit['CPF'] ?? '')),
+            $tpAmbCfg,
+            $o->mod,
+            $o->serie,
+            $o->nNF
+        );
+    } catch (Throwable $e) {
+        dieMsg("Falha ao gerar cNF: " . $e->getMessage());
+    }
+}
 
 $o->dhEmi    = (string)$ide['dhEmi'];
 $o->tpNF     = (int)$ide['tpNF'];
@@ -134,7 +154,7 @@ $o->cMunFG   = (int)$ide['cMunFG'];
 $o->tpImp    = (int)$ide['tpImp'];
 $o->tpEmis   = (int)$ide['tpEmis'];
 $o->cDV      = null;
-$o->tpAmb    = (int)($ide['tpAmb'] ?? (int)($cfg['tpAmb'] ?? 2));
+$o->tpAmb    = $tpAmbCfg;
 $o->finNFe   = (int)$ide['finNFe'];
 $o->indFinal = (int)$ide['indFinal'];
 $o->indPres  = (int)$ide['indPres'];
@@ -161,7 +181,7 @@ $e->IM    = (string)($emit['IM'] ?? "");
 $e->CNAE  = (string)($emit['CNAE'] ?? "");
 $e->CRT   = (int)$emit['CRT'];
 
-if (!empty($emit['CNPJ'])) $e->CNPJ = onlyDigits((string)$emit['CNPJ']);
+if ($cnpjEmit !== '') $e->CNPJ = $cnpjEmit;
 if (!empty($emit['CPF']))  $e->CPF  = onlyDigits((string)$emit['CPF']);
 
 $make->tagemit($e);
@@ -191,7 +211,7 @@ if (count($autXmlRows) === 0) {
 foreach ($autXmlRows as $row) {
     $row = (array)$row;
     $ax = new stdClass();
-    if (!empty($row['CNPJ'])) $ax->CNPJ = onlyDigits((string)$row['CNPJ']);
+    if (!empty($row['CNPJ'])) $ax->CNPJ = ChaveAcesso::normalizarCnpj((string)$row['CNPJ']);
     if (!empty($row['CPF']))  $ax->CPF  = onlyDigits((string)$row['CPF']);
     if (!empty($ax->CNPJ) || !empty($ax->CPF)) $make->tagautXML($ax);
 }
@@ -205,7 +225,7 @@ $d->indIEDest = (int)$dest['indIEDest'];
 $d->IE        = (string)($dest['IE'] ?? "");
 $d->email     = (string)($dest['email'] ?? "");
 
-if (!empty($dest['CNPJ'])) $d->CNPJ = onlyDigits((string)$dest['CNPJ']);
+if (!empty($dest['CNPJ'])) $d->CNPJ = ChaveAcesso::normalizarCnpj((string)$dest['CNPJ']);
 if (!empty($dest['CPF']))  $d->CPF  = onlyDigits((string)$dest['CPF']);
 
 $make->tagdest($d);

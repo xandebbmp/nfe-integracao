@@ -6,9 +6,14 @@ return [
     'certPfxPath' => __DIR__ . '/../storage/certs/SEU_CERTIFICADO.pfx',
     'certPassword' => 'SENHA_DO_CERTIFICADO_AQUI',
 
-    // Opcional: quando preenchido, os wrappers HTTP/JSON exigem o header X-NFE-API-TOKEN.
+    // Obrigatorio para uso HTTP: sem ele todas as rotas respondem 503.
+    // Os clientes enviam o valor no header X-NFE-API-TOKEN.
     'apiToken' => 'TOKEN_INTERNO_FORTE_AQUI',
 
-    // Opcional: habilita raw.output apenas com token valido (ou local sem token configurado).
+    // Recomendado: segredo fixo para derivar o cNF (ex.: bin2hex(random_bytes(32))).
+    // Nao troque depois de comecar a emitir, senao retentativas geram outra chave.
+    'cnfSecret' => 'SEGREDO_CNF_AQUI',
+
+    // Opcional: habilita raw.output apenas para requisicoes com token valido.
     'debugRawOutput' => false,
 ];
