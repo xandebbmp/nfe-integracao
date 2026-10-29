@@ -383,20 +383,26 @@ sobe para logo depois de E2.
 
 ## 12. Decisões que precisam de aprovação
 
+**Já definidas pelo Prompt Mestre (não dependem de aprovação):**
+
+- **PHP puro, sem framework** (seção 2: "não imponha microsserviços, frameworks ou padrões desnecessários").
+- **Consumidores com credenciais e escopos próprios** (seções 4 e 11).
+- **Consultar o autorizador antes de reenviar em caso de incerteza** (seção 8): o comportamento atual da branch será ajustado.
+- **Webhook assinado + consulta** como canais de resultado (seção 10); o WebSocket do monitor pertence ao Financeiro Universal.
+- **Minimização de dados clínicos** (seção 6.1); só o texto modelo da descrição depende de aprovação (D12).
+
+**Pendentes de aprovação:**
+
 | # | Decisão | Recomendação |
 |---|---|---|
-| D1 | Framework | Manter PHP puro + Composer com camadas hexagonais; sem framework completo |
 | D2 | Commits da branch (segurança, multiempresa, numeração, fila) | Manter como base, refatorar para o núcleo em E1 e E2 e homologar em E0 (alternativa: descartar e refazer) |
-| D3 | Identidades | Criar "Consumidor" com tokens próprios (guardados como hash) e escopos por empresa e operação; substitui o token único |
 | D4 | Contratos | v2 canônico + v1 mantido; compat PlugNotas só se a API Node depender dele (preciso de exemplos reais de payload) |
 | D5 | Seleção de canal | Política em tabela, com vigência, aprovada por um responsável fiscal; regra inicial da seção 9.2 |
 | D6 | Prioridade | NFS-e Nacional (E4 e E5) antes de completar a NF-e (E7) |
-| D7 | Resultado para os consumidores | Webhook assinado + consulta; o WebSocket do monitor fica no Financeiro Universal |
 | D8 | Pacotes | `agrupamento` com modelo `POR_ATENDIMENTO` ou `CONSOLIDADO` e unicidade por atendimento e por pacote; o modelo de cada prestador é configuração aprovada |
-| D9 | Reenvio em incerteza | Consultar sempre antes de reenviar (muda o comportamento atual da branch) |
 | D10 | NFS-e Nacional | Adaptador próprio sobre o manual oficial, avaliando bibliotecas da comunidade só como referência |
 | D11 | Armazenamento | Disco por CNPJ + backup agora; abstração para armazenamento de objetos depois |
-| D12 | Dados clínicos | O contrato aceita só o necessário para a descrição fiscal; logs mascarados; descrição montada por modelo aprovado |
+| D12 | Texto da descrição de serviços de saúde | Aprovar o modelo (ex.: "Serviço de psicoterapia realizado em DD/MM/AAAA, duração de XX minutos, profissional responsável, CRP/UF nº XXXXX"), validado com contador e jurídico |
 
 **Informações necessárias para destravar etapas:**
 
