@@ -1,0 +1,11 @@
+# Defesa para quando o document root do Apache aponta para a raiz do projeto
+# (ex.: WAMP em http://localhost/nfe-integracao/). O ideal em produção é o
+# document root ser a pasta public/.
+#
+# Certificados (storage/certs), XMLs fiscais, configs e vendor nunca podem
+# ser servidos por HTTP.
+
+Options -Indexes
+
+RedirectMatch 404 ^/(.*/)?(storage|config|vendor|src|database|docs|documentacao|json)(/|$)
+RedirectMatch 404 ^/(.*/)?(composer\.(json|lock)|test_cli\.php|\.git.*)$

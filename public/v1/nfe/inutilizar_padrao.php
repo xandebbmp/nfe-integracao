@@ -11,7 +11,7 @@ $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
 
 /**
  * POST /v1/nfe/inutilizar_padrao
- * (Também aceita GET para facilitar testes)
+ * (Somente POST: operação fiscal irreversível não pode ser disparada por GET.)
  *
  * Estrutura espelhada do cancelar_padrao:
  * - inclui o fiscal existente (public/inutilizar.php) sem alterar lógica
@@ -20,11 +20,10 @@ $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
  *
  * Entrada:
  *  - POST JSON: {"ano":"26","serie":1,"ini":10,"fim":20,"just":"...>=15..."}
- *  - ou GET: ?ano=26&serie=1&ini=10&fim=20&just=...
  */
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-if (!in_array($method, ['GET', 'POST'], true)) {
+if ($method !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Método não permitido'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -36,34 +35,26 @@ $ini   = 0;
 $fim   = 0;
 $just  = 'Inutilização por numeração não utilizada.';
 
-if ($method === 'GET') {
-    $ano   = (string)($_GET['ano'] ?? '');
-    $serie = (int)($_GET['serie'] ?? 1);
-    $ini   = (int)($_GET['ini'] ?? 0);
-    $fim   = (int)($_GET['fim'] ?? 0);
-    $just  = (string)($_GET['just'] ?? $just);
-} else {
-    $rawBody = file_get_contents('php://input') ?: '';
-    $rawBodyTrim = trim($rawBody);
+$rawBody = file_get_contents('php://input') ?: '';
+$rawBodyTrim = trim($rawBody);
 
-    if ($rawBodyTrim !== '') {
-        $decoded = json_decode($rawBodyTrim, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            $ano   = (string)($decoded['ano'] ?? '');
-            $serie = (int)($decoded['serie'] ?? 1);
-            $ini   = (int)($decoded['ini'] ?? 0);
-            $fim   = (int)($decoded['fim'] ?? 0);
-            $just  = (string)($decoded['just'] ?? $just);
-        }
+if ($rawBodyTrim !== '') {
+    $decoded = json_decode($rawBodyTrim, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $ano   = (string)($decoded['ano'] ?? '');
+        $serie = (int)($decoded['serie'] ?? 1);
+        $ini   = (int)($decoded['ini'] ?? 0);
+        $fim   = (int)($decoded['fim'] ?? 0);
+        $just  = (string)($decoded['just'] ?? $just);
     }
-
-    // fallback form-data
-    if ($ano === '') $ano = (string)($_POST['ano'] ?? '');
-    if (!isset($decoded['serie'])) $serie = (int)($_POST['serie'] ?? $serie);
-    if (!isset($decoded['ini']))   $ini   = (int)($_POST['ini'] ?? $ini);
-    if (!isset($decoded['fim']))   $fim   = (int)($_POST['fim'] ?? $fim);
-    if (!isset($decoded['just']))  $just  = (string)($_POST['just'] ?? $just);
 }
+
+// fallback form-data
+if ($ano === '') $ano = (string)($_POST['ano'] ?? '');
+if (!isset($decoded['serie'])) $serie = (int)($_POST['serie'] ?? $serie);
+if (!isset($decoded['ini']))   $ini   = (int)($_POST['ini'] ?? $ini);
+if (!isset($decoded['fim']))   $fim   = (int)($_POST['fim'] ?? $fim);
+if (!isset($decoded['just']))  $just  = (string)($_POST['just'] ?? $just);
 
 $ano = trim($ano);
 if ($ano === '') $ano = date('y'); // mesmo default do fiscal

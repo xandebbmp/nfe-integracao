@@ -6,6 +6,6 @@ return [
     'port' => 5432,
     'database' => 'nfephp_dev',
     'username' => 'nfephp_app',
-    'password' => '140299',
+    'password' => 'SENHA_DO_BANCO_AQUI',
     'charset' => 'utf8',
 ];

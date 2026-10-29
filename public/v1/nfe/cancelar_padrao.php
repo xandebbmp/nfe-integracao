@@ -11,11 +11,10 @@ $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
 
 /**
  * POST /v1/nfe/cancelar_padrao
- * (Também aceita GET para facilitar testes)
+ * (Somente POST: operação fiscal irreversível não pode ser disparada por GET.)
  *
  * Entrada:
  *  - POST JSON: {"chave":"44digitos","protocolo":"nProt","just":"...>=15..."}
- *  - ou GET: ?chave=...&protocolo=...&just=...
  *
  * Execução:
  *  - NÃO altera o script fiscal.
@@ -27,7 +26,7 @@ $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
  */
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-if (!in_array($method, ['GET', 'POST'], true)) {
+if ($method !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Método não permitido'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -51,28 +50,22 @@ $chave = '';
 $protocolo = '';
 $just = 'Cancelamento por solicitação do cliente.';
 
-if ($method === 'GET') {
-    $chave     = (string)($_GET['chave'] ?? '');
-    $protocolo = (string)($_GET['protocolo'] ?? '');
-    $just      = (string)($_GET['just'] ?? $just);
-} else {
-    $rawBody = file_get_contents('php://input') ?: '';
-    $rawBodyTrim = trim($rawBody);
+$rawBody = file_get_contents('php://input') ?: '';
+$rawBodyTrim = trim($rawBody);
 
-    if ($rawBodyTrim !== '') {
-        $decoded = json_decode($rawBodyTrim, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            $chave     = (string)($decoded['chave'] ?? '');
-            $protocolo = (string)($decoded['protocolo'] ?? '');
-            $just      = (string)($decoded['just'] ?? $just);
-        }
+if ($rawBodyTrim !== '') {
+    $decoded = json_decode($rawBodyTrim, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $chave     = (string)($decoded['chave'] ?? '');
+        $protocolo = (string)($decoded['protocolo'] ?? '');
+        $just      = (string)($decoded['just'] ?? $just);
     }
-
-    // fallback form-data
-    if ($chave === '') $chave = (string)($_POST['chave'] ?? '');
-    if ($protocolo === '') $protocolo = (string)($_POST['protocolo'] ?? '');
-    if (!isset($decoded['just'])) $just = (string)($_POST['just'] ?? $just);
 }
+
+// fallback form-data
+if ($chave === '') $chave = (string)($_POST['chave'] ?? '');
+if ($protocolo === '') $protocolo = (string)($_POST['protocolo'] ?? '');
+if (!isset($decoded['just'])) $just = (string)($_POST['just'] ?? $just);
 
 $chave = onlyDigits($chave);
 $protocolo = onlyDigits($protocolo);

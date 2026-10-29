@@ -11,11 +11,10 @@ $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
 
 /**
  * POST /v1/nfe/cce_padrao
- * (Também aceita GET para facilitar testes)
+ * (Somente POST: operação fiscal irreversível não pode ser disparada por GET.)
  *
  * Entrada:
  *  - POST JSON: {"chave":"44digitos","texto":"...>=15...","seq":1}
- *  - ou GET: ?chave=...&texto=...&seq=1
  *
  * Execução:
  *  - NÃO altera o script fiscal.
@@ -27,7 +26,7 @@ $debugRaw = nfe_debug_raw_enabled($cfgSecurity);
  */
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-if (!in_array($method, ['GET', 'POST'], true)) {
+if ($method !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Método não permitido'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -52,28 +51,22 @@ $chave = '';
 $texto = '';
 $seq = 1;
 
-if ($method === 'GET') {
-    $chave = (string)($_GET['chave'] ?? '');
-    $texto = (string)($_GET['texto'] ?? '');
-    $seq   = (int)($_GET['seq'] ?? 1);
-} else {
-    $rawBody = file_get_contents('php://input') ?: '';
-    $rawBodyTrim = trim($rawBody);
+$rawBody = file_get_contents('php://input') ?: '';
+$rawBodyTrim = trim($rawBody);
 
-    if ($rawBodyTrim !== '') {
-        $decoded = json_decode($rawBodyTrim, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            $chave = (string)($decoded['chave'] ?? '');
-            $texto = (string)($decoded['texto'] ?? '');
-            $seq   = (int)($decoded['seq'] ?? 1);
-        }
+if ($rawBodyTrim !== '') {
+    $decoded = json_decode($rawBodyTrim, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $chave = (string)($decoded['chave'] ?? '');
+        $texto = (string)($decoded['texto'] ?? '');
+        $seq   = (int)($decoded['seq'] ?? 1);
     }
-
-    // fallback form-data
-    if ($chave === '') $chave = (string)($_POST['chave'] ?? '');
-    if ($texto === '') $texto = (string)($_POST['texto'] ?? '');
-    if (!isset($decoded['seq'])) $seq = (int)($_POST['seq'] ?? $seq);
 }
+
+// fallback form-data
+if ($chave === '') $chave = (string)($_POST['chave'] ?? '');
+if ($texto === '') $texto = (string)($_POST['texto'] ?? '');
+if (!isset($decoded['seq'])) $seq = (int)($_POST['seq'] ?? $seq);
 
 $chave = onlyDigits($chave);
 $texto = trim($texto);

@@ -36,6 +36,7 @@ $routes = [
     'GET' => [
         '/v1/nfe/consultar_padrao' => __DIR__ . '/v1/nfe/consultar_padrao.php',
         '/v1/nfe/status_padrao'    => __DIR__ . '/v1/nfe/status_padrao.php',
+        '/v1/nfe/dfe_padrao'       => __DIR__ . '/v1/nfe/dfe_padrao.php',
     ],
 
     'POST' => [
@@ -43,6 +44,7 @@ $routes = [
         '/v1/nfe/cce_padrao' => __DIR__ . '/v1/nfe/cce_padrao.php',
         '/v1/nfe/cancelar_padrao' => __DIR__ . '/v1/nfe/cancelar_padrao.php',
         '/v1/nfe/inutilizar_padrao' => __DIR__ . '/v1/nfe/inutilizar_padrao.php',
+        '/v1/nfe/dfe_padrao' => __DIR__ . '/v1/nfe/dfe_padrao.php',
 
     ],
 ];

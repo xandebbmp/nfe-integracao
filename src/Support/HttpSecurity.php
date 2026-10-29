@@ -61,9 +61,19 @@ function nfe_request_has_valid_token(array $cfg): bool
 function nfe_require_api_token(?array $cfg = null): array
 {
     $cfg = $cfg ?? nfe_load_config();
-    $expected = nfe_configured_api_token($cfg);
-    if ($expected === '') {
+    if (nfe_is_cli()) {
         return $cfg;
+    }
+
+    // Fail-closed: sem token configurado, nenhuma rota HTTP fica aberta.
+    if (nfe_configured_api_token($cfg) === '') {
+        http_response_code(503);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'error' => 'Service Unavailable',
+            'message' => 'apiToken nao configurado em config/nfe.local.php.',
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
     }
 
     if (!nfe_request_has_valid_token($cfg)) {
@@ -79,12 +89,6 @@ function nfe_require_api_token(?array $cfg = null): array
     return $cfg;
 }
 
-function nfe_is_local_request(): bool
-{
-    $addr = (string)($_SERVER['REMOTE_ADDR'] ?? '');
-    return in_array($addr, ['', '127.0.0.1', '::1'], true);
-}
-
 function nfe_debug_raw_enabled(?array $cfg = null): bool
 {
     $cfg = $cfg ?? nfe_load_config();
@@ -92,11 +96,8 @@ function nfe_debug_raw_enabled(?array $cfg = null): bool
         return false;
     }
 
-    if (nfe_configured_api_token($cfg) !== '') {
-        return nfe_request_has_valid_token($cfg);
-    }
-
-    return nfe_is_local_request();
+    // Atras de proxy reverso REMOTE_ADDR e sempre 127.0.0.1; por isso o debug exige token valido.
+    return nfe_is_cli() || nfe_request_has_valid_token($cfg);
 }
 
 function nfe_maybe_raw(array $raw, ?array $cfg = null): ?array
