@@ -87,7 +87,21 @@ sudo -u www-data php bin/empresa.php numeracao --cnpj=41986662000160 --serie=1 -
 
 A senha do PFX é pedida no terminal (ou `NFE_PFX_SENHA`), para não ficar no histórico do shell.
 
-## 7. Firewall
+## 7. Worker de emissão
+
+A emissão por `POST /v1/nfe/lotes` é processada pelo worker (ver `docs/fila-emissao.md`):
+
+```bash
+sudo cp deploy/nfe-worker@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nfe-worker@1 nfe-worker@2
+journalctl -u 'nfe-worker@*' -f
+```
+
+Dois workers bastam para começar; a SEFAZ leva alguns segundos por nota.
+Depois de atualizar o código: `sudo systemctl restart 'nfe-worker@*'`.
+
+## 8. Firewall
 
 ```bash
 sudo ufw allow OpenSSH && sudo ufw allow 'Apache Full' && sudo ufw enable
@@ -95,7 +109,7 @@ sudo ufw allow OpenSSH && sudo ufw allow 'Apache Full' && sudo ufw enable
 
 Se o Financeiro Universal tiver IP fixo, restrinja a API a ele (no vhost: `Require ip ...`).
 
-## 8. Backup (obrigatório)
+## 9. Backup (obrigatório)
 
 XML de NF-e deve ser guardado por 5 anos. Copie diariamente para fora da VPS:
 
@@ -103,11 +117,12 @@ XML de NF-e deve ser guardado por 5 anos. Copie diariamente para fora da VPS:
 - `pg_dump -Fc nfephp` (empresas, certificados cifrados, numeração, documentos);
 - a `masterKey` (separada do backup do banco: um sem o outro não abre os certificados).
 
-## 9. Conferência
+## 10. Conferência
 
 ```bash
 curl -s https://nfe-api.seudominio.com.br/health
 curl -s -H "X-NFE-API-TOKEN: $TOKEN" -H "X-NFE-EMPRESA: 41986662000160" \
   https://nfe-api.seudominio.com.br/v1/nfe/status_padrao
 sudo -u www-data php bin/empresa.php vencimentos --dias=30
+systemctl status 'nfe-worker@*'
 ```
