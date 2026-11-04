@@ -128,9 +128,9 @@ final class ProvedorFactory
             return $this->certificadoFixo;
         }
 
-        return $this->certificados[$emitente['cnpj']] ??= CertificadoCliente::doArquivo(
-            (string)($emitente['certificado']['arquivo'] ?? ''),
-            (string)($emitente['certificado']['senha'] ?? '')
+        return $this->certificados[$emitente['cnpj']] ??= CertificadoCliente::doEmitente(
+            $emitente,
+            (string)($this->cfg['cadastro']['chave'] ?? '')
         );
     }
 }

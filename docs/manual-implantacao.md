@@ -321,7 +321,13 @@ Rode o comando abaixo **uma vez para cada token** e guarde os resultados:
 openssl rand -hex 32
 ```
 
-Exemplo: rode uma vez para o **ERP** e outra para o **Monitor**.
+Exemplo: rode uma vez para o **ERP**, outra para o **Monitor** e uma
+terceira com o comando abaixo, para a **chave do cadastro** (protege os
+certificados enviados pelas telas do Scriptcase):
+
+```bash
+openssl rand -base64 32
+```
 
 ### 7.3 Arquivo de configuração da NFS-e
 
@@ -353,6 +359,11 @@ return [
 
     'monitor_token' => 'TOKEN_DO_MONITOR_GERADO_NO_PASSO_7_2',
 
+    // Protege os certificados enviados pelo cadastro (Scriptcase).
+    'cadastro' => [
+        'chave' => 'CHAVE_DO_CADASTRO_GERADA_NO_PASSO_7_2',
+    ],
+
     // Copia dos XMLs numa pasta do servidor (mude para a nuvem depois).
     'armazenamento' => [
         'tipo' => 'local',
@@ -362,8 +373,10 @@ return [
 
 Salve e saia.
 
-> **Mais de uma empresa?** Veja o modelo completo, com o bloco
-> `emitentes`, em `config/nfse.local.php.example`.
+> **Mais de uma empresa?** O jeito mais fácil é cadastrar pelas telas do
+> Scriptcase (empresas, certificados, sistemas e numeração), sem mexer neste
+> arquivo: veja `docs/cadastro-scriptcase.md`. Para criar o usuário de banco
+> das telas: `sudo bash deploy/criar_usuario_scriptcase.sh`.
 
 ### 7.4 Proteger os arquivos de configuração (contêm senhas)
 
@@ -714,6 +727,11 @@ sudo systemctl reload php8.3-fpm && sudo systemctl restart nfse-worker@1 nfse-wo
 4. Confira com o verificador: deve mostrar a nova data de validade.
 
 ## Dar acesso a um novo sistema
+
+**Com as telas do Scriptcase:** cadastre em **Sistemas** e marque as
+empresas (ver `docs/cadastro-scriptcase.md`). Não precisa reiniciar nada.
+
+**Sem o Scriptcase**, pelo arquivo:
 
 1. Gere um token: `openssl rand -hex 32`.
 2. Acrescente um bloco em `consumidores` no `config/nfse.local.php`:

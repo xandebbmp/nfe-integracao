@@ -326,7 +326,7 @@ src/Nfse/
 ├── Repositorio/        TODO o SQL: documentos, fila, eventos, monitor, webhooks
 ├── Servico/            Regras do fluxo: RecebimentoLote, ProcessadorJobs, Solicitacoes, webhooks
 ├── Api/                Api.php: autenticação, JSON e erros comuns aos endpoints
-├── NfseConfig.php      Junta config/nfe.php + config/nfse.php
+├── NfseConfig.php      Junta config/nfe.php + config/nfse.php (+ cadastro do banco: comCadastro)
 └── ProvedorFactory.php Escolhe o provedor pelo padrão
 
 public/v1/nfse/         Endpoints HTTP (um arquivo por rota, como em public/v1/nfe)
@@ -366,6 +366,9 @@ Scripts (seguem `docs/padrao-scripts-sql.md`):
 - `0004_nfe_alterar_documentos_para_nfe.sql` — padrão `NFE`, status
   `DENEGADO`, chave de 44 dígitos, `protocolo_autorizacao` e `sequencia` do
   evento (CC-e).
+- `0005_cadastro_criar_empresas_sistemas.sql` — cadastro mantido pelo
+  Scriptcase: empresas, certificados (criptografados), sistemas/tokens
+  (só o hash), permissões e numeração inicial. Ver `docs/cadastro-scriptcase.md`.
 
 | Tabela | Papel |
 |---|---|
@@ -376,6 +379,9 @@ Scripts (seguem `docs/padrao-scripts-sql.md`):
 | `nfse_jobs` | Fila do worker. |
 | `nfse_monitor` | Feed append-only do painel. |
 | `nfse_webhooks_saida` | Avisos pendentes para os consumidores. |
+| `fiscal_empresas` / `fiscal_empresas_certificados` | Cadastro de empresas; certificado A1 criptografado (libsodium). |
+| `fiscal_sistemas` / `fiscal_sistemas_empresas` | Sistemas e painéis (hash do token) e as empresas que cada um usa. |
+| `fiscal_numeracao_inicial` | Último número já usado, aplicado em `nfse_numeracao` sem voltar para trás. |
 
 Decisões: status em `VARCHAR + CHECK` (fácil de evoluir e vira *union type*
 em TypeScript), datas `TIMESTAMPTZ`, identificadores fiscais como texto

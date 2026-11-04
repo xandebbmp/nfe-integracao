@@ -52,7 +52,10 @@ final class Api
             ]]);
         });
 
-        $api = new self(NfseConfig::carregar());
+        // Config dos arquivos + cadastro do banco (empresas e sistemas do Scriptcase).
+        $pdo = ConnectionFactory::make();
+        $api = new self(NfseConfig::comCadastro(NfseConfig::carregar(), $pdo));
+        $api->pdo = $pdo;
 
         $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         if (!in_array($metodo, $metodos, true)) {
@@ -85,9 +88,13 @@ final class Api
         }
 
         if ($token !== '') {
+            // Cadastro no banco guarda so o hash (sha256) do token.
+            $hash = hash('sha256', $token);
             foreach ($this->cfg['consumidores'] as $nome => $dados) {
                 $esperado = (string)($dados['token'] ?? '');
-                if ($esperado !== '' && hash_equals($esperado, $token)) {
+                $esperadoHash = (string)($dados['token_hash'] ?? '');
+                if (($esperado !== '' && hash_equals($esperado, $token))
+                    || ($esperadoHash !== '' && hash_equals($esperadoHash, $hash))) {
                     return ['consumidor' => (string)$nome, 'painel' => false];
                 }
             }
@@ -95,11 +102,16 @@ final class Api
             if ($tokenPainel !== '' && hash_equals($tokenPainel, $token)) {
                 return ['consumidor' => null, 'painel' => true];
             }
+            foreach ($this->cfg['paineis'] ?? [] as $hashPainel) {
+                if (hash_equals((string)$hashPainel, $hash)) {
+                    return ['consumidor' => null, 'painel' => true];
+                }
+            }
         }
 
         // Ambiente de desenvolvimento sem nenhum token configurado: libera
         // somente chamadas da propria maquina.
-        $semTokens = $this->cfg['consumidores'] === [] && empty($this->cfg['monitor_token']);
+        $semTokens = $this->cfg['consumidores'] === [] && empty($this->cfg['monitor_token']) && empty($this->cfg['paineis']);
         if ($semTokens && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true)) {
             return ['consumidor' => 'LOCAL', 'painel' => true];
         }

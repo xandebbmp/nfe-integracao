@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace Xande\NfeIntegracao\Nfse;
 
+use PDO;
 use RuntimeException;
+use Xande\NfeIntegracao\Nfse\Repositorio\CadastroRepositorio;
 
 /**
  * Junta config/nfe.php (ambiente e empresa da NF-e) com config/nfse.php.
@@ -17,6 +19,10 @@ use RuntimeException;
  * Para montar a config de UM emitente (o que os provedores recebem), use
  * NfseConfig::paraEmitente($cfg, $cnpj): ela coloca os dados dele em
  * cfg['emitente'].
+ *
+ * Cadastro no banco (script 0005, telas do Scriptcase): comCadastro()
+ * acrescenta as empresas e os sistemas cadastrados. O banco vale MAIS que o
+ * arquivo para o mesmo CNPJ/codigo de sistema.
  */
 final class NfseConfig
 {
@@ -70,6 +76,13 @@ final class NfseConfig
         }
 
         $cfg['emitentes'] = self::montarEmitentes($nfe, $nfse);
+        // true = emitente unico tirado do config/nfe.php (nao foi listado de proposito).
+        $cfg['emitente_implicito'] = ($nfse['emitentes'] ?? []) === [];
+        $cfg['cadastro'] = array_replace(['chave' => ''], (array)($nfse['cadastro'] ?? []));
+        if ($cfg['cadastro']['chave'] === '' && getenv('NFSE_CHAVE_CADASTRO')) {
+            $cfg['cadastro']['chave'] = (string)getenv('NFSE_CHAVE_CADASTRO');
+        }
+        $cfg['paineis'] = [];
 
         // NF-e (modelo 55): parametros tecnicos vem do config/nfe.php.
         $cfg['nfe'] = array_replace([
@@ -93,13 +106,69 @@ final class NfseConfig
     }
 
     /**
+     * Acrescenta o cadastro do banco (empresas, certificados, sistemas).
+     * Sem o script 0005 aplicado, devolve a config como veio.
+     */
+    public static function comCadastro(array $cfg, PDO $pdo): array
+    {
+        $cadastro = new CadastroRepositorio($pdo);
+        if (!$cadastro->existe()) {
+            return $cfg;
+        }
+
+        $empresas = $cadastro->empresasAtivas();
+        if ($empresas !== [] && !empty($cfg['emitente_implicito'])) {
+            // Ha empresas cadastradas: o emitente "automatico" do config/nfe.php sai.
+            $cfg['emitentes'] = [];
+        }
+        foreach ($empresas as $e) {
+            $cnpj = self::normalizarCnpj($e['cnpj']);
+            $base = $cfg['emitentes'][$cnpj] ?? self::EMITENTE_PADRAO;
+            $emitente = array_replace($base, [
+                'cnpj' => $cnpj,
+                'razao_social' => (string)$e['razao_social'],
+                'uf' => strtoupper((string)($e['uf'] ?? '')),
+                'ie' => (string)($e['ie'] ?? ''),
+                'inscricao_municipal' => (string)($e['inscricao_municipal'] ?? ''),
+                'codigo_municipio' => (string)$e['codigo_municipio'],
+                'telefone' => (string)($e['telefone'] ?? ''),
+                'email' => (string)($e['email'] ?? ''),
+                'opcao_simples_nacional' => (int)$e['opcao_simples_nacional'],
+                'regime_apuracao_simples' => $e['regime_apuracao_simples'] !== null ? (int)$e['regime_apuracao_simples'] : null,
+                'regime_especial_tributacao' => (int)$e['regime_especial_tributacao'],
+                'incentivador_cultural' => (bool)$e['incentivador_cultural'],
+                'regime_especial_abrasf' => $e['regime_especial_abrasf'] !== null ? (int)$e['regime_especial_abrasf'] : null,
+            ]);
+            if ($e['conteudo_cifrado'] !== null) {
+                $emitente['certificado'] = ['cifrado' => $e['conteudo_cifrado']];
+            }
+            $cfg['emitentes'][$cnpj] = $emitente;
+        }
+
+        foreach ($cadastro->sistemasAtivos() as $s) {
+            if ($s['perfil'] === 'PAINEL') {
+                $cfg['paineis'][] = (string)$s['token_hash'];
+                continue;
+            }
+            $cfg['consumidores'][(string)$s['codigo']] = [
+                'token_hash' => (string)$s['token_hash'],
+                'webhook_url' => (string)($s['webhook_url'] ?? ''),
+                'webhook_segredo' => (string)($s['webhook_segredo'] ?? ''),
+                'cnpjs' => $s['cnpjs'] !== '' ? explode(',', (string)$s['cnpjs']) : [],
+            ];
+        }
+
+        return $cfg;
+    }
+
+    /**
      * Config pronta para um emitente: igual a $cfg, com cfg['emitente'] preenchido.
      */
     public static function paraEmitente(array $cfg, string $cnpj): array
     {
         $cnpj = self::normalizarCnpj($cnpj);
         if (!isset($cfg['emitentes'][$cnpj])) {
-            throw new RuntimeException("Emitente {$cnpj} nao esta configurado em config/nfse.php (emitentes).");
+            throw new RuntimeException("Emitente {$cnpj} nao esta cadastrado (cadastro de empresas ou config/nfse.php, emitentes) ou esta inativo.");
         }
         $cfg['emitente'] = $cfg['emitentes'][$cnpj];
         return $cfg;

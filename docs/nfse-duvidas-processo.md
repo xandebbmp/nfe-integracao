@@ -32,14 +32,14 @@ Legenda de prioridade: 🔴 bloqueia produção · 🟡 decidir antes de escalar
 
 | # | O que | Para quê |
 |---|---|---|
-| A | Cadastro de cada empresa: CNPJ, razão social, inscrição municipal, município, regime e certificado | Preencher `emitentes` em `config/nfse.local.php` |
-| B | Quais CNPJs cada sistema pode usar | `consumidores.<sistema>.cnpjs` |
+| A | Cadastro de cada empresa: CNPJ, razão social, UF/IE, inscrição municipal, município, regime e certificado | Tela **Empresas** do Scriptcase (`docs/cadastro-scriptcase.md`) |
+| B | Quais CNPJs cada sistema pode usar | Tela **Sistemas** (detalhe de empresas) |
 | C | Provedor de nuvem (S3, Azure, Google, MinIO...) e prazo de guarda | `armazenamento` (S3 e compatíveis já prontos; Azure/Google nativos exigem nova classe) |
 | E | Exemplo de link de visualização de nota no portal de Salvador | `salvador.url_visualizacao` |
 | F | Confirmação do contador: padrão de Salvador em 2026/2027 e regime (Simples?) de cada empresa | Escolha do padrão e campos de regime |
-| G | Séries e último número de DPS/RPS já usados por empresa | Evitar conflito de numeração (A3) |
+| G | Séries e último número de NF-e/DPS/RPS já usados por empresa | Tela **Numeração inicial** — evita conflito (A3, D1) |
 | H | Credenciamento na Produção Restrita (Nacional) e homologação de Salvador | Homologar |
-| I | Lista de sistemas, tokens e URLs de webhook | `consumidores` |
+| I | Lista de sistemas, tokens e URLs de webhook | Tela **Sistemas** |
 | J | Existe retenção de PIS/COFINS? | A9 |
 | K | Volume (notas/dia, picos) | Limites de lote e nº de workers (B7, C9) |
 | L | Servidor do worker e quem recebe alertas | Operação (C9) |

@@ -154,6 +154,7 @@ if ($pdo !== null) {
         '0002 (tabelas da NFS-e)' => "SELECT to_regclass('public.nfse_documentos') IS NOT NULL",
         '0003 (multiempresa / arquivamento)' => "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nfse_documentos' AND column_name = 'arquivado_em')",
         '0004 (NF-e na fila / monitor)' => "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nfse_documentos' AND column_name = 'protocolo_autorizacao')",
+        '0005 (cadastro de empresas e sistemas)' => "SELECT to_regclass('public.fiscal_empresas') IS NOT NULL",
     ];
     foreach ($checagens as $script => $sql) {
         if ($existe($sql)) {
@@ -175,6 +176,34 @@ if ($pdo !== null) {
     }
 }
 
+// Cadastro no banco (Scriptcase): empresas e sistemas entram na verificacao.
+if ($pdo !== null) {
+    try {
+        $cfg = \Xande\NfeIntegracao\Nfse\NfseConfig::comCadastro($cfg, $pdo);
+        if ($existe("SELECT to_regclass('public.fiscal_empresas') IS NOT NULL")) {
+            $chaveOk = true;
+            try {
+                new \Xande\NfeIntegracao\Nfse\Infra\CofreCertificado((string)($cfg['cadastro']['chave'] ?? ''));
+            } catch (Throwable) {
+                $chaveOk = false;
+            }
+            if ($chaveOk) {
+                item('OK', 'Chave do cadastro configurada');
+            } else {
+                item('ATENCAO', 'Chave do cadastro ausente ou invalida: certificados enviados pelo cadastro nao serao aceitos.',
+                    "gere com: php bin/fiscal_cadastro.php --gerar-chave  e coloque em config/nfse.local.php ('cadastro' => ['chave' => '...'])");
+            }
+            foreach ($pdo->query("SELECT cnpj, certificado_situacao, certificado_mensagem FROM fiscal_empresas WHERE ativo AND certificado_situacao <> 'OK' ORDER BY cnpj") as $linha) {
+                item('ATENCAO', "Cadastro {$linha['cnpj']}: certificado {$linha['certificado_situacao']}"
+                    . ($linha['certificado_mensagem'] ? " - {$linha['certificado_mensagem']}" : ''),
+                    'envie o .pfx e a senha pela tela de empresas (Scriptcase).');
+            }
+        }
+    } catch (Throwable $e) {
+        item('ERRO', 'Cadastro do banco nao pode ser lido: ' . $e->getMessage(), 'rode: bash deploy/aplicar_banco.sh');
+    }
+}
+
 // ===========================================================================
 secao('4. Empresas (emitentes) e certificados');
 // ===========================================================================
@@ -188,12 +217,13 @@ foreach ($cfg['emitentes'] as $cnpj => $emitente) {
     }
 
     $arquivo = (string)($emitente['certificado']['arquivo'] ?? '');
-    if (str_starts_with(realpath($arquivo) ?: $arquivo, realpath("{$raiz}/public") ?: "{$raiz}/public")) {
+    $doBanco = !empty($emitente['certificado']['cifrado']);
+    if (!$doBanco && str_starts_with(realpath($arquivo) ?: $arquivo, realpath("{$raiz}/public") ?: "{$raiz}/public")) {
         item('ERRO', "{$nome}: o certificado esta dentro da pasta public (visivel na internet!).", 'mova o .pfx para storage/certs/ e ajuste o caminho.');
     }
 
     try {
-        $certificado = \Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente::doArquivo($arquivo, (string)($emitente['certificado']['senha'] ?? ''))->certificado();
+        $certificado = \Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente::doEmitente($emitente, (string)($cfg['cadastro']['chave'] ?? ''))->certificado();
         $dias = (int)floor(($certificado->getValidTo()->getTimestamp() - time()) / 86400);
         $cnpjCertificado = \Xande\NfeIntegracao\Nfse\NfseConfig::normalizarCnpj($certificado->getCnpj() ?? '');
 
@@ -223,6 +253,9 @@ if ($consumidores === []) {
 }
 foreach ($consumidores as $nome => $dados) {
     $token = (string)($dados['token'] ?? '');
+    if (!empty($dados['token_hash'])) {
+        $token = str_repeat('x', 32); // cadastrado no banco: o trigger ja exige 32+ caracteres
+    }
     if (strlen($token) < 24 || str_contains(strtoupper($token), 'TOKEN')) {
         item('ERRO', "Sistema {$nome}: token vazio, curto ou de exemplo.", 'gere um token forte com: openssl rand -hex 32');
         continue;

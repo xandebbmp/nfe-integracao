@@ -20,7 +20,8 @@ X-NFE-API-TOKEN: <seu-token>
 ```
 
 (ou `Authorization: Bearer <seu-token>`). Cada sistema só vê os próprios
-documentos. Tokens são cadastrados em `config/nfse.local.php`.
+documentos. Tokens são cadastrados na tela **Sistemas** (Scriptcase,
+ver `docs/cadastro-scriptcase.md`) ou em `config/nfse.local.php`.
 
 ---
 

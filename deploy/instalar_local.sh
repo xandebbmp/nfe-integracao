@@ -281,6 +281,7 @@ configurar_sistema() {
 
   TOKEN_ERP="$(openssl rand -hex 32)"
   TOKEN_MONITOR="$(openssl rand -hex 32)"
+  CHAVE_CADASTRO="$(openssl rand -base64 32)"
   local razao_php
   razao_php="$(RAZAO="$RAZAO_CERT" php -r 'echo var_export(trim(explode(":", getenv("RAZAO"))[0]), true);')"
 
@@ -306,6 +307,12 @@ return [
     ],
 
     'monitor_token' => '${TOKEN_MONITOR}',
+
+    // Criptografa os certificados enviados pelo cadastro (Scriptcase).
+    // Guarde uma copia: sem ela os certificados precisam ser reenviados.
+    'cadastro' => [
+        'chave' => '${CHAVE_CADASTRO}',
+    ],
 
     'armazenamento' => [
         'tipo' => 'local',
