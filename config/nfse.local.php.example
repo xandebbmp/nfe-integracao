@@ -51,12 +51,6 @@ return [
 
     'monitor_token' => 'TOKEN_DO_PAINEL',
 
-    // Chave que criptografa os certificados enviados pelo cadastro (Scriptcase).
-    // Gere com: php bin/fiscal_cadastro.php --gerar-chave
-    'cadastro' => [
-        'chave' => 'COLE_AQUI_A_CHAVE_GERADA',
-    ],
-
     // Arquivamento dos XMLs em nuvem (exemplo S3):
     // 'armazenamento' => [
     //     'tipo' => 's3',

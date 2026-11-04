@@ -76,12 +76,6 @@ if (!in_array($padrao, Padrao::TODOS, true)) {
 }
 
 $cfgGeral = NfseConfig::carregar();
-try {
-    // Empresas cadastradas no banco (Scriptcase) tambem valem aqui.
-    $cfgGeral = NfseConfig::comCadastro($cfgGeral, \Xande\NfeIntegracao\Database\ConnectionFactory::make());
-} catch (Throwable $e) {
-    fwrite(STDERR, 'Aviso: cadastro do banco nao lido (' . $e->getMessage() . "). Usando so os arquivos de configuracao.\n");
-}
 if ((int)$cfgGeral['tpAmb'] !== 2) {
     parar('tpAmb configurado e 1 (PRODUCAO). Este script so roda em HOMOLOGACAO (tpAmb = 2).');
 }
@@ -132,7 +126,10 @@ linha('Inscricao municipal', (string)$emitente['inscricao_municipal']);
 linha('Nota de teste', $arquivoPayload);
 
 try {
-    $certificado = CertificadoCliente::doEmitente($emitente, (string)($cfgGeral['cadastro']['chave'] ?? ''));
+    $certificado = CertificadoCliente::doArquivo(
+        (string)$emitente['certificado']['arquivo'],
+        (string)$emitente['certificado']['senha']
+    );
 } catch (Throwable $e) {
     parar('Certificado: ' . $e->getMessage());
 }

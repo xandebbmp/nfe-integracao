@@ -154,15 +154,6 @@ $cfg = [
 
     // Token para o painel do monitor (pode ir na query string do EventSource).
     'monitor_token' => '',
-
-    // Cadastro no banco (telas do Scriptcase, script 0005).
-    // 'chave' criptografa os certificados enviados pelo cadastro. Gere com:
-    //   php bin/fiscal_cadastro.php --gerar-chave
-    // e coloque em config/nfse.local.php (ou na variavel NFSE_CHAVE_CADASTRO).
-    // Guarde uma copia segura: sem ela, os certificados precisam ser reenviados.
-    'cadastro' => [
-        'chave' => '',
-    ],
 ];
 
 $localConfigFile = __DIR__ . '/nfse.local.php';

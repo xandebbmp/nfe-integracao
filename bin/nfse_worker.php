@@ -20,7 +20,6 @@ use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\ProvedorFactory;
 use Xande\NfeIntegracao\Nfse\Repositorio\FilaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\EntregadorWebhook;
-use Xande\NfeIntegracao\Nfse\Servico\ProcessadorCertificados;
 use Xande\NfeIntegracao\Nfse\Servico\ProcessadorJobs;
 
 if (PHP_SAPI !== 'cli') {
@@ -33,34 +32,12 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 $umaVez = in_array('--uma-vez', $argv, true);
 $workerId = gethostname() . ':' . getmypid();
 
+$cfg = NfseConfig::carregar();
 $pdo = ConnectionFactory::make();
-$cfgArquivos = NfseConfig::carregar();
 
 $fila = new FilaRepositorio($pdo);
-$certificados = new ProcessadorCertificados($pdo, (string)$cfgArquivos['cadastro']['chave']);
-
-// Monta (ou remonta) tudo que depende do cadastro de empresas/sistemas.
-// O cadastro e mantido pelo Scriptcase: o worker relê a cada minuto e
-// sempre que um certificado novo e conferido, sem precisar reiniciar.
-$cfg = [];
-$processador = null;
-$entregador = null;
-$assinaturaCadastro = '';
-$recarregar = static function () use ($pdo, $cfgArquivos, $workerId, &$cfg, &$processador, &$entregador, &$assinaturaCadastro): void {
-    $novo = NfseConfig::comCadastro($cfgArquivos, $pdo);
-    $assinatura = md5(serialize([$novo['emitentes'], $novo['consumidores']]));
-    if ($assinatura === $assinaturaCadastro) {
-        return;
-    }
-    if ($assinaturaCadastro !== '') {
-        registrar('Cadastro de empresas/sistemas mudou: configuracao recarregada.');
-    }
-    $cfg = $novo;
-    $processador = new ProcessadorJobs($pdo, $cfg, new ProvedorFactory($cfg), $workerId);
-    $entregador = new EntregadorWebhook($pdo, $cfg);
-    $assinaturaCadastro = $assinatura;
-};
-$recarregar();
+$processador = new ProcessadorJobs($pdo, $cfg, new ProvedorFactory($cfg), $workerId);
+$entregador = new EntregadorWebhook($pdo, $cfg);
 
 // Parada graciosa.
 $continuar = true;
@@ -87,19 +64,7 @@ while ($continuar) {
         if ($liberados > 0) {
             registrar("{$liberados} job(s) travado(s) devolvido(s) para a fila.");
         }
-        $recarregar();
         $ultimaLimpeza = time();
-    }
-
-    // Certificados enviados pelo cadastro: confere, criptografa e apaga o original.
-    try {
-        $conferidos = $certificados->processarPendentes();
-        if ($conferidos > 0) {
-            registrar("{$conferidos} certificado(s) do cadastro conferido(s).");
-            $recarregar();
-        }
-    } catch (Throwable $e) {
-        registrar('Falha ao conferir certificados do cadastro: ' . $e->getMessage());
     }
 
     $processouAlgo = false;
