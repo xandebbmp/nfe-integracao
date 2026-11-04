@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Monitor Fiscal NFS-e
+   Monitor Fiscal (NFS-e e NF-e)
    --------------------------------------------------------------------------
    Como funciona:
      1. O usuario informa o token do painel (monitor_token).
@@ -263,7 +263,7 @@ function textoUltimaAcao(doc, ultimaMensagem) {
   if (aoVivo) {
     return `${OPERACOES[aoVivo.operacao] || aoVivo.operacao}${aoVivo.mensagem ? ': ' + aoVivo.mensagem : ''}`;
   }
-  if (doc.status === 'AUTORIZADO') return `NFS-e ${doc.nfse?.numero || ''} autorizada`;
+  if (doc.status === 'AUTORIZADO') return `${doc.padrao === 'NFE' ? 'NF-e' : 'NFS-e'} ${doc.nfse?.numero || ''} autorizada`.replace('  ', ' ');
   return '—';
 }
 
@@ -358,7 +358,9 @@ function conteudoModal(doc) {
     if (doc.pode_reenviar) {
       partes.push(el('p', { class: 'suave' },
         `Depois de corrigir no sistema de origem, reenvie com a mesma referência (${doc.referencia}). `
-        + (doc.dps_rps ? 'O número da DPS/RPS será reaproveitado.' : 'O número da DPS/RPS será reservado no reenvio.')));
+        + (doc.padrao === 'NFE'
+          ? (doc.dps_rps ? 'O número da NF-e será reaproveitado.' : 'O número da NF-e será reservado no reenvio.')
+          : (doc.dps_rps ? 'O número da DPS/RPS será reaproveitado.' : 'O número da DPS/RPS será reservado no reenvio.'))));
     }
   }
 
