@@ -21,9 +21,14 @@ final class Capacidades
      *   consulta: bool,
      *   eventos: array<string, string>,
      *   eventos_nao_suportados: array<string, string>,
+     *   cancelamento_externo: bool,
      *   pdf: string,
      *   observacoes: list<string>
      * }
+     *
+     * cancelamento_externo = true quando o padrao NAO cancela por webservice
+     * e a API aceita registrar o cancelamento feito no portal da prefeitura
+     * (rota /v1/nfse/cancelamento_externo.php).
      */
     public static function doPadrao(string $padrao): array
     {
@@ -61,6 +66,7 @@ final class Capacidades
                 '105105' => 'Cancelamento indeferido: evento exclusivo do fisco.',
                 '305101' => 'Cancelamento de oficio: evento exclusivo do fisco.',
             ],
+            'cancelamento_externo' => false,
             'pdf' => 'OFICIAL_DANFSE',
             'observacoes' => [
                 'Codigos de motivo do cancelamento (101101): 1=Erro na emissao, 2=Servico nao prestado, 9=Outros.',
@@ -73,7 +79,7 @@ final class Capacidades
 
     private static function salvador(): array
     {
-        $semWebservice = 'Salvador nao oferece este servico por webservice. Solicite no portal da NFS-e da prefeitura (Cancelamento > Gerar Pedido) ou por processo administrativo.';
+        $semWebservice = 'Salvador nao oferece este servico por webservice. Solicite no portal da NFS-e da prefeitura (Cancelamento > Gerar Pedido) ou por processo administrativo e, depois de deferido, registre na API em /v1/nfse/cancelamento_externo.php.';
 
         return [
             'emissao' => 'ASSINCRONA',
@@ -84,12 +90,14 @@ final class Capacidades
                 TipoEvento::SOLICITACAO_ANALISE_CANCELAMENTO => $semWebservice,
                 TipoEvento::CANCELAMENTO_POR_SUBSTITUICAO => $semWebservice,
             ],
+            'cancelamento_externo' => true,
             'pdf' => 'ESPELHO_GERADO_PELA_API',
             'observacoes' => [
                 'Emissao assincrona: o documento fica PROCESSANDO ate a prefeitura processar o lote.',
                 'Um RPS por lote: cada documento tem resultado proprio.',
                 'Tomador obrigatorio (nome). CNPJ/CPF apenas numericos.',
                 'Informe servico.item_lista_servico (LC 116) e valores.aliquota_iss em percentual (ex.: 5).',
+                'PDF: espelho auxiliar com link de consulta no portal (quando salvador.url_visualizacao estiver configurada).',
             ],
         ];
     }

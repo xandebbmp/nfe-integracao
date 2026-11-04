@@ -31,15 +31,16 @@ final class MonitorRepositorio
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO nfse_monitor (
-                documento_id, lote_id, consumidor, padrao, referencia, operacao, status, mensagem, numero_nfse, chave_acesso
+                documento_id, lote_id, consumidor, emitente_cnpj, padrao, referencia, operacao, status, mensagem, numero_nfse, chave_acesso
              ) VALUES (
-                :documento_id, :lote_id, :consumidor, :padrao, :referencia, :operacao, :status, :mensagem, :numero_nfse, :chave_acesso
+                :documento_id, :lote_id, :consumidor, :emitente_cnpj, :padrao, :referencia, :operacao, :status, :mensagem, :numero_nfse, :chave_acesso
              ) RETURNING id'
         );
         $stmt->execute([
             ':documento_id' => $documento['id'],
             ':lote_id' => $documento['lote_id'],
             ':consumidor' => $documento['consumidor'],
+            ':emitente_cnpj' => $documento['emitente_cnpj'] ?? null,
             ':padrao' => $documento['padrao'],
             ':referencia' => $documento['referencia'],
             ':operacao' => $operacao,

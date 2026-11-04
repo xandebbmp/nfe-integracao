@@ -4,8 +4,12 @@ declare(strict_types=1);
 /**
  * Configuracao da emissao de NFS-e (Padrao Nacional e Salvador-BA).
  *
- * Dados do emitente (CNPJ, razao social, certificado, ambiente) sao
- * reaproveitados de config/nfe.php para nao duplicar.
+ * Empresa unica: preencha 'emitente' abaixo. CNPJ, razao social e
+ * certificado sao reaproveitados de config/nfe.php.
+ *
+ * Varias empresas: preencha 'emitentes' (em config/nfse.local.php), um
+ * bloco por CNPJ, cada um com seu certificado. Nesse caso 'emitente' e
+ * ignorado. Ver config/nfse.local.php.example.
  *
  * NUNCA coloque segredos aqui. Use config/nfse.local.php (fora do Git),
  * a partir de config/nfse.local.php.example.
@@ -16,7 +20,8 @@ $cfg = [
     'tpAmb' => null,
 
     // ---------------------------------------------------------------
-    // Emitente (prestador de servico)
+    // Emitente unico (prestador de servico). Usado quando 'emitentes' esta vazio.
+    // Os mesmos campos valem para cada item de 'emitentes'.
     // ---------------------------------------------------------------
     'emitente' => [
         // Vazio = usa o CNPJ do config/nfe.php.
@@ -43,6 +48,10 @@ $cfg = [
         //   4=Cooperativa, 5=MEI, 6=ME/EPP do Simples. null = nao informar.
         'regime_especial_abrasf' => null,
     ],
+
+    // Varias empresas: CNPJ => mesmos campos de 'emitente' + certificado.
+    // Preencha em config/nfse.local.php (contem senha do certificado).
+    'emitentes' => [],
 
     // ---------------------------------------------------------------
     // Padrao Nacional (Sefin Nacional / ADN)
@@ -112,10 +121,36 @@ $cfg = [
     //       'token' => 'token-forte',
     //       'webhook_url' => 'https://erp.empresa/webhooks/nfse',
     //       'webhook_segredo' => 'segredo-hmac',
+    //       // CNPJs que este sistema pode usar. Obrigatorio quando ha
+    //       // mais de um emitente configurado.
+    //       'cnpjs' => ['41986662000160'],
     //   ],
     // Se ficar vazio, o apiToken do config/nfe.php vale como consumidor 'PADRAO'.
     // ---------------------------------------------------------------
     'consumidores' => [],
+
+    // ---------------------------------------------------------------
+    // Arquivamento dos XMLs fora do banco (guarda legal de 5 anos).
+    //   tipo: 'nenhum' | 'local' | 's3'
+    //   's3' funciona com AWS S3 e servicos compativeis (MinIO, Wasabi,
+    //   Cloudflare R2, DigitalOcean Spaces...). Credenciais em nfse.local.php.
+    // ---------------------------------------------------------------
+    'armazenamento' => [
+        'tipo' => 'nenhum',
+        'local' => [
+            'diretorio' => __DIR__ . '/../storage/xml/nfse',
+        ],
+        's3' => [
+            'endpoint' => 'https://s3.amazonaws.com',
+            'regiao' => 'us-east-1',
+            'bucket' => '',
+            'prefixo' => 'nfse',
+            'chave_acesso' => '',
+            'chave_secreta' => '',
+            // true para MinIO e alguns compativeis (https://host/bucket/arquivo).
+            'path_style' => false,
+        ],
+    ],
 
     // Token para o painel do monitor (pode ir na query string do EventSource).
     'monitor_token' => '',

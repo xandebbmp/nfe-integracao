@@ -23,7 +23,7 @@ if (!in_array($documento['status'], StatusNfse::COM_NFSE, true)) {
 }
 
 try {
-    $pdf = (new ProvedorFactory($api->cfg))->para($documento['padrao'])->gerarPdf($documento);
+    $pdf = (new ProvedorFactory($api->cfg))->para($documento['padrao'], $documento['emitente_cnpj'])->gerarPdf($documento);
 } catch (RuntimeException $e) {
     $api->erro(502, 'PDF_INDISPONIVEL', $e->getMessage());
 }

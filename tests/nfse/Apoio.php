@@ -53,6 +53,9 @@ final class Apoio
     public static function config(): array
     {
         $nfse = require dirname(__DIR__, 2) . '/config/nfse.php';
+        // Isola os testes da config local do desenvolvedor (nfse.local.php).
+        $nfse['emitentes'] = [];
+        $nfse['armazenamento']['tipo'] = 'nenhum';
         $nfse['emitente']['inscricao_municipal'] = '12345678';
         $nfse['consumidores'] = ['TESTE' => ['token' => 'token-teste']];
         return NfseConfig::montar(

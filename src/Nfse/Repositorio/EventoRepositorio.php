@@ -18,13 +18,32 @@ final class EventoRepositorio
     {
     }
 
-    public function criar(string $documentoId, string $tipo, string $motivoCodigo, string $motivoTexto): string
+    /**
+     * @param array{origem?: string, status?: string, numero_processo?: ?string, observacao?: ?string, registrado_por?: ?string} $extras
+     *   origem EXTERNO = cancelamento feito fora do webservice (portal da prefeitura).
+     */
+    public function criar(string $documentoId, string $tipo, string $motivoCodigo, string $motivoTexto, array $extras = []): string
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO nfse_eventos (documento_id, tipo_evento, motivo_codigo, motivo_texto)
-             VALUES (:doc, :tipo, :codigo, :texto) RETURNING id'
+            'INSERT INTO nfse_eventos (
+                documento_id, tipo_evento, motivo_codigo, motivo_texto,
+                origem, status, numero_processo, observacao, registrado_por
+             ) VALUES (
+                :doc, :tipo, :codigo, :texto,
+                :origem, :status, :processo, :observacao, :registrado_por
+             ) RETURNING id'
         );
-        $stmt->execute([':doc' => $documentoId, ':tipo' => $tipo, ':codigo' => $motivoCodigo, ':texto' => $motivoTexto]);
+        $stmt->execute([
+            ':doc' => $documentoId,
+            ':tipo' => $tipo,
+            ':codigo' => $motivoCodigo,
+            ':texto' => $motivoTexto,
+            ':origem' => $extras['origem'] ?? 'API',
+            ':status' => $extras['status'] ?? 'RECEBIDO',
+            ':processo' => $extras['numero_processo'] ?? null,
+            ':observacao' => $extras['observacao'] ?? null,
+            ':registrado_por' => $extras['registrado_por'] ?? null,
+        ]);
         return (string)$stmt->fetchColumn();
     }
 

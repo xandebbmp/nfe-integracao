@@ -27,15 +27,18 @@ documentos. Tokens são cadastrados em `config/nfse.local.php`.
 | Método | Rota | Para quê |
 |---|---|---|
 | GET | `capacidades.php` | O que cada padrão suporta (eventos, PDF, observações) |
+| GET | `emitentes.php` | CNPJs que o seu sistema pode usar como emitente |
 | POST | `emitir.php[?aguardar=N]` | Enviar lote com 1+ documentos |
 | GET | `lote.php?id=...[&aguardar=N][&xml=1]` | Situação de todos os documentos do lote |
-| GET | `documento.php?id=...[&historico=1]` | Um documento (JSON com XML autorizado) |
+| GET | `documento.php?id=...[&historico=1][&xml=0]` | Um documento (JSON; `xml=0` omite o XML autorizado) |
 | GET | `documento.php?id=...&formato=xml` | Apenas o XML autorizado |
 | GET | `pdf.php?id=...[&download=1]` | PDF da NFS-e |
 | POST | `consultar.php` | Consultar o documento no fisco |
-| POST | `evento.php` | Cancelamento e demais eventos |
+| POST | `evento.php` | Cancelamento e demais eventos (via webservice) |
+| POST | `cancelamento_externo.php` | Registrar cancelamento feito no portal da prefeitura (Salvador) |
 | GET | `documentos.php` | Lista (carga inicial do painel) |
-| GET | `monitor.php?token=...` | Stream em tempo real (SSE) |
+| GET | `monitor.php?token=...[&desde=agora]` | Stream em tempo real (SSE) |
+| — | `/monitor/` | Página pronta do painel (ver `docs/nfse-monitor.md`) |
 
 Erros têm sempre o formato:
 
@@ -58,6 +61,7 @@ Content-Type: application/json
 ```json
 {
   "padrao": "NACIONAL",
+  "emitente_cnpj": "41986662000160",
   "documentos": [
     {
       "referencia": "PEDIDO-2026-000123",
@@ -107,6 +111,7 @@ Content-Type: application/json
 | Campo | Nacional | Salvador | Observação |
 |---|---|---|---|
 | `padrao` (lote ou documento) | `NACIONAL` | `SALVADOR` | Obrigatório. Pode variar por documento. |
+| `emitente_cnpj` (lote ou documento) | cond. | cond. | CNPJ do prestador. Obrigatório quando o seu sistema pode emitir por mais de uma empresa (veja `emitentes.php`). Com uma só, pode omitir. |
 | `referencia` | obrig. | obrig. | Id do documento no **seu** sistema (até 60). Garante que não sai nota duplicada. |
 | `competencia` | opcional | — | `AAAA-MM-DD`. Padrão: hoje. |
 | `tomador` | opcional | **obrig.** | `nome` obrigatório se informado. CPF (11) ou CNPJ (14). |
@@ -126,11 +131,13 @@ Content-Type: application/json
 | `natureza_operacao` | — | opcional | 1 (padrão) a 6, tabela ABRASF. |
 | `substituicao` | opcional | — | `{ "chave_substituida": "50 dígitos", "codigo_motivo": "01", "motivo": "..." }` |
 
-O **prestador (emitente)** vem da configuração do servidor, nunca do corpo.
+Os dados do **prestador** (inscrição municipal, regime, certificado) vêm da
+configuração do servidor. O corpo só escolhe **qual** CNPJ, e a API confere
+se o seu sistema tem permissão para ele.
 
 ### Resposta
 
-`202 Accepted` (ainda processando) ou `200 OK` (todos finalizados dentro do `aguardar`):
+`202 Accepted` (há documentos processando ou recusados) ou `200 OK` (todos finalizados dentro do `aguardar`):
 
 ```json
 {
@@ -141,10 +148,12 @@ O **prestador (emitente)** vem da configuração do servidor, nunca do corpo.
       "id": "c59ac931-77ac-419c-a284-ee23c860f088",
       "referencia": "PEDIDO-2026-000123",
       "padrao": "NACIONAL",
+      "emitente_cnpj": "41986662000160",
       "ambiente": "HOMOLOGACAO",
       "status": "AUTORIZADO",
       "finalizado": true,
       "pode_reenviar": false,
+      "indice": 0,
       "situacao_recebimento": "NOVO",
       "dps_rps": { "serie": "1", "numero": 15 },
       "nfse": {
@@ -161,27 +170,46 @@ O **prestador (emitente)** vem da configuração do servidor, nunca do corpo.
       },
       "xml_autorizado": "<NFSe ...>...</NFSe>"
     }
-  ]
+  ],
+  "recusados": []
 }
 ```
 
-`situacao_recebimento`: `NOVO`, `JA_EXISTENTE` (mesma referência já
-autorizada/em andamento — **nenhuma nota nova foi gerada**) ou `REENVIADO`
-(referência estava `REJEITADO`/`ERRO` e foi reenviada com os dados novos).
+`situacao_recebimento` de cada documento:
 
-`422` quando algum documento é inválido (nada é gravado):
+| Situação | Significado |
+|---|---|
+| `NOVO` | Válido: gravado e enfileirado para o fisco. |
+| `INVALIDO` | Dados com erro: **gravado como `REJEITADO`** (sem número de DPS/RPS), aparece no monitor com o motivo e a sugestão de correção. Corrija e reenvie com a mesma referência. |
+| `REENVIADO` | A referência estava `REJEITADO`/`ERRO` e veio corrigida. |
+| `JA_EXISTENTE` | Referência já autorizada/em andamento — **nenhuma nota nova foi gerada**. |
+
+Um documento inválido **não derruba o lote**: os válidos seguem normalmente.
+
+Vão para `recusados` (não são gravados nem aparecem no monitor) apenas os
+casos em que não dá para gravar: padrão desconhecido, emitente não
+informado/não liberado, referência repetida no mesmo lote, item que não é
+objeto JSON.
 
 ```json
-{
-  "erro": {
-    "codigo": "DOCUMENTOS_INVALIDOS",
-    "mensagem": "Um ou mais documentos sao invalidos. Nenhum documento foi gravado.",
-    "documentos": [
-      { "indice": 0, "referencia": "A1", "erros": ["tomador e obrigatorio em Salvador."] }
-    ]
+"recusados": [
+  {
+    "indice": 2,
+    "situacao_recebimento": "RECUSADO",
+    "referencia": "PED-9",
+    "erros": [{
+      "codigo": "NAO_ARMAZENADO",
+      "campo": "emitente_cnpj",
+      "mensagem": "Emitente 99999999000199 nao liberado para este sistema.",
+      "correcao": "Use um dos CNPJs liberados: 41986662000160."
+    }]
   }
-}
+]
 ```
+
+`422` só quando a requisição inteira é inválida (`LOTE_INVALIDO`: lista
+vazia, mais de 50 documentos, sistema sem emitente liberado) ou quando
+**nenhum** documento pôde ser gravado (`DOCUMENTOS_RECUSADOS`).
 
 ### Status (iguais para todos os padrões)
 
@@ -193,8 +221,17 @@ autorizada/em andamento — **nenhuma nota nova foi gerada**) ou `REENVIADO`
 | `ERRO` | Falha técnica. Chamar `consultar.php` primeiro; se continuar sem nota, reenviar. |
 | `CANCELADO` / `SUBSTITUIDO` | Nota não vale mais. |
 
-Cada item de `mensagens`: `{ "codigo": "E0312", "mensagem": "...", "correcao": "..." }`.
-Códigos `XSD` indicam erro de estrutura detectado **antes** de enviar ao fisco.
+Cada item de `mensagens`:
+
+```json
+{ "codigo": "CAMPO_OBRIGATORIO", "campo": "servico.descricao", "mensagem": "...", "correcao": "Como corrigir..." }
+```
+
+- Erros de entrada (da API): `CAMPO_OBRIGATORIO`, `FORMATO_INVALIDO`,
+  `VALOR_INVALIDO`, `NAO_SUPORTADO_PELO_PADRAO` — sempre com `campo` e `correcao`.
+- `XSD`: estrutura recusada pelo schema oficial **antes** de ir ao fisco.
+- Demais códigos (ex.: `E0312`): vêm do Sefin/Salvador; `correcao` aparece
+  quando o fisco a informa.
 
 ---
 
@@ -237,10 +274,33 @@ Respostas:
 | 202 | Evento enfileirado (ou concluído dentro do `aguardar`) |
 | 200 | Já havia um pedido igual; devolve o mesmo evento |
 | 409 `STATUS_NAO_PERMITE` | Documento não está `AUTORIZADO` |
-| 422 `NAO_SUPORTADO_PELO_PADRAO` | Padrão não aceita (ex.: **Salvador não cancela por webservice**) |
+| 422 `NAO_SUPORTADO_PELO_PADRAO` | Padrão não aceita (ex.: **Salvador não cancela por webservice** — use a seção 5.1) |
 
 Status do evento: `RECEBIDO`, `PROCESSANDO`, `REGISTRADO`, `REJEITADO`, `ERRO`.
 Quando um cancelamento é `REGISTRADO`, o documento passa a `CANCELADO`.
+
+---
+
+### 5.1 Cancelamento feito no portal (Salvador)
+
+Salvador só cancela pelo portal da prefeitura ou processo administrativo.
+Depois de cancelado lá, registre na API para a nota, o monitor e os webhooks
+ficarem coerentes (a API não chama a prefeitura nesta rota):
+
+```http
+POST /v1/nfse/cancelamento_externo.php
+{
+  "documento_id": "c59ac931-...",
+  "numero_processo": "2026/77881",
+  "motivo_codigo": "1",
+  "motivo": "Cancelado no portal: valor incorreto",
+  "observacao": "Pedido deferido em 05/11/2026"
+}
+```
+
+`201` com o evento (`origem: "EXTERNO"`, `status: "REGISTRADO"`) e o
+documento já `CANCELADO`. `422` se o padrão cancela pela API (Nacional:
+use `evento.php`), `409` se a nota não estiver `AUTORIZADO`.
 
 ---
 
@@ -250,7 +310,8 @@ Quando um cancelamento é `REGISTRADO`, o documento passa a `CANCELADO`.
 
 - **Nacional:** DANFSe oficial, baixado do ADN.
 - **Salvador:** espelho gerado pela API (documento auxiliar; a prefeitura não
-  fornece PDF por webservice).
+  fornece PDF por webservice), com o link de consulta no portal quando
+  `salvador.url_visualizacao` estiver configurada.
 
 `409 SEM_NFSE` se o documento ainda não tiver NFS-e.
 
@@ -296,36 +357,22 @@ até 10 vezes). Use `documento.id` + `status` para ignorar entregas repetidas.
 
 ## 8. Monitor (painel em tempo real)
 
-Carga inicial + stream:
+Há uma **página pronta** em `/monitor/` (documentação em `docs/nfse-monitor.md`).
+Para montar um painel próprio, use a carga inicial + o stream:
 
-```html
-<script>
+```js
 const token = 'TOKEN_DO_PAINEL';
-const linhas = new Map();
-
 fetch('/v1/nfse/documentos.php?limite=200', { headers: { 'X-NFE-API-TOKEN': token } })
   .then(r => r.json())
-  .then(({ documentos }) => documentos.forEach(d => desenhar(d.id, d.referencia, d.padrao, d.status, '')));
+  .then(({ documentos }) => documentos.forEach(desenhar));
 
-const fonte = new EventSource('/v1/nfse/monitor.php?token=' + encodeURIComponent(token));
+const fonte = new EventSource('/v1/nfse/monitor.php?desde=agora&token=' + encodeURIComponent(token));
 fonte.addEventListener('nfse', (e) => {
-  const m = JSON.parse(e.data);
-  desenhar(m.documento_id, m.referencia, m.padrao, m.status, `${m.operacao}: ${m.mensagem ?? ''}`);
+  const m = JSON.parse(e.data); // linha do monitor (formato abaixo)
+  fetch(`/v1/nfse/documento.php?id=${m.documento_id}&xml=0`, { headers: { 'X-NFE-API-TOKEN': token } })
+    .then(r => r.json())
+    .then(({ documento }) => desenhar(documento));
 });
-
-function desenhar(id, referencia, padrao, status, ultimaAcao) {
-  let tr = linhas.get(id);
-  if (!tr) {
-    tr = document.querySelector('#notas').insertRow(0);
-    linhas.set(id, tr);
-  }
-  tr.innerHTML = '';
-  for (const valor of [referencia, padrao, status, ultimaAcao]) {
-    tr.insertCell().textContent = valor;
-  }
-}
-</script>
-<table><tbody id="notas"></tbody></table>
 ```
 
 Cada evento `nfse`:
@@ -336,6 +383,7 @@ Cada evento `nfse`:
   "documento_id": "c59ac931-...",
   "lote_id": "24765aae-...",
   "padrao": "NACIONAL",
+  "emitente_cnpj": "41986662000160",
   "referencia": "PEDIDO-2026-000123",
   "operacao": "EMISSAO",
   "status": "AUTORIZADO",
@@ -346,4 +394,5 @@ Cada evento `nfse`:
 }
 ```
 
-O navegador reconecta sozinho e continua do último `id` recebido.
+`desde`: `agora` (só eventos novos), um id (continua dele) ou vazio (últimas
+50 linhas). O navegador reconecta sozinho e continua do último `id` recebido.

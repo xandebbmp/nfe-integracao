@@ -7,6 +7,50 @@ para produção.
 
 Legenda de prioridade: 🔴 bloqueia produção · 🟡 decidir antes de escalar · 🟢 pode esperar.
 
+## Decisões tomadas (04/11/2026)
+
+| # | Tema | Decisão | Situação no código |
+|---|---|---|---|
+| A1 | Padrão para notas de Salvador | Manter os dois (Nacional e webservice de Salvador) | Já era assim |
+| A4 | Emitentes | **Várias empresas** | Implementado: `emitentes` + `cnpjs` por consumidor + `emitente_cnpj` na emissão. Aguarda cadastro real. |
+| A6 | Alíquota no Nacional | Só se o sistema enviar | Já era assim |
+| A8 | Tributos aproximados | Não informar | Já era assim |
+| A10 | Competência | Data de hoje quando não vier | Já era assim |
+| B1 | Documento inválido no lote | Gravar como REJEITADO, mostrar no monitor com motivo e sugestão de correção | Implementado (sem consumir número de DPS/RPS) |
+| B2 | Reenvio após rejeição | Reaproveitar o número | Já era assim — **validar em homologação de Salvador** |
+| B3 | Cancelamento em Salvador | Rota de registro manual | Implementado: `cancelamento_externo.php` |
+| B4 | Cancelamento fora do prazo (Nacional) | Só devolver a rejeição | Já era assim |
+| B5 | Confirmação/rejeição (202201…) | Não agora | — |
+| B6 | Substituição | Atualizar a substituída automaticamente | Implementado (consulta 1 min após autorizar a substituta) |
+| C1 | Quem cancela | Cada sistema, só as próprias notas | Já era assim |
+| C3 | Painel | Rede interna/VPN, token na URL do stream | Já era assim; página pronta em `/monitor/` |
+| C4 | PDF de Salvador | Espelho + link do portal | Implementado; **falta o formato do link** (`salvador.url_visualizacao`) |
+| C6 | XMLs | Banco + armazenamento em nuvem | Implementado (`local` ou `s3`/compatível); **falta escolher o provedor** |
+| C7 | CNPJ alfanumérico em Salvador | Recusar com aviso | Já era assim |
+
+## Informações que ainda faltam
+
+| # | O que | Para quê |
+|---|---|---|
+| A | Cadastro de cada empresa: CNPJ, razão social, inscrição municipal, município, regime e certificado | Preencher `emitentes` em `config/nfse.local.php` |
+| B | Quais CNPJs cada sistema pode usar | `consumidores.<sistema>.cnpjs` |
+| C | Provedor de nuvem (S3, Azure, Google, MinIO...) e prazo de guarda | `armazenamento` (S3 e compatíveis já prontos; Azure/Google nativos exigem nova classe) |
+| E | Exemplo de link de visualização de nota no portal de Salvador | `salvador.url_visualizacao` |
+| F | Confirmação do contador: padrão de Salvador em 2026/2027 e regime (Simples?) de cada empresa | Escolha do padrão e campos de regime |
+| G | Séries e último número de DPS/RPS já usados por empresa | Evitar conflito de numeração (A3) |
+| H | Credenciamento na Produção Restrita (Nacional) e homologação de Salvador | Homologar |
+| I | Lista de sistemas, tokens e URLs de webhook | `consumidores` |
+| J | Existe retenção de PIS/COFINS? | A9 |
+| K | Volume (notas/dia, picos) | Limites de lote e nº de workers (B7, C9) |
+| L | Servidor do worker e quem recebe alertas | Operação (C9) |
+
+---
+
+# Registro original das dúvidas
+
+O texto abaixo é o levantamento original, mantido como histórico. As
+decisões acima prevalecem.
+
 ---
 
 ## A. Escopo fiscal e cadastro

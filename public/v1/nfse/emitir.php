@@ -16,9 +16,15 @@ declare(strict_types=1);
  *   ?aguardar=30  espera ate 30s pelo resultado (max. config api.max_aguardar_segundos)
  *
  * Respostas:
- *   202  lote aceito (documentos ainda processando)
+ *   202  lote aceito (ha documentos processando ou recusados)
  *   200  lote aceito e todos os documentos ja finalizados (quando usar aguardar)
- *   422  algum documento invalido: NADA foi gravado, veja erro.documentos
+ *   422  requisicao invalida, ou nenhum documento pode ser gravado
+ *
+ * Documento com dados invalidos NAO derruba o lote: ele e gravado como
+ * REJEITADO (situacao_recebimento = INVALIDO), aparece no monitor com o
+ * motivo e a sugestao de correcao, e pode ser reenviado com a mesma
+ * referencia. So vai para "recusados" o que nem da para gravar
+ * (padrao desconhecido, emitente nao liberado, referencia repetida no lote).
  *
  * Exemplo completo: docs/nfse-guia-api.md
  */
@@ -37,18 +43,21 @@ $corpo = $api->corpoJson();
 $resultado = (new RecebimentoLote($api->pdo(), $api->cfg))->receber($consumidor, $corpo);
 
 if (!$resultado['ok']) {
-    $api->erro(422, 'DOCUMENTOS_INVALIDOS', 'Um ou mais documentos sao invalidos. Nenhum documento foi gravado.', [
-        'documentos' => $resultado['erros'],
+    $api->erro(422, 'LOTE_INVALIDO', $resultado['erro']);
+}
+
+// Separa o que foi gravado (aparece no monitor) do que foi recusado sem gravar.
+$gravados = array_values(array_filter($resultado['documentos'], static fn($d) => isset($d['id']) && $d['situacao_recebimento'] !== RecebimentoLote::RECUSADO));
+$recusados = array_values(array_filter($resultado['documentos'], static fn($d) => $d['situacao_recebimento'] === RecebimentoLote::RECUSADO));
+
+if ($gravados === []) {
+    $api->erro(422, 'DOCUMENTOS_RECUSADOS', 'Nenhum documento pode ser gravado. Veja o motivo de cada um.', [
+        'recusados' => $recusados,
     ]);
 }
 
 $repositorio = new DocumentoRepositorio($api->pdo());
-$ids = array_column($resultado['documentos'], 'id');
-$situacao = array_column($resultado['documentos'], 'situacao_recebimento', 'id');
-
-$carregar = static function () use ($repositorio, $ids): array {
-    return array_map(static fn(string $id) => $repositorio->buscar($id), $ids);
-};
+$carregar = static fn(): array => array_map(static fn(array $d) => $repositorio->buscar($d['id']), $gravados);
 
 $api->aguardar((int)($_GET['aguardar'] ?? 0), static function () use ($carregar): bool {
     foreach ($carregar() as $doc) {
@@ -61,16 +70,18 @@ $api->aguardar((int)($_GET['aguardar'] ?? 0), static function () use ($carregar)
 
 $documentos = [];
 $todosFinalizados = true;
-foreach ($carregar() as $doc) {
+foreach ($carregar() as $i => $doc) {
     $saida = DocumentoApresentador::documento($doc, true);
-    $saida['situacao_recebimento'] = $situacao[$doc['id']];
+    $saida['indice'] = $gravados[$i]['indice'];
+    $saida['situacao_recebimento'] = $gravados[$i]['situacao_recebimento'];
     $todosFinalizados = $todosFinalizados && $saida['finalizado'];
     $documentos[] = $saida;
 }
 
-$api->responder($todosFinalizados ? 200 : 202, [
+$api->responder($todosFinalizados && $recusados === [] ? 200 : 202, [
     'lote_id' => $resultado['lote_id'],
-    'resumo' => array_count_values(array_column($documentos, 'status')),
+    'resumo' => array_count_values(array_column($documentos, 'status')) + ($recusados !== [] ? ['RECUSADO' => count($recusados)] : []),
     'documentos' => $documentos,
+    'recusados' => $recusados,
     'links' => ['lote' => '/v1/nfse/lote.php?id=' . $resultado['lote_id']],
 ]);

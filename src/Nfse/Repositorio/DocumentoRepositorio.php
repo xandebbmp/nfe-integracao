@@ -19,6 +19,7 @@ final class DocumentoRepositorio
         'status', 'id_dps', 'protocolo_lote', 'chave_acesso', 'numero_nfse',
         'codigo_verificacao', 'data_autorizacao', 'codigo_retorno', 'mensagem_retorno',
         'mensagens', 'xml_enviado', 'xml_autorizado', 'payload', 'lote_id',
+        'serie', 'numero', 'arquivado_em',
     ];
 
     public function __construct(private PDO $pdo)
@@ -65,10 +66,10 @@ final class DocumentoRepositorio
         $stmt = $this->pdo->prepare(
             'INSERT INTO nfse_documentos (
                 lote_id, consumidor, padrao, tp_amb, emitente_cnpj, referencia,
-                status, payload, serie, numero
+                status, payload, serie, numero, mensagens, codigo_retorno, mensagem_retorno
             ) VALUES (
                 :lote_id, :consumidor, :padrao, :tp_amb, :emitente_cnpj, :referencia,
-                :status, :payload, :serie, :numero
+                :status, :payload, :serie, :numero, :mensagens, :codigo_retorno, :mensagem_retorno
             ) RETURNING id'
         );
         $stmt->execute([
@@ -82,6 +83,9 @@ final class DocumentoRepositorio
             ':payload' => json_encode($dados['payload'], JSON_UNESCAPED_UNICODE),
             ':serie' => $dados['serie'],
             ':numero' => $dados['numero'],
+            ':mensagens' => json_encode($dados['mensagens'] ?? [], JSON_UNESCAPED_UNICODE),
+            ':codigo_retorno' => $dados['codigo_retorno'] ?? null,
+            ':mensagem_retorno' => $dados['mensagem_retorno'] ?? null,
         ]);
         return (string)$stmt->fetchColumn();
     }
@@ -122,6 +126,19 @@ final class DocumentoRepositorio
         return $row === false ? null : self::decodificar($row);
     }
 
+    /**
+     * Documento pela chave de acesso (usado para achar a nota substituida).
+     */
+    public function buscarPorChave(string $emitenteCnpj, string $chave): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM nfse_documentos WHERE emitente_cnpj = :cnpj AND chave_acesso = :chave LIMIT 1'
+        );
+        $stmt->execute([':cnpj' => $emitenteCnpj, ':chave' => $chave]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row === false ? null : self::decodificar($row);
+    }
+
     /** @return list<array> */
     public function listarDoLote(string $loteId): array
     {
@@ -131,7 +148,7 @@ final class DocumentoRepositorio
     }
 
     /**
-     * Lista para o painel. Filtros opcionais: status, padrao, consumidor.
+     * Lista para o painel. Filtros opcionais: status, padrao, consumidor, emitente_cnpj.
      *
      * @return list<array>
      */
@@ -139,7 +156,7 @@ final class DocumentoRepositorio
     {
         $where = [];
         $params = [];
-        foreach (['status', 'padrao', 'consumidor'] as $campo) {
+        foreach (['status', 'padrao', 'consumidor', 'emitente_cnpj'] as $campo) {
             if (!empty($filtros[$campo])) {
                 $where[] = "{$campo} = :{$campo}";
                 $params[":{$campo}"] = $filtros[$campo];
@@ -190,7 +207,7 @@ final class DocumentoRepositorio
         $row['payload'] = json_decode((string)$row['payload'], true) ?? [];
         $row['mensagens'] = json_decode((string)($row['mensagens'] ?? '[]'), true) ?? [];
         $row['tp_amb'] = (int)$row['tp_amb'];
-        $row['numero'] = (int)$row['numero'];
+        $row['numero'] = $row['numero'] === null ? null : (int)$row['numero'];
         return $row;
     }
 }

@@ -33,7 +33,7 @@ final class CertificadoCliente
     {
         $conteudo = is_file($caminhoPfx) ? file_get_contents($caminhoPfx) : false;
         if ($conteudo === false || $conteudo === '') {
-            throw new RuntimeException('Certificado digital (.pfx) nao encontrado ou vazio. Verifique certPfxPath.');
+            throw new RuntimeException('Certificado digital (.pfx) nao encontrado ou vazio. Verifique o caminho do certificado do emitente (certPfxPath ou emitentes.*.certificado).');
         }
 
         $certificado = Certificate::readPfx($conteudo, $senha);

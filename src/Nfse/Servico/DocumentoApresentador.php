@@ -25,15 +25,17 @@ final class DocumentoApresentador
             'id' => $doc['id'],
             'referencia' => $doc['referencia'],
             'padrao' => $doc['padrao'],
+            'emitente_cnpj' => $doc['emitente_cnpj'],
             'ambiente' => (int)$doc['tp_amb'] === 1 ? 'PRODUCAO' : 'HOMOLOGACAO',
             'lote_id' => $doc['lote_id'],
             'status' => $doc['status'],
             'finalizado' => !in_array($doc['status'], StatusNfse::EM_ANDAMENTO, true),
             'pode_reenviar' => in_array($doc['status'], StatusNfse::PERMITE_REENVIO, true),
-            'dps_rps' => [
+            // null quando o documento foi rejeitado na entrada (ainda sem numero).
+            'dps_rps' => $doc['numero'] !== null ? [
                 'serie' => $doc['serie'],
                 'numero' => (int)$doc['numero'],
-            ],
+            ] : null,
             'nfse' => $temNfse ? [
                 'numero' => $doc['numero_nfse'],
                 'chave_acesso' => $doc['chave_acesso'],
@@ -70,6 +72,9 @@ final class DocumentoApresentador
             'status' => $evento['status'],
             'motivo_codigo' => $evento['motivo_codigo'],
             'motivo_texto' => $evento['motivo_texto'],
+            'origem' => $evento['origem'] ?? 'API',
+            'numero_processo' => $evento['numero_processo'] ?? null,
+            'observacao' => $evento['observacao'] ?? null,
             'mensagens' => $evento['mensagens'] ?? [],
             'criado_em' => $evento['criado_em'] ?? null,
             'atualizado_em' => $evento['atualizado_em'] ?? null,
@@ -84,6 +89,7 @@ final class DocumentoApresentador
             'documento_id' => $linha['documento_id'],
             'lote_id' => $linha['lote_id'],
             'padrao' => $linha['padrao'],
+            'emitente_cnpj' => $linha['emitente_cnpj'] ?? null,
             'referencia' => $linha['referencia'],
             'operacao' => $linha['operacao'],
             'status' => $linha['status'],

@@ -3,17 +3,63 @@ declare(strict_types=1);
 
 // Copie para config/nfse.local.php (fora do Git) e preencha no servidor.
 return [
+    // ---------------------------------------------------------------
+    // EMPRESA UNICA: preencha so a inscricao municipal (o resto vem do nfe.php).
+    // ---------------------------------------------------------------
     'emitente' => [
         'inscricao_municipal' => 'SUA_INSCRICAO_MUNICIPAL',
     ],
+
+    // ---------------------------------------------------------------
+    // VARIAS EMPRESAS: descomente e preencha um bloco por CNPJ.
+    // Quando 'emitentes' tem itens, o bloco 'emitente' acima e ignorado.
+    // ---------------------------------------------------------------
+    // 'emitentes' => [
+    //     '41986662000160' => [
+    //         'razao_social' => 'LEBRE TECNOLOGIA E INFORMATICA LTDA',
+    //         'inscricao_municipal' => '123456',
+    //         'codigo_municipio' => '2927408',
+    //         'opcao_simples_nacional' => 1,
+    //         'regime_especial_tributacao' => 0,
+    //         'certificado' => [
+    //             'arquivo' => __DIR__ . '/../storage/certs/41986662000160.pfx',
+    //             'senha' => 'SENHA_DO_CERTIFICADO',
+    //         ],
+    //     ],
+    //     '11222333000181' => [
+    //         'razao_social' => 'OUTRA EMPRESA LTDA',
+    //         'inscricao_municipal' => '654321',
+    //         'codigo_municipio' => '2927408',
+    //         'opcao_simples_nacional' => 3,
+    //         'regime_apuracao_simples' => 1,
+    //         'certificado' => [
+    //             'arquivo' => __DIR__ . '/../storage/certs/11222333000181.pfx',
+    //             'senha' => 'SENHA_DO_CERTIFICADO',
+    //         ],
+    //     ],
+    // ],
 
     'consumidores' => [
         'ERP' => [
             'token' => 'TOKEN_FORTE_DO_ERP',
             'webhook_url' => 'https://erp.suaempresa.com.br/webhooks/nfse',
             'webhook_segredo' => 'SEGREDO_HMAC_DO_WEBHOOK',
+            // Obrigatorio com varias empresas:
+            // 'cnpjs' => ['41986662000160', '11222333000181'],
         ],
     ],
 
     'monitor_token' => 'TOKEN_DO_PAINEL',
+
+    // Arquivamento dos XMLs em nuvem (exemplo S3):
+    // 'armazenamento' => [
+    //     'tipo' => 's3',
+    //     's3' => [
+    //         'endpoint' => 'https://s3.sa-east-1.amazonaws.com',
+    //         'regiao' => 'sa-east-1',
+    //         'bucket' => 'empresa-xml-fiscal',
+    //         'chave_acesso' => 'AKIA...',
+    //         'chave_secreta' => '...',
+    //     ],
+    // ],
 ];

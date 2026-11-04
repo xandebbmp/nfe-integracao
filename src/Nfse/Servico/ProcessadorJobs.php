@@ -5,6 +5,8 @@ namespace Xande\NfeIntegracao\Nfse\Servico;
 
 use PDO;
 use Throwable;
+use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoArquivos;
+use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoFactory;
 use Xande\NfeIntegracao\Nfse\Contrato\RetornoProvedor;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusEvento;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusNfse;
@@ -39,8 +41,10 @@ final class ProcessadorJobs
         private PDO $pdo,
         private array $cfg,
         private ProvedorFactory $provedores,
-        private string $workerId
+        private string $workerId,
+        private ?ArmazenamentoArquivos $armazenamento = null
     ) {
+        $this->armazenamento ??= ArmazenamentoFactory::criar($cfg);
         $this->documentos = new DocumentoRepositorio($pdo);
         $this->eventos = new EventoRepositorio($pdo);
         $this->fila = new FilaRepositorio($pdo);
@@ -61,6 +65,12 @@ final class ProcessadorJobs
         $documento = $this->documentos->buscar((string)$job['documento_id']);
         if ($documento === null) {
             $this->fila->falhar((int)$job['id'], 'Documento nao encontrado.');
+            return true;
+        }
+
+        // Arquivamento nao mexe no status do documento: tratado a parte.
+        if ($job['tipo'] === FilaRepositorio::ARQUIVAR) {
+            $this->arquivar($job, $documento);
             return true;
         }
 
@@ -110,7 +120,7 @@ final class ProcessadorJobs
             $this->monitor->registrar($documento, 'EMISSAO', StatusNfse::PROCESSANDO, 'Enviando ao fisco');
         }
 
-        $retorno = $this->provedores->para($documento['padrao'])->emitir($documento);
+        $retorno = $this->provedores->para($documento['padrao'], $documento['emitente_cnpj'])->emitir($documento);
         $this->aplicarRetornoDocumento($job, $documento, $retorno, 'EMISSAO');
     }
 
@@ -121,13 +131,13 @@ final class ProcessadorJobs
             return;
         }
 
-        $retorno = $this->provedores->para($documento['padrao'])->consultarProcessamento($documento);
+        $retorno = $this->provedores->para($documento['padrao'], $documento['emitente_cnpj'])->consultarProcessamento($documento);
         $this->aplicarRetornoDocumento($job, $documento, $retorno, 'EMISSAO');
     }
 
     private function consultar(array $job, array $documento): void
     {
-        $provedor = $this->provedores->para($documento['padrao']);
+        $provedor = $this->provedores->para($documento['padrao'], $documento['emitente_cnpj']);
 
         // Sem NFS-e ainda (processando, erro, rejeitado): pergunta se o envio
         // virou nota. Com NFS-e: pergunta a situacao atual (cancelada?).
@@ -147,8 +157,34 @@ final class ProcessadorJobs
         }
 
         $this->eventos->atualizar($evento['id'], ['status' => StatusEvento::PROCESSANDO]);
-        $retorno = $this->provedores->para($documento['padrao'])->registrarEvento($documento, $evento);
+        $retorno = $this->provedores->para($documento['padrao'], $documento['emitente_cnpj'])->registrarEvento($documento, $evento);
         $this->aplicarRetornoEvento($job, $documento, $evento, $retorno);
+    }
+
+    /**
+     * Copia os XMLs para o armazenamento externo (nuvem/pasta).
+     * Falha aqui nunca altera o status fiscal: so tenta de novo depois.
+     */
+    private function arquivar(array $job, array $documento): void
+    {
+        if ($this->armazenamento === null) {
+            $this->fila->concluir((int)$job['id']);
+            return;
+        }
+
+        try {
+            (new Arquivador($this->armazenamento, $this->eventos))->arquivar($documento);
+            $this->documentos->atualizar($documento['id'], ['arquivado_em' => date(DATE_ATOM)]);
+            $this->fila->concluir((int)$job['id']);
+        } catch (Throwable $e) {
+            $tentativa = (int)$job['tentativas'];
+            if ($tentativa < (int)$job['max_tentativas']) {
+                $this->fila->reagendar((int)$job['id'], $this->espera($tentativa), $e->getMessage());
+                return;
+            }
+            $this->fila->falhar((int)$job['id'], $e->getMessage());
+            $this->monitor->registrar($documento, 'CONSULTA', $documento['status'], 'Falha ao arquivar XML no armazenamento externo: ' . $e->getMessage());
+        }
     }
 
     // =================================================================
@@ -265,6 +301,9 @@ final class ProcessadorJobs
         if ($retorno->status === StatusEvento::REGISTRADO && $evento['tipo_evento'] === TipoEvento::CANCELAMENTO) {
             $this->mudarStatus($documento, StatusNfse::CANCELADO, [], 'EVENTO', 'Cancelamento registrado');
         } else {
+            if ($retorno->status === StatusEvento::REGISTRADO) {
+                $this->agendarArquivamento($documento['id']);
+            }
             $this->registrarMonitor($documento, 'EVENTO', $documento['status'], "{$descricao}: {$retorno->status}. " . $retorno->resumo());
         }
 
@@ -282,8 +321,32 @@ final class ProcessadorJobs
         $this->registrarMonitor($atualizado, $operacao, $status, $mensagem);
 
         // O consumidor so e avisado quando o status muda de verdade.
-        if ($documento['status'] !== $status) {
-            $this->notificador->documentoAtualizado($atualizado);
+        if ($documento['status'] === $status) {
+            return;
+        }
+        $this->notificador->documentoAtualizado($atualizado);
+
+        if (in_array($status, StatusNfse::COM_NFSE, true)) {
+            $this->agendarArquivamento($atualizado['id']);
+        }
+
+        // Nota substituta autorizada: consulta a substituida para ela passar
+        // a SUBSTITUIDO. Espera 1 minuto para o Sefin registrar o evento.
+        $chaveSubstituida = $atualizado['payload']['substituicao']['chave_substituida'] ?? null;
+        if ($status === StatusNfse::AUTORIZADO && is_string($chaveSubstituida)) {
+            $antiga = $this->documentos->buscarPorChave($atualizado['emitente_cnpj'], $chaveSubstituida);
+            if ($antiga !== null && !$this->fila->existePendente(FilaRepositorio::CONSULTAR, $antiga['id'])) {
+                $this->fila->enfileirar(FilaRepositorio::CONSULTAR, $antiga['id'], null, 60, (int)$this->cfg['fila']['max_tentativas']);
+                $this->monitor->registrar($antiga, 'CONSULTA', $antiga['status'],
+                    'Substituida pela NFS-e ' . ($atualizado['numero_nfse'] ?? $atualizado['id']) . ': consulta agendada');
+            }
+        }
+    }
+
+    private function agendarArquivamento(string $documentoId): void
+    {
+        if ($this->armazenamento !== null && !$this->fila->existePendente(FilaRepositorio::ARQUIVAR, $documentoId)) {
+            $this->fila->enfileirar(FilaRepositorio::ARQUIVAR, $documentoId, null, 0, 10);
         }
     }
 

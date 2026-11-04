@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * GET /v1/nfse/monitor.php?token=<monitor_token>
+ * GET /v1/nfse/monitor.php?token=<monitor_token>[&desde=<id>|agora]
  *
  * Stream em tempo real (Server-Sent Events) para o painel do monitor fiscal.
  * Cada mudanca de documento (recebido, enviado, autorizado, rejeitado,
@@ -36,8 +36,15 @@ $consumidor = $acesso['painel'] ? null : $acesso['consumidor'];
 $pdo = $api->pdo();
 $monitor = new MonitorRepositorio($pdo);
 
-$ultimoId = (int)($_SERVER['HTTP_LAST_EVENT_ID'] ?? ($_GET['desde'] ?? -1));
-if ($ultimoId < 0) {
+// De onde comecar:
+//   Last-Event-ID (reconexao automatica do navegador) > ?desde=<id> >
+//   ?desde=agora (so eventos novos) > ultimas 50 linhas.
+$desde = (string)($_SERVER['HTTP_LAST_EVENT_ID'] ?? ($_GET['desde'] ?? ''));
+if ($desde === 'agora') {
+    $ultimoId = $monitor->idParaUltimos(0);
+} elseif (ctype_digit($desde)) {
+    $ultimoId = (int)$desde;
+} else {
     $ultimoId = $monitor->idParaUltimos(50);
 }
 

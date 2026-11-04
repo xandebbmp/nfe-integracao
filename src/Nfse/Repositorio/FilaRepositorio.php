@@ -21,6 +21,7 @@ use PDO;
  *   CONSULTAR_PROCESSAMENTO  acompanha envio assincrono (lote Salvador)
  *   CONSULTAR                consulta pedida pelo consumidor
  *   EVENTO                   registra evento (cancelamento...)
+ *   ARQUIVAR                 copia os XMLs para o armazenamento externo
  */
 final class FilaRepositorio
 {
@@ -28,6 +29,7 @@ final class FilaRepositorio
     public const CONSULTAR_PROCESSAMENTO = 'CONSULTAR_PROCESSAMENTO';
     public const CONSULTAR = 'CONSULTAR';
     public const EVENTO = 'EVENTO';
+    public const ARQUIVAR = 'ARQUIVAR';
 
     public function __construct(private PDO $pdo)
     {

@@ -16,75 +16,82 @@ use Xande\NfeIntegracao\Nfse\Salvador\ProvedorSalvador;
 use Xande\NfeIntegracao\Nfse\Salvador\SalvadorSoapCliente;
 
 /**
- * Cria o provedor certo para cada padrao.
+ * Cria o provedor certo para cada padrao E emitente (CNPJ).
  *
- * O certificado so e lido quando um provedor e realmente usado (ex.: a rota
- * de capacidades nao precisa dele).
+ * Cada emitente tem o proprio certificado digital, usado para assinar o XML
+ * e para a conexao mTLS. O certificado so e lido quando o provedor e usado.
  *
- * Nos testes passamos $certificado e $transporte falsos.
+ * Nos testes passamos $certificadoFixo e $transporte falsos.
  */
 final class ProvedorFactory
 {
-    /** @var array<string, ProvedorNfse> */
-    private array $cache = [];
+    /** @var array<string, ProvedorNfse> chave: "PADRAO|CNPJ" */
+    private array $provedores = [];
+
+    /** @var array<string, CertificadoCliente> chave: CNPJ */
+    private array $certificados = [];
 
     public function __construct(
         private array $cfg,
-        private ?CertificadoCliente $certificado = null,
+        private ?CertificadoCliente $certificadoFixo = null,
         private ?TransporteHttp $transporte = null
     ) {
     }
 
-    public function para(string $padrao): ProvedorNfse
+    public function para(string $padrao, string $cnpj): ProvedorNfse
     {
-        return $this->cache[$padrao] ??= match ($padrao) {
-            Padrao::NACIONAL => $this->criarNacional(),
-            Padrao::SALVADOR => $this->criarSalvador(),
+        $cfgEmitente = NfseConfig::paraEmitente($this->cfg, $cnpj);
+        $chave = $padrao . '|' . $cfgEmitente['emitente']['cnpj'];
+
+        return $this->provedores[$chave] ??= match ($padrao) {
+            Padrao::NACIONAL => $this->criarNacional($cfgEmitente),
+            Padrao::SALVADOR => $this->criarSalvador($cfgEmitente),
             default => throw new RuntimeException("Padrao de NFS-e desconhecido: {$padrao}"),
         };
     }
 
-    private function criarNacional(): ProvedorNacional
+    private function criarNacional(array $cfg): ProvedorNacional
     {
-        $c = $this->cfg['nacional'];
-        $tpAmb = (int)$this->cfg['tpAmb'];
+        $c = $cfg['nacional'];
+        $tpAmb = (int)$cfg['tpAmb'];
+        $certificado = $this->certificado($cfg['emitente']);
 
         return new ProvedorNacional(
-            $this->cfg,
+            $cfg,
             new SefinNacionalCliente(
-                $this->transporte((int)$c['timeout_segundos']),
+                $this->transporte ?? new CurlTransporte($certificado, (int)$c['timeout_segundos']),
                 rtrim((string)$c['url_sefin'][$tpAmb], '/'),
                 rtrim((string)$c['url_danfse'][$tpAmb], '/')
             ),
-            new AssinadorXml($this->certificado()->certificado(), (string)$c['algoritmo_assinatura'])
+            new AssinadorXml($certificado->certificado(), (string)$c['algoritmo_assinatura'])
         );
     }
 
-    private function criarSalvador(): ProvedorSalvador
+    private function criarSalvador(array $cfg): ProvedorSalvador
     {
-        $c = $this->cfg['salvador'];
-        $tpAmb = (int)$this->cfg['tpAmb'];
+        $c = $cfg['salvador'];
+        $tpAmb = (int)$cfg['tpAmb'];
+        $certificado = $this->certificado($cfg['emitente']);
 
         return new ProvedorSalvador(
-            $this->cfg,
+            $cfg,
             new SalvadorSoapCliente(
-                $this->transporte((int)$c['timeout_segundos']),
+                $this->transporte ?? new CurlTransporte($certificado, (int)$c['timeout_segundos']),
                 rtrim((string)$c['url_base'][$tpAmb], '/')
             ),
-            new AssinadorXml($this->certificado()->certificado(), (string)$c['algoritmo_assinatura'])
+            new AssinadorXml($certificado->certificado(), (string)$c['algoritmo_assinatura'])
         );
     }
 
-    private function certificado(): CertificadoCliente
+    private function certificado(array $emitente): CertificadoCliente
     {
-        return $this->certificado ??= CertificadoCliente::doArquivo(
-            (string)$this->cfg['certPfxPath'],
-            (string)$this->cfg['certPassword']
-        );
-    }
+        if ($this->certificadoFixo !== null) {
+            return $this->certificadoFixo;
+        }
 
-    private function transporte(int $timeout): TransporteHttp
-    {
-        return $this->transporte ?? new CurlTransporte($this->certificado(), $timeout);
+        return $this->certificados[$emitente['cnpj']] ??= CertificadoCliente::doArquivo(
+            (string)($emitente['certificado']['arquivo'] ?? ''),
+            (string)($emitente['certificado']['senha'] ?? '')
+        );
     }
 }

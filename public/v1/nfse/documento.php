@@ -2,10 +2,11 @@
 declare(strict_types=1);
 
 /**
- * GET /v1/nfse/documento.php?id=<documento_id>[&formato=xml][&historico=1]
+ * GET /v1/nfse/documento.php?id=<documento_id>[&formato=xml][&historico=1][&xml=0]
  *
  *   formato=xml  devolve o XML autorizado puro (Content-Type: application/xml)
  *   historico=1  inclui a linha do tempo do monitor (envios, consultas...)
+ *   xml=0        nao inclui o XML autorizado no JSON (usado pelo painel)
  */
 
 use Xande\NfeIntegracao\Nfse\Api\Api;
@@ -31,7 +32,7 @@ if (($_GET['formato'] ?? '') === 'xml') {
 
 $saida = DocumentoApresentador::documento(
     $documento,
-    true,
+    ($_GET['xml'] ?? '1') !== '0',
     (new EventoRepositorio($api->pdo()))->listarDoDocumento($documento['id'])
 );
 

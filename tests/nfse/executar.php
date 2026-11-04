@@ -20,6 +20,8 @@ declare(strict_types=1);
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 require __DIR__ . '/Apoio.php';
 
+use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoLocal;
+use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoS3;
 use Xande\NfeIntegracao\Nfse\Contrato\RetornoProvedor;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusEvento;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusNfse;
@@ -30,6 +32,7 @@ use Xande\NfeIntegracao\Nfse\Infra\Xml;
 use Xande\NfeIntegracao\Nfse\Nacional\EventoXmlBuilder;
 use Xande\NfeIntegracao\Nfse\Nacional\ProvedorNacional;
 use Xande\NfeIntegracao\Nfse\Nacional\SefinNacionalCliente;
+use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\ProvedorFactory;
 use Xande\NfeIntegracao\Nfse\Repositorio\DocumentoRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\EventoRepositorio;
@@ -42,7 +45,9 @@ use Xande\NfeIntegracao\Nfse\Servico\Solicitacoes;
 use Xande\NfeIntegracao\Nfse\Servico\ValidadorPayload;
 
 $raiz = dirname(__DIR__, 2);
-$cfg = Apoio::config();
+$cfgGeral = Apoio::config();
+// Provedores e montadores recebem a config de UM emitente.
+$cfg = NfseConfig::paraEmitente($cfgGeral, '41986662000160');
 $chave = str_repeat('1', 50);
 
 // ---------------------------------------------------------------------------
@@ -151,7 +156,6 @@ $alfanumerico['tomador']['cpf_cnpj'] = '12ABC34501DE35';
 Apoio::igual([], ValidadorPayload::validar($alfanumerico, 'NACIONAL'), 'CNPJ alfanumerico aceito na validacao do Nacional');
 Apoio::verificar(ValidadorPayload::validar($alfanumerico, 'SALVADOR') !== [], 'CNPJ alfanumerico recusado em Salvador (XSD so numerico)');
 
-Apoio::verificar(ValidadorPayload::validar($doc, 'RECIFE') !== [], 'padrao desconhecido e recusado');
 
 // ===========================================================================
 echo "\n[2] Padrao Nacional - XML e assinatura\n";
@@ -261,6 +265,35 @@ $pdf = provedorSalvador($cfg, new TransporteFalso())->gerarPdf($docSalvador + ['
 Apoio::verificar(str_starts_with($pdf, '%PDF'), 'espelho PDF de Salvador gerado');
 
 // ===========================================================================
+echo "\n[4b] Armazenamento externo (S3 / pasta)\n";
+// ===========================================================================
+
+// Exemplo oficial da documentacao AWS (Signature Version 4, GET /test.txt).
+$autorizacao = ArmazenamentoS3::autorizacao('GET', '/test.txt', '', [
+    'host' => 'examplebucket.s3.amazonaws.com',
+    'range' => 'bytes=0-9',
+    'x-amz-content-sha256' => 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    'x-amz-date' => '20130524T000000Z',
+], 'us-east-1', 'AKIAIOSFODNN7EXAMPLE', 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', '20130524T000000Z');
+Apoio::verificar(str_ends_with($autorizacao, 'Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41'), 'assinatura S3 (SigV4) igual ao exemplo oficial da AWS');
+
+$http = new TransporteFalso();
+$http->responder(200, '');
+(new ArmazenamentoS3($http, 'https://s3.sa-east-1.amazonaws.com', 'sa-east-1', 'meu-bucket', 'AK', 'SK', 'nfse'))->salvar('homologacao/x/nfse.xml', '<a/>');
+Apoio::igual('PUT https://meu-bucket.s3.sa-east-1.amazonaws.com/nfse/homologacao/x/nfse.xml', $http->requisicoes[0]['metodo'] . ' ' . $http->requisicoes[0]['url'], 'S3: PUT no bucket com prefixo');
+
+$http = new TransporteFalso();
+$http->responder(403, '<Error>AccessDenied</Error>');
+try {
+    (new ArmazenamentoS3($http, 'http://minio:9000', 'us-east-1', 'b', 'AK', 'SK', '', true))->salvar('a.xml', '<a/>');
+    Apoio::verificar(false, 'S3: erro HTTP gera excecao');
+} catch (RuntimeException) {
+    Apoio::verificar(str_starts_with($http->requisicoes[0]['url'], 'http://minio:9000/b/a.xml'), 'S3 path-style (MinIO) e erro HTTP gera excecao');
+}
+
+$pastaArquivos = sys_get_temp_dir() . '/nfse_teste_arquivos_' . getmypid();
+
+// ===========================================================================
 echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
 // ===========================================================================
 
@@ -270,13 +303,18 @@ if (!$dsn) {
 } else {
     $pdo = new PDO($dsn, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
     $pdo->exec('DROP TABLE IF EXISTS nfse_webhooks_saida, nfse_monitor, nfse_jobs, nfse_eventos, nfse_numeracao, nfse_documentos, nfse_lotes CASCADE');
-    $pdo->exec((string)file_get_contents("{$raiz}/database/scripts/0002_nfse_criar_base.sql"));
+    // Aplica todos os scripts da NFS-e, na ordem (0002, 0003...).
+    $scripts = glob("{$raiz}/database/scripts/*_nfse_*.sql");
+    sort($scripts);
+    foreach ($scripts as $script) {
+        $pdo->exec((string)file_get_contents($script));
+    }
 
-    $cfg['consumidores']['TESTE']['webhook_url'] = 'https://consumidor.teste/webhook';
+    $cfgGeral['consumidores']['TESTE']['webhook_url'] = 'https://consumidor.teste/webhook';
     $http = new TransporteFalso();
-    $fabrica = new ProvedorFactory($cfg, new CertificadoCliente(Apoio::certificado()), $http);
-    $worker = new ProcessadorJobs($pdo, $cfg, $fabrica, 'teste');
-    $recebimento = new RecebimentoLote($pdo, $cfg);
+    $fabrica = new ProvedorFactory($cfgGeral, new CertificadoCliente(Apoio::certificado()), $http);
+    $worker = new ProcessadorJobs($pdo, $cfgGeral, $fabrica, 'teste', new ArmazenamentoLocal($pastaArquivos));
+    $recebimento = new RecebimentoLote($pdo, $cfgGeral);
     $documentos = new DocumentoRepositorio($pdo);
 
     $payload = Apoio::documentoNacional()['payload'];
@@ -288,8 +326,27 @@ if (!$dsn) {
     [$doc1, $doc2] = array_map(fn($d) => $documentos->buscar($d['id']), $lote['documentos']);
     Apoio::igual([1, 2], [$doc1['numero'], $doc2['numero']], 'numeracao DPS sequencial reservada (1, 2)');
 
-    $invalido = $recebimento->receber('TESTE', ['padrao' => 'NACIONAL', 'documentos' => [array_replace($payload, ['referencia' => 'X']), ['referencia' => 'Y']]]);
-    Apoio::verificar(!$invalido['ok'] && count($invalido['erros']) === 1, 'lote com 1 invalido e recusado inteiro (nada gravado)');
+    // Lote misto: 1 valido, 1 invalido (gravado como REJEITADO), 1 recusado (padrao errado).
+    $misto = $recebimento->receber('TESTE', ['padrao' => 'NACIONAL', 'documentos' => [
+        array_replace($payload, ['referencia' => 'X']),
+        ['referencia' => 'Y', 'servico' => ['descricao' => 'Teste']],
+        array_replace($payload, ['referencia' => 'Z', 'padrao' => 'RECIFE']),
+    ]]);
+    Apoio::igual(['NOVO', 'INVALIDO', 'RECUSADO'], array_column($misto['documentos'], 'situacao_recebimento'), 'lote misto: valido segue, invalido e gravado, recusado nao e gravado');
+    $lotesAntes = (int)$pdo->query('SELECT count(*) FROM nfse_lotes')->fetchColumn();
+    $soRecusados = $recebimento->receber('TESTE', ['padrao' => 'RECIFE', 'documentos' => [$payload]]);
+    Apoio::igual([null, $lotesAntes], [$soRecusados['lote_id'], (int)$pdo->query('SELECT count(*) FROM nfse_lotes')->fetchColumn()], 'lote so com recusados nao deixa lote vazio gravado');
+    $docInvalido = $documentos->buscar($misto['documentos'][1]['id']);
+    Apoio::igual([StatusNfse::REJEITADO, null], [$docInvalido['status'], $docInvalido['numero']], 'invalido fica REJEITADO e nao consome numero de DPS');
+    Apoio::verificar(($docInvalido['mensagens'][0]['correcao'] ?? '') !== '' && ($docInvalido['mensagens'][0]['campo'] ?? '') !== '', 'mensagem traz campo e sugestao de correcao');
+    Apoio::igual('REJEITADO', (new MonitorRepositorio($pdo))->historico($docInvalido['id'])[0]['status'] ?? null, 'invalido aparece no monitor como REJEITADO');
+    $pdo->exec("DELETE FROM nfse_jobs WHERE documento_id = '{$misto['documentos'][0]['id']}'");
+
+    $corrigido = $recebimento->receber('TESTE', ['padrao' => 'NACIONAL', 'documentos' => [array_replace($payload, ['referencia' => 'Y'])]]);
+    $docCorrigido = $documentos->buscar($corrigido['documentos'][0]['id']);
+    Apoio::igual(['REENVIADO', StatusNfse::RECEBIDO, $docInvalido['id']], [$corrigido['documentos'][0]['situacao_recebimento'], $docCorrigido['status'], $docCorrigido['id']], 'reenvio corrigido reaproveita o documento');
+    Apoio::verificar($docCorrigido['numero'] !== null, 'reenvio corrigido recebe numero de DPS');
+    $pdo->exec("DELETE FROM nfse_jobs WHERE documento_id = '{$docCorrigido['id']}'");
 
     // Doc 1 autoriza; doc 2 e rejeitado.
     $http->responder(201, respostaSefinAutorizada($chave));
@@ -328,7 +385,7 @@ if (!$dsn) {
     Apoio::igual(StatusNfse::PROCESSANDO, $documentos->buscar($loteFalha['documentos'][0]['id'])['status'], 'documento segue PROCESSANDO durante as tentativas');
 
     // Cancelamento (evento)
-    $solicitacoes = new Solicitacoes($pdo, $cfg);
+    $solicitacoes = new Solicitacoes($pdo, $cfgGeral);
     $r = $solicitacoes->registrarEvento($doc1, '101101', '1', 'Curto');
     Apoio::igual('MOTIVO_INVALIDO', $r['codigo'] ?? null, 'motivo com menos de 15 caracteres e recusado');
     $r = $solicitacoes->registrarEvento($doc1, '101101', '1', 'Erro na emissao da nota fiscal');
@@ -364,6 +421,44 @@ if (!$dsn) {
     while ($worker->processarProximo()) {
     }
     Apoio::igual([StatusNfse::AUTORIZADO, '987'], [$documentos->buscar($idSsa)['status'], $documentos->buscar($idSsa)['numero_nfse']], 'Salvador: AUTORIZADO apos consulta do lote');
+
+    // Arquivamento: as notas autorizadas/canceladas foram copiadas para a pasta.
+    while ($worker->processarProximo()) {
+    }
+    $arquivados = glob($pastaArquivos . '/homologacao/41986662000160/*/*/*/nfse.xml') ?: [];
+    Apoio::verificar(count($arquivados) >= 3, 'XMLs autorizados copiados para o armazenamento (' . count($arquivados) . ' notas)');
+    $semEnvio = array_filter($arquivados, static fn(string $nfse) => !is_file(dirname($nfse) . '/envio.xml'));
+    Apoio::igual([], array_values($semEnvio), 'XML de envio arquivado junto de cada NFS-e');
+    Apoio::verificar($documentos->buscar($idSsa)['arquivado_em'] !== null, 'documento marcado com arquivado_em');
+
+    // Cancelamento externo (Salvador)
+    $r = $solicitacoes->registrarCancelamentoExterno($documentos->buscar($idSsa), 'TESTE', '', '1', 'Cancelado no portal da prefeitura', null);
+    Apoio::igual('PROCESSO_INVALIDO', $r['codigo'] ?? null, 'cancelamento externo exige numero do processo');
+    $r = $solicitacoes->registrarCancelamentoExterno($documentos->buscar($idSsa), 'TESTE', '2026/0001', '1', 'Cancelado no portal da prefeitura', 'Pedido deferido');
+    Apoio::igual([201, StatusNfse::CANCELADO], [$r['http'], $documentos->buscar($idSsa)['status']], 'cancelamento externo registrado e nota CANCELADA');
+    Apoio::igual(['EXTERNO', '2026/0001', 'REGISTRADO'], [$r['evento']['origem'], $r['evento']['numero_processo'], $r['evento']['status']], 'evento externo com origem e processo');
+    $r = $solicitacoes->registrarCancelamentoExterno($documentos->buscar($doc2['id']), 'TESTE', '2026/0002', '1', 'Cancelado no portal da prefeitura', null);
+    Apoio::igual('NAO_SUPORTADO_PELO_PADRAO', $r['codigo'] ?? null, 'Nacional nao aceita cancelamento externo (usa evento.php)');
+
+    // Substituicao (Nacional): ao autorizar a substituta, a antiga e consultada.
+    $pdo->exec("DELETE FROM nfse_jobs WHERE status = 'PENDENTE'");
+    $loteSub = $recebimento->receber('TESTE', ['padrao' => 'NACIONAL', 'documentos' => [array_replace($payload, [
+        'referencia' => 'SUBSTITUTA-1',
+        'substituicao' => ['chave_substituida' => str_repeat('2', 50), 'codigo_motivo' => '01', 'motivo' => 'Correcao de valores'],
+    ])]]);
+    $http->responder(201, respostaSefinAutorizada(str_repeat('3', 50)));
+    $worker->processarProximo();
+    $consultaAgendada = $pdo->query("SELECT count(*) FROM nfse_jobs WHERE tipo = 'CONSULTAR' AND documento_id = '{$doc2['id']}' AND status = 'PENDENTE'")->fetchColumn();
+    Apoio::igual(1, (int)$consultaAgendada, 'substituta autorizada agenda consulta da nota substituida');
+    $pdo->exec("UPDATE nfse_jobs SET executar_apos = CURRENT_TIMESTAMP WHERE tipo = 'CONSULTAR'");
+    $pdo->exec("DELETE FROM nfse_jobs WHERE tipo = 'ARQUIVAR' AND status = 'PENDENTE'");
+    $http->responder(200, json_encode(['chaveAcesso' => str_repeat('2', 50), 'nfseXmlGZipB64' => SefinNacionalCliente::compactar(nfseNacionalXml(str_repeat('2', 50)))]));
+    $http->responder(200, json_encode(['eventos' => [['tipoEvento' => '105102']]]));
+    while ($worker->processarProximo()) {
+    }
+    Apoio::igual(StatusNfse::SUBSTITUIDO, $documentos->buscar($doc2['id'])['status'], 'nota antiga passa a SUBSTITUIDO');
+
+    exec('rm -rf ' . escapeshellarg($pastaArquivos));
 }
 
 // ===========================================================================

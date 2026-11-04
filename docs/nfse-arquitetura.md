@@ -74,27 +74,35 @@ sequenceDiagram
     participant W as Worker
     participant F as Fisco
     C->>API: POST lote (N documentos)
-    API->>API: valida TODOS (ValidadorPayload)
-    alt algum invalido
-        API-->>C: 422 + erros por documento (nada gravado)
-    else todos validos
-        API->>DB: BEGIN; lote; numero DPS/RPS; documentos; jobs EMITIR; monitor; COMMIT
-        DB-->>W: NOTIFY nfse_jobs
-        API-->>C: 202 + id de cada documento (status RECEBIDO)
-        loop para cada job
-            W->>DB: pega job (SKIP LOCKED) e marca PROCESSANDO
-            W->>F: envia DPS (Nacional) ou lote RPS (Salvador)
-            F-->>W: resposta
-            W->>DB: status + XML + mensagens; monitor (NOTIFY); webhook (outbox)
+    API->>DB: BEGIN; cria lote
+    loop cada documento
+        alt nao da para gravar (padrao/emitente invalido)
+            API->>API: vai para "recusados"
+        else dados invalidos (ValidadorPayload)
+            API->>DB: documento REJEITADO (sem numero) + monitor com motivo e correcao
+        else valido
+            API->>DB: reserva numero DPS/RPS; documento RECEBIDO; job EMITIR; monitor
         end
+    end
+    API->>DB: COMMIT
+    DB-->>W: NOTIFY nfse_jobs
+    API-->>C: 202 + situacao de cada documento
+    loop para cada job
+        W->>DB: pega job (SKIP LOCKED) e marca PROCESSANDO
+        W->>F: envia DPS (Nacional) ou lote RPS (Salvador)
+        F-->>W: resposta
+        W->>DB: status + XML + mensagens; monitor (NOTIFY); webhook (outbox); job ARQUIVAR
     end
 ```
 
 Pontos importantes:
 
-1. **Validação tudo-ou-nada na entrada.** Se 1 de 10 documentos estiver
-   inválido, nenhum é gravado e a resposta diz exatamente o erro de cada um.
-   (Decisão a confirmar — ver dúvidas.)
+1. **Documento inválido não derruba o lote** (decisão B1). Ele é gravado
+   como `REJEITADO`, **sem consumir número** de DPS/RPS, e aparece no monitor
+   com o motivo e a sugestão de correção (`campo` + `correcao`). Corrigido e
+   reenviado com a mesma referência, recebe número e segue o fluxo normal.
+   Só fica de fora (lista `recusados`) o que nem dá para gravar: padrão
+   desconhecido, emitente não liberado, referência repetida no lote.
 2. **Cada documento é independente depois de aceito.** No Sefin Nacional não
    existe lote (uma DPS por chamada). Em Salvador enviamos **um RPS por
    lote**, porque no ABRASF um erro em um RPS derruba o lote inteiro.
@@ -182,11 +190,11 @@ assim o consumidor tem um contrato só. O que cada padrão aceita está em
 
 | Evento | Nacional | Salvador |
 |---|---|---|
-| 101101 Cancelamento | ✅ | ❌ só pelo portal / processo administrativo |
+| 101101 Cancelamento | ✅ | ❌ pelo webservice · ✅ **registro manual** do cancelamento feito no portal (`cancelamento_externo.php`) |
 | 101103 Solicitação de análise fiscal p/ cancelamento (fora do prazo) | ✅ | ❌ |
 | 105102 Cancelamento por substituição | ✅ automático ao emitir com `substituicao` | ❌ |
 | Consulta de situação | ✅ (NFS-e + eventos) | ✅ (lote / RPS) |
-| PDF | DANFSe oficial (ADN) | Espelho gerado pela API |
+| PDF | DANFSe oficial (ADN) | Espelho gerado pela API + link do portal |
 | Confirmação/rejeição (202201, 202205...) | previsto, não implementado | ❌ |
 | Eventos do fisco (105104, 305101...) | detectados na consulta | — |
 
@@ -197,7 +205,14 @@ worker assina e envia → `REGISTRADO` (documento vira `CANCELADO`) ou
 
 Em Salvador a API **recusa na entrada** (HTTP 422, código
 `NAO_SUPORTADO_PELO_PADRAO`) com a orientação da prefeitura, sem chamar o
-webservice.
+webservice. Depois que a prefeitura cancelar pelo portal, o sistema
+registra em `POST /v1/nfse/cancelamento_externo.php` (número do processo
+obrigatório): a nota vira `CANCELADO`, com evento `origem = EXTERNO`,
+monitor, webhook e arquivamento — sem chamar a prefeitura.
+
+**Substituição (Nacional):** ao autorizar uma NFS-e com o grupo
+`substituicao`, o worker agenda (1 minuto depois) a consulta da nota
+substituída, que passa a `SUBSTITUIDO` quando o Sefin registrar o evento 105102.
 
 ---
 
@@ -220,7 +235,42 @@ Assim o painel mostra cada nota **quando é recebida, enviada, autorizada,
 rejeitada, consultada ou cancelada**, inclusive as falhas temporárias
 ("tentativa 2/5, nova tentativa em 60s").
 
-Exemplo de painel mínimo: ver `docs/nfse-guia-api.md`, seção "Monitor".
+**Página pronta:** `public/monitor/` (acesse `/monitor/`). Lista em tempo
+real, contadores, filtros (status, padrão, emitente, busca), dica ao passar
+o mouse nas rejeitadas e modal com motivo + "Como corrigir", eventos e linha
+do tempo. Detalhes em `docs/nfse-monitor.md`.
+
+---
+
+## 6.1 Multiempresa
+
+- `config/nfse.local.php → emitentes`: um bloco por CNPJ (inscrição
+  municipal, regime, **certificado próprio**). Sem esse bloco, vale a empresa
+  única do `config/nfe.php` (compatível com a primeira versão).
+- `consumidores.<sistema>.cnpjs`: CNPJs que cada sistema pode usar.
+  Com mais de uma empresa configurada, a lista é **obrigatória**.
+- O corpo da requisição escolhe o CNPJ (`emitente_cnpj`); a API confere a
+  permissão. Inscrição, regime e certificado sempre vêm da configuração.
+- `ProvedorFactory::para($padrao, $cnpj)` cria um provedor por padrão +
+  CNPJ, cada um com seu certificado (mTLS e assinatura).
+- Numeração DPS/RPS, documentos e monitor já são separados por CNPJ.
+
+## 6.2 Arquivamento dos XMLs (nuvem)
+
+- Guarda principal: PostgreSQL. Cópia externa configurável em
+  `armazenamento.tipo`: `nenhum`, `local` (pasta) ou `s3` (AWS S3 e
+  compatíveis: MinIO, Wasabi, R2, Spaces...). Decisão C6: banco + nuvem.
+- Quando a nota chega a `AUTORIZADO`/`CANCELADO`/`SUBSTITUIDO` (ou um evento
+  é registrado), o worker cria um job `ARQUIVAR`, que grava
+  `{ambiente}/{cnpj}/{AAAA}/{MM}/{documento_id}/` com `envio.xml`,
+  `nfse.xml` e os XMLs de eventos, e preenche `arquivado_em`.
+- Falha no arquivamento **nunca** altera o status fiscal: tenta de novo com
+  espera crescente (até 10 vezes) e avisa no monitor se desistir.
+- S3 sem SDK: assinatura AWS Signature V4 própria
+  (`src/Nfse/Armazenamento/ArmazenamentoS3.php`), testada com o exemplo
+  oficial da AWS.
+- Retenção de 5 anos: configure no bucket (ciclo de vida e, se possível,
+  Object Lock), não no código.
 
 ---
 
@@ -234,6 +284,7 @@ src/Nfse/
 ├── Salvador/           Salvador: RpsXmlBuilder, SalvadorSoapCliente, ProvedorSalvador
 ├── Infra/              Técnico: AssinadorXml, ValidadorXsd, CertificadoCliente, CurlTransporte, Xml
 ├── Pdf/                EspelhoNfsePdf (PDF auxiliar para quem não tem PDF oficial)
+├── Armazenamento/      Cópia dos XMLs: ArmazenamentoLocal, ArmazenamentoS3 (+ fábrica)
 ├── Repositorio/        TODO o SQL: documentos, fila, eventos, monitor, webhooks
 ├── Servico/            Regras do fluxo: RecebimentoLote, ProcessadorJobs, Solicitacoes, webhooks
 ├── Api/                Api.php: autenticação, JSON e erros comuns aos endpoints
@@ -241,6 +292,7 @@ src/Nfse/
 └── ProvedorFactory.php Escolhe o provedor pelo padrão
 
 public/v1/nfse/         Endpoints HTTP (um arquivo por rota, como em public/v1/nfe)
+public/monitor/         Página do Monitor Fiscal (HTML/CSS/JS puros)
 bin/nfse_worker.php     Worker
 database/scripts/0002_nfse_criar_base.sql
 schemas/nfse/           XSDs oficiais
@@ -267,7 +319,12 @@ tests/nfse/             Testes (php tests/nfse/executar.php)
 
 ## 8. Banco de dados
 
-Script: `database/scripts/0002_nfse_criar_base.sql` (segue `docs/padrao-scripts-sql.md`).
+Scripts (seguem `docs/padrao-scripts-sql.md`):
+
+- `0002_nfse_criar_base.sql` — tabelas da NFS-e.
+- `0003_nfse_alterar_multiempresa_rejeicao_arquivo.sql` — documento sem
+  número (rejeitado na entrada), cancelamento externo (origem, processo),
+  emitente no monitor, job `ARQUIVAR` e `arquivado_em`.
 
 | Tabela | Papel |
 |---|---|
@@ -292,8 +349,9 @@ worker podem estar em servidores diferentes sem disco compartilhado).
   cabeçalho `X-NFE-API-TOKEN` ou `Authorization: Bearer`). Cada consumidor
   só enxerga os próprios documentos; o token do painel enxerga todos, mas
   não emite nem cancela.
-- O **emitente vem da configuração**, nunca do corpo da requisição (mesma
-  regra adotada no DF-e).
+- Os **dados do emitente vêm da configuração** (inscrição, regime,
+  certificado). O corpo só escolhe o CNPJ, e a API confere se o sistema tem
+  permissão para ele (`consumidores.<sistema>.cnpjs`).
 - Certificado A1: lido do `.pfx`; para o mTLS é gravado em arquivo
   temporário `0600` apagado ao fim do processo.
 - Webhook assinado com `X-NFSe-Assinatura: sha256=<HMAC>`.
