@@ -81,6 +81,12 @@ O desenho como servico fiscal permite expansao futura para outras obrigacoes fis
 
 Cada nova obrigacao deve ser incorporada por contrato de API e persistencia fiscal propria, sem exigir acesso direto ao banco dos sistemas consumidores.
 
+### Atualizacao: NFS-e implementada
+
+A NFS-e (Padrao Nacional e Salvador-BA) foi incorporada seguindo esta decisao:
+contrato de API proprio, persistencia propria no PostgreSQL e fila/worker
+internos. Ver `docs/nfse-arquitetura.md`.
+
 ## 8. Impacto na Fase 2 do DF-e
 
 A Fase 2 do DF-e deve considerar que o controle de NSU, historico de consultas e prevencao de consumo indevido pertencem ao dominio do servico fiscal.

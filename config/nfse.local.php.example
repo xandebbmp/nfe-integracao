@@ -1,0 +1,19 @@
+<?php
+declare(strict_types=1);
+
+// Copie para config/nfse.local.php (fora do Git) e preencha no servidor.
+return [
+    'emitente' => [
+        'inscricao_municipal' => 'SUA_INSCRICAO_MUNICIPAL',
+    ],
+
+    'consumidores' => [
+        'ERP' => [
+            'token' => 'TOKEN_FORTE_DO_ERP',
+            'webhook_url' => 'https://erp.suaempresa.com.br/webhooks/nfse',
+            'webhook_segredo' => 'SEGREDO_HMAC_DO_WEBHOOK',
+        ],
+    ],
+
+    'monitor_token' => 'TOKEN_DO_PAINEL',
+];
