@@ -36,6 +36,10 @@ final class Apoio
 
     /**
      * Certificado autoassinado gerado em memoria (NUNCA usar fora de teste).
+     *
+     * Leva o identificador ICP-Brasil do CNPJ (OID 2.16.76.1.3.3), como um
+     * e-CNPJ real: a biblioteca da NF-e usa isso para saber que o autor dos
+     * eventos e pessoa juridica (tag CNPJ).
      */
     public static function certificado(): Certificate
     {
@@ -43,10 +47,15 @@ final class Apoio
         if ($cert !== null) {
             return $cert;
         }
-        $chave = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
-        $csr = openssl_csr_new(['commonName' => 'EMPRESA TESTE:41986662000160'], $chave);
-        $x509 = openssl_csr_sign($csr, null, $chave, 365);
+        $arquivoConfig = tempnam(sys_get_temp_dir(), 'icp_');
+        file_put_contents($arquivoConfig, "[req]\ndistinguished_name = dn\n[dn]\n[icp]\nbasicConstraints = CA:FALSE\n"
+            . "keyUsage = digitalSignature, keyEncipherment\nsubjectAltName = otherName:2.16.76.1.3.3;UTF8:41986662000160\n");
+        $opcoes = ['config' => $arquivoConfig, 'x509_extensions' => 'icp', 'private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA];
+        $chave = openssl_pkey_new($opcoes);
+        $csr = openssl_csr_new(['commonName' => 'EMPRESA TESTE:41986662000160'], $chave, $opcoes);
+        $x509 = openssl_csr_sign($csr, null, $chave, 365, $opcoes);
         openssl_pkcs12_export($x509, $pfx, $chave, 'teste');
+        @unlink($arquivoConfig);
         return $cert = Certificate::readPfx($pfx, 'teste');
     }
 
@@ -59,7 +68,7 @@ final class Apoio
         $nfse['emitente']['inscricao_municipal'] = '12345678';
         $nfse['consumidores'] = ['TESTE' => ['token' => 'token-teste']];
         return NfseConfig::montar(
-            ['tpAmb' => 2, 'cnpj' => '41986662000160', 'razao' => 'EMPRESA TESTE LTDA'],
+            ['tpAmb' => 2, 'cnpj' => '41986662000160', 'razao' => 'EMPRESA TESTE LTDA', 'siglaUF' => 'BA', 'ie' => '31638351'],
             $nfse
         );
     }
@@ -129,5 +138,108 @@ final class TransporteFalso implements TransporteHttp
             throw new RuntimeException("Requisicao inesperada no teste: {$metodo} {$url}");
         }
         return array_shift($this->respostas);
+    }
+}
+
+/**
+ * SOAP falso para a NF-e (biblioteca sped-nfe). Cada resposta enfileirada
+ * pode ser: string (XML de retorno), Throwable (simula queda de rede) ou
+ * callable(string $requisicao): string (monta o retorno a partir do que foi
+ * enviado - necessario para o digVal da assinatura bater).
+ */
+final class SoapNfeFalso extends \NFePHP\Common\Soap\SoapBase
+{
+    /** @var list<string|Throwable|callable> */
+    public array $respostas = [];
+    /** @var list<array{operacao: string, requisicao: string}> */
+    public array $requisicoes = [];
+
+    public function responder(string|Throwable|callable $resposta): self
+    {
+        $this->respostas[] = $resposta;
+        return $this;
+    }
+
+    public function send(
+        $url,
+        $operation = '',
+        $action = '',
+        $soapver = SOAP_1_2,
+        $parameters = [],
+        $namespaces = [],
+        $request = '',
+        $soapheader = null
+    ) {
+        $this->requisicoes[] = ['operacao' => (string)$operation, 'requisicao' => (string)$request];
+        if ($this->respostas === []) {
+            throw new RuntimeException("Chamada SOAP inesperada no teste: {$operation}");
+        }
+        $resposta = array_shift($this->respostas);
+        if ($resposta instanceof Throwable) {
+            throw $resposta;
+        }
+        $corpo = is_callable($resposta) ? $resposta((string)$request) : $resposta;
+        // Igual a SEFAZ: retorno dentro de um envelope SOAP.
+        return '<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body>'
+            . '<nfeResultMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/x">' . $corpo . '</nfeResultMsg>'
+            . '</soap:Body></soap:Envelope>';
+    }
+
+    // ---- Retornos prontos da SEFAZ ----
+
+    /** retEnviNFe sincrono (cStat do lote 104) com protocolo cStat informado. */
+    public static function retornoEnvio(string $cStatNota, string $xMotivo = 'Autorizado o uso da NF-e', string $cStatLote = '104'): callable
+    {
+        return static function (string $requisicao) use ($cStatNota, $xMotivo, $cStatLote): string {
+            [$chave, $digest] = self::chaveEDigest($requisicao);
+            $prot = $cStatLote === '104' ? self::protNFe($chave, $digest, $cStatNota, $xMotivo) : '';
+            return '<retEnviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><tpAmb>2</tpAmb><verAplic>BA-TESTE</verAplic>'
+                . "<cStat>{$cStatLote}</cStat><xMotivo>" . ($cStatLote === '104' ? 'Lote processado' : 'Lote recebido com sucesso') . '</xMotivo><cUF>29</cUF>'
+                . '<dhRecbto>2026-11-04T10:00:00-03:00</dhRecbto>'
+                . ($cStatLote === '103' ? '<infRec><nRec>291000000000001</nRec><tMed>1</tMed></infRec>' : '')
+                . $prot . '</retEnviNFe>';
+        };
+    }
+
+    /** retConsSitNFe para a chave do XML assinado informado. */
+    public static function retornoConsulta(string $xmlAssinado, string $cStat, string $xMotivo): string
+    {
+        [$chave, $digest] = self::chaveEDigest($xmlAssinado);
+        $prot = in_array($cStat, ['100', '150', '101', '110'], true) ? self::protNFe($chave, $digest, $cStat === '101' ? '100' : $cStat, 'Autorizado o uso da NF-e') : '';
+        return '<retConsSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><tpAmb>2</tpAmb><verAplic>BA-TESTE</verAplic>'
+            . "<cStat>{$cStat}</cStat><xMotivo>{$xMotivo}</xMotivo><cUF>29</cUF><dhRecbto>2026-11-04T10:00:00-03:00</dhRecbto>"
+            . "<chNFe>{$chave}</chNFe>{$prot}</retConsSitNFe>";
+    }
+
+    /** retEnvEvento (lote 128) com o cStat do evento informado. */
+    public static function retornoEvento(string $cStatEvento, string $xMotivo = 'Evento registrado e vinculado a NF-e'): callable
+    {
+        return static function (string $requisicao) use ($cStatEvento, $xMotivo): string {
+            preg_match('/<chNFe>(\d{44})<\/chNFe>/', $requisicao, $c);
+            preg_match('/<tpEvento>(\d{6})<\/tpEvento>/', $requisicao, $t);
+            preg_match('/<nSeqEvento>(\d+)<\/nSeqEvento>/', $requisicao, $n);
+            preg_match('/<idLote>(\d+)<\/idLote>/', $requisicao, $l); // a SEFAZ devolve o mesmo idLote
+            return '<retEnvEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><idLote>' . ($l[1] ?? '1') . '</idLote><tpAmb>2</tpAmb><verAplic>BA-TESTE</verAplic>'
+                . '<cOrgao>29</cOrgao><cStat>128</cStat><xMotivo>Lote de Evento Processado</xMotivo>'
+                . '<retEvento versao="1.00"><infEvento><tpAmb>2</tpAmb><verAplic>BA-TESTE</verAplic><cOrgao>29</cOrgao>'
+                . "<cStat>{$cStatEvento}</cStat><xMotivo>{$xMotivo}</xMotivo><chNFe>" . ($c[1] ?? '') . '</chNFe>'
+                . '<tpEvento>' . ($t[1] ?? '') . '</tpEvento><xEvento>Evento</xEvento><nSeqEvento>' . ($n[1] ?? '1') . '</nSeqEvento>'
+                . '<dhRegEvento>2026-11-04T11:00:00-03:00</dhRegEvento><nProt>129261000000099</nProt></infEvento></retEvento></retEnvEvento>';
+        };
+    }
+
+    private static function protNFe(string $chave, string $digest, string $cStat, string $xMotivo): string
+    {
+        return '<protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>BA-TESTE</verAplic>'
+            . "<chNFe>{$chave}</chNFe><dhRecbto>2026-11-04T10:00:01-03:00</dhRecbto><nProt>129261000000042</nProt>"
+            . "<digVal>{$digest}</digVal><cStat>{$cStat}</cStat><xMotivo>{$xMotivo}</xMotivo></infProt></protNFe>";
+    }
+
+    /** @return array{0: string, 1: string} chave (44) e DigestValue do XML assinado */
+    private static function chaveEDigest(string $xml): array
+    {
+        preg_match('/Id="NFe(\d{44})"/', $xml, $c);
+        preg_match('/<DigestValue>([^<]+)<\/DigestValue>/', $xml, $d);
+        return [$c[1] ?? '', $d[1] ?? ''];
     }
 }

@@ -13,7 +13,10 @@ namespace Xande\NfeIntegracao\Nfse\Dominio;
  *   PROCESSANDO  -> enviado ao fisco, aguardando resposta (Salvador e assincrono).
  *   AUTORIZADO   -> NFS-e gerada. XML autorizado disponivel. Pode gerar PDF.
  *   REJEITADO    -> fisco recusou por erro nos dados. Corrija e reenvie com a
- *                   MESMA referencia (o numero da DPS/RPS e reaproveitado).
+ *                   MESMA referencia (o numero da DPS/RPS/NF-e e reaproveitado).
+ *   DENEGADO     -> (so NF-e) SEFAZ denegou o uso por irregularidade fiscal do
+ *                   emitente ou destinatario. A nota NAO tem valor, o numero
+ *                   foi consumido e NAO pode ser reenviada.
  *   ERRO         -> falha tecnica que persistiu apos todas as tentativas.
  *                   NAO significa que a nota nao existe: use "consultar" antes
  *                   de reenviar.
@@ -26,6 +29,7 @@ final class StatusNfse
     public const PROCESSANDO = 'PROCESSANDO';
     public const AUTORIZADO = 'AUTORIZADO';
     public const REJEITADO = 'REJEITADO';
+    public const DENEGADO = 'DENEGADO';
     public const ERRO = 'ERRO';
     public const CANCELADO = 'CANCELADO';
     public const SUBSTITUIDO = 'SUBSTITUIDO';
@@ -36,8 +40,8 @@ final class StatusNfse
     /** Status em que o consumidor pode reenviar a mesma referencia. */
     public const PERMITE_REENVIO = [self::REJEITADO, self::ERRO];
 
-    /** Status em que existe uma NFS-e valida ou que ja existiu. */
-    public const COM_NFSE = [self::AUTORIZADO, self::CANCELADO, self::SUBSTITUIDO];
+    /** Status em que o fisco gerou o documento (tem chave/numero e XML). */
+    public const COM_NFSE = [self::AUTORIZADO, self::CANCELADO, self::SUBSTITUIDO, self::DENEGADO];
 
     private function __construct()
     {

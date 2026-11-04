@@ -5,9 +5,10 @@ declare(strict_types=1);
  * POST /v1/nfse/evento.php
  *   {
  *     "documento_id": "<uuid>",
- *     "tipo_evento": "101101",          (101101 = cancelamento; padrao)
- *     "motivo_codigo": "1",             (1=Erro na emissao, 2=Servico nao prestado, 9=Outros)
- *     "motivo": "Texto de 15 a 255 caracteres",
+ *     "tipo_evento": "101101",          (NFS-e: 101101 cancelamento | NF-e: 110111 cancelamento, 110110 CC-e)
+ *                                       (sem tipo_evento = cancelamento)
+ *     "motivo_codigo": "1",             (so NFS-e: 1=Erro na emissao, 2=Servico nao prestado, 9=Outros)
+ *     "motivo": "Texto de 15 a 255 caracteres (CC-e: texto da correcao, ate 1000)",
  *     "aguardar": 20                    (opcional)
  *   }
  *
@@ -34,7 +35,8 @@ $documento = $api->documentoPermitido((string)($corpo['documento_id'] ?? ''), $a
 
 $resultado = (new Solicitacoes($api->pdo(), $api->cfg))->registrarEvento(
     $documento,
-    (string)($corpo['tipo_evento'] ?? TipoEvento::CANCELAMENTO),
+    // Sem tipo_evento = cancelamento (110111 na NF-e, 101101 na NFS-e).
+    (string)($corpo['tipo_evento'] ?? ($documento['padrao'] === 'NFE' ? TipoEvento::NFE_CANCELAMENTO : TipoEvento::CANCELAMENTO)),
     (string)($corpo['motivo_codigo'] ?? ''),
     (string)($corpo['motivo'] ?? '')
 );

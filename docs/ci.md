@@ -61,8 +61,8 @@ A partir daí o botão de merge fica bloqueado enquanto o check estiver vermelho
   Teste vermelho é aviso de que algo quebrou: corrija o código, ou ajuste o
   teste se a regra de negócio mudou de verdade (e explique no PR).
 - Mudou uma regra? Acrescente uma verificação em `tests/nfse/executar.php`.
-- Novo script SQL em `database/scripts/` com `_nfse_` no nome entra
-  automaticamente nos testes, em ordem.
+- Todo script SQL novo em `database/scripts/` entra automaticamente nos
+  testes, em ordem.
 
 ## Custo
 

@@ -7,6 +7,7 @@ use PDO;
 use Throwable;
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoFactory;
 use Xande\NfeIntegracao\Nfse\Dominio\Capacidades;
+use Xande\NfeIntegracao\Nfse\Dominio\Padrao;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusEvento;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusNfse;
 use Xande\NfeIntegracao\Nfse\Dominio\TipoEvento;
@@ -69,33 +70,45 @@ final class Solicitacoes
                 'ok' => false,
                 'http' => 409,
                 'codigo' => 'STATUS_NAO_PERMITE',
-                'mensagem' => "Evento so pode ser registrado em NFS-e AUTORIZADA (status atual: {$documento['status']}).",
+                'mensagem' => "Evento so pode ser registrado em nota AUTORIZADA (status atual: {$documento['status']}).",
             ];
         }
 
-        if (!in_array($motivoCodigo, ['1', '2', '9'], true)) {
-            return ['ok' => false, 'http' => 400, 'codigo' => 'MOTIVO_INVALIDO', 'mensagem' => 'motivo_codigo deve ser 1 (erro na emissao), 2 (servico nao prestado) ou 9 (outros).'];
+        $erro = self::validarMotivo($documento, $tipo, $motivoCodigo, $motivoTexto);
+        if ($erro !== null) {
+            return ['ok' => false, 'http' => 400, 'codigo' => 'MOTIVO_INVALIDO', 'mensagem' => $erro];
         }
 
-        $tamanho = mb_strlen(trim($motivoTexto));
-        if ($tamanho < 15 || $tamanho > 255) {
-            return ['ok' => false, 'http' => 400, 'codigo' => 'MOTIVO_INVALIDO', 'mensagem' => 'motivo deve ter entre 15 e 255 caracteres.'];
+        if ($tipo === TipoEvento::NFE_CANCELAMENTO && empty($documento['protocolo_autorizacao'])) {
+            return ['ok' => false, 'http' => 409, 'codigo' => 'SEM_PROTOCOLO',
+                'mensagem' => 'NF-e sem protocolo de autorizacao gravado. Use "consultar" para atualizar e tente de novo.'];
         }
 
         $eventos = new EventoRepositorio($this->pdo);
+        // CC-e pode ter varias (cada uma substitui a anterior); as demais sao unicas.
+        $cartaCorrecao = $tipo === TipoEvento::NFE_CARTA_CORRECAO;
 
         $this->pdo->beginTransaction();
         try {
             // Evita dois cancelamentos em paralelo para a mesma nota.
             $this->pdo->prepare('SELECT 1 FROM nfse_documentos WHERE id = :id FOR UPDATE')->execute([':id' => $documento['id']]);
 
-            $ativo = $eventos->buscarAtivo($documento['id'], $tipo);
+            $ativo = $eventos->buscarAtivo($documento['id'], $tipo, $cartaCorrecao);
             if ($ativo !== null) {
                 $this->pdo->commit();
                 return ['ok' => true, 'http' => 200, 'mensagem' => 'Evento ja solicitado anteriormente.', 'evento' => $ativo];
             }
 
-            $eventoId = $eventos->criar($documento['id'], $tipo, $motivoCodigo, trim($motivoTexto));
+            $extras = [];
+            if ($cartaCorrecao) {
+                $extras['sequencia'] = $eventos->contarDoTipo($documento['id'], $tipo) + 1;
+                if ($extras['sequencia'] > 20) {
+                    $this->pdo->rollBack();
+                    return ['ok' => false, 'http' => 409, 'codigo' => 'LIMITE_CCE', 'mensagem' => 'Limite de 20 Cartas de Correcao por NF-e atingido.'];
+                }
+            }
+
+            $eventoId = $eventos->criar($documento['id'], $tipo, $motivoCodigo, trim($motivoTexto), $extras);
             (new FilaRepositorio($this->pdo))->enfileirar(
                 FilaRepositorio::EVENTO,
                 $documento['id'],
@@ -121,6 +134,28 @@ final class Solicitacoes
             'mensagem' => 'Evento enfileirado.',
             'evento' => $eventos->buscar($eventoId) ?? ['id' => $eventoId, 'status' => StatusEvento::RECEBIDO],
         ];
+    }
+
+    /**
+     * Regras do texto/motivo de cada evento. Retorna a mensagem de erro ou null.
+     */
+    private static function validarMotivo(array $documento, string $tipo, string $codigo, string $texto): ?string
+    {
+        $tamanho = mb_strlen(trim($texto));
+
+        if ($tipo === TipoEvento::NFE_CARTA_CORRECAO) {
+            return ($tamanho < 15 || $tamanho > 1000)
+                ? 'motivo (texto da correcao) deve ter entre 15 e 1000 caracteres.'
+                : null;
+        }
+        if ($tamanho < 15 || $tamanho > 255) {
+            return 'motivo deve ter entre 15 e 255 caracteres.';
+        }
+        // NFS-e exige o codigo do motivo; a NF-e nao tem esse campo.
+        if (in_array($documento['padrao'], Padrao::NFSE, true) && !in_array($codigo, ['1', '2', '9'], true)) {
+            return 'motivo_codigo deve ser 1 (erro na emissao), 2 (servico nao prestado) ou 9 (outros).';
+        }
+        return null;
     }
 
     /**

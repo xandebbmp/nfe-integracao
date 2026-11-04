@@ -20,10 +20,23 @@ final class TipoEvento
     /** Cancelamento por substituicao (gerado pelo fisco ao emitir a substituta). */
     public const CANCELAMENTO_POR_SUBSTITUICAO = '105102';
 
+    // ----- NF-e (modelo 55) -----
+
+    /** Cancelamento de NF-e. */
+    public const NFE_CANCELAMENTO = '110111';
+
+    /** Carta de Correcao Eletronica (CC-e) da NF-e. */
+    public const NFE_CARTA_CORRECAO = '110110';
+
+    /** Eventos que, quando registrados, deixam o documento CANCELADO. */
+    public const CANCELAMENTOS = [self::CANCELAMENTO, self::NFE_CANCELAMENTO];
+
     public const DESCRICOES = [
         self::CANCELAMENTO => 'Cancelamento de NFS-e',
         self::SOLICITACAO_ANALISE_CANCELAMENTO => 'Solicitação de Análise Fiscal para Cancelamento de NFS-e',
         self::CANCELAMENTO_POR_SUBSTITUICAO => 'Cancelamento de NFS-e por Substituição',
+        self::NFE_CANCELAMENTO => 'Cancelamento de NF-e',
+        self::NFE_CARTA_CORRECAO => 'Carta de Correção Eletrônica (CC-e)',
     ];
 
     private function __construct()

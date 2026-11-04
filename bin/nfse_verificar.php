@@ -153,6 +153,7 @@ if ($pdo !== null) {
     $checagens = [
         '0002 (tabelas da NFS-e)' => "SELECT to_regclass('public.nfse_documentos') IS NOT NULL",
         '0003 (multiempresa / arquivamento)' => "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nfse_documentos' AND column_name = 'arquivado_em')",
+        '0004 (NF-e na fila / monitor)' => "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nfse_documentos' AND column_name = 'protocolo_autorizacao')",
     ];
     foreach ($checagens as $script => $sql) {
         if ($existe($sql)) {
@@ -287,6 +288,23 @@ if ($testarRede) {
         'ADN (DANFSe)' => $cfg['nacional']['url_danfse'][$tpAmb],
         'NFS-e Salvador' => $cfg['salvador']['url_base'][$tpAmb],
     ];
+
+    // NF-e: endereco da SEFAZ de cada UF de emitente, da lista oficial da sped-nfe.
+    $listaSefaz = @simplexml_load_file("{$raiz}/vendor/nfephp-org/sped-nfe/storage/wsnfe_4.00_mod55.xml");
+    $ambiente = $tpAmb === 1 ? 'producao' : 'homologacao';
+    foreach (array_unique(array_filter(array_column($cfg['emitentes'], 'uf'))) as $uf) {
+        $url = '';
+        foreach ($listaSefaz ? $listaSefaz->UF : [] as $no) {
+            if ((string)$no->sigla === $uf) {
+                $url = (string)$no->{$ambiente}->NfeAutorizacao;
+            }
+        }
+        if ($url !== '') {
+            $destinos["SEFAZ {$uf} (NF-e)"] = $url;
+        } else {
+            item('ATENCAO', "SEFAZ {$uf}: estado usa SEFAZ virtual; teste o acesso com bin/nfse_homologar.php --padrao=NFE.");
+        }
+    }
     foreach ($destinos as $nome => $url) {
         $curl = curl_init($url);
         curl_setopt_array($curl, [CURLOPT_NOBODY => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_TIMEOUT => 15]);

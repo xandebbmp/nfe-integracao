@@ -1,4 +1,4 @@
-# Roteiro de Homologação NFS-e
+# Roteiro de Homologação NFS-e e NF-e
 
 Passo a passo para homologar a NFS-e (Padrão Nacional e Salvador) com o
 script `bin/nfse_homologar.php`. O script fala **direto com o fisco** (sem
@@ -94,6 +94,34 @@ php bin/nfse_homologar.php --padrao=SALVADOR --numero=<numero_do_rps_rejeitado>
 ```
 
 Se Salvador aceitar, o reaproveitamento de número está validado.
+
+### 4.1 NF-e (modelo 55)
+
+Usa a nota de `json/nota_homologacao_emitir_padrao.json` (troque com
+`--payload=arquivo.json`). O `emit.CNPJ` desse JSON precisa estar em
+`emitentes` (com `uf` e `ie`) — hoje o JSON de exemplo usa
+`07047183000140` e o `config/nfe.php` usa `41986662000160`: alinhe um dos dois.
+
+```bash
+php bin/nfse_homologar.php --padrao=NFE --so-validar
+```
+
+```bash
+php bin/nfse_homologar.php --padrao=NFE
+```
+
+| Etapa | O que testa | Esperado |
+|---|---|---|
+| 1. Emitir | `NfeAutorizacao4` (síncrono; consulta o recibo se vier 103/105) | `AUTORIZADO`, com chave e protocolo |
+| 2. Consultar | `NfeConsultaProtocolo4` pela chave | `AUTORIZADO` |
+| 3. DANFE | PDF oficial | `nfse.pdf` gravado |
+| 4. CC-e | Evento 110110, sequência 1 | `REGISTRADO` |
+| 5. Cancelar | Evento 110111 com o protocolo | `REGISTRADO` |
+| 6. Conferir cancelamento | Consulta após o evento | `CANCELADO` |
+
+O número da nota de teste é gerado pela data/hora (`dHis`) para não colidir
+com notas reais; troque com `--numero=`. Os pedidos/respostas SOAP ficam
+gravados na pasta do resultado (`NN-SOAP-<operação>.txt`).
 
 ---
 

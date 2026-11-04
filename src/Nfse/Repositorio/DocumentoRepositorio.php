@@ -19,7 +19,7 @@ final class DocumentoRepositorio
         'status', 'id_dps', 'protocolo_lote', 'chave_acesso', 'numero_nfse',
         'codigo_verificacao', 'data_autorizacao', 'codigo_retorno', 'mensagem_retorno',
         'mensagens', 'xml_enviado', 'xml_autorizado', 'payload', 'lote_id',
-        'serie', 'numero', 'arquivado_em',
+        'serie', 'numero', 'arquivado_em', 'protocolo_autorizacao',
     ];
 
     public function __construct(private PDO $pdo)

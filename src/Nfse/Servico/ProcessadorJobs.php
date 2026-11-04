@@ -298,7 +298,7 @@ final class ProcessadorJobs
         $this->eventos->atualizar($evento['id'], $campos + ['status' => $retorno->status]);
         $this->fila->concluir($jobId);
 
-        if ($retorno->status === StatusEvento::REGISTRADO && $evento['tipo_evento'] === TipoEvento::CANCELAMENTO) {
+        if ($retorno->status === StatusEvento::REGISTRADO && in_array($evento['tipo_evento'], TipoEvento::CANCELAMENTOS, true)) {
             $this->mudarStatus($documento, StatusNfse::CANCELADO, [], 'EVENTO', 'Cancelamento registrado');
         } else {
             if ($retorno->status === StatusEvento::REGISTRADO) {

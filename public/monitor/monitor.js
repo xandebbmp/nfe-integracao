@@ -24,9 +24,17 @@ const STATUS = {
   PROCESSANDO: { nome: 'Processando', cor: 'var(--st-processando)' },
   AUTORIZADO: { nome: 'Autorizado', cor: 'var(--st-autorizado)' },
   REJEITADO: { nome: 'Rejeitado', cor: 'var(--st-rejeitado)' },
+  DENEGADO: { nome: 'Denegado', cor: 'var(--st-denegado)' },
   ERRO: { nome: 'Erro', cor: 'var(--st-erro)' },
   CANCELADO: { nome: 'Cancelado', cor: 'var(--st-cancelado)' },
   SUBSTITUIDO: { nome: 'Substituído', cor: 'var(--st-substituido)' },
+};
+
+/** Nome amigavel de cada padrao (tipo de documento). */
+const PADROES = {
+  NFE: 'NF-e',
+  NACIONAL: 'NFS-e Nacional',
+  SALVADOR: 'NFS-e Salvador',
 };
 
 const OPERACOES = {
@@ -105,7 +113,7 @@ function seloStatus(status) {
 }
 
 function temProblema(doc) {
-  return (doc.status === 'REJEITADO' || doc.status === 'ERRO') && (doc.mensagens || []).length > 0;
+  return ['REJEITADO', 'ERRO', 'DENEGADO'].includes(doc.status) && (doc.mensagens || []).length > 0;
 }
 
 // ==========================================================================
@@ -237,7 +245,7 @@ function linhaDocumento(doc) {
   },
     el('td', {}, data(doc.atualizado_em)),
     el('td', { class: 'mono' }, doc.referencia),
-    el('td', {}, doc.padrao === 'NACIONAL' ? 'Nacional' : 'Salvador'),
+    el('td', {}, PADROES[doc.padrao] || doc.padrao),
     el('td', {}, nomeEmitente(doc.emitente_cnpj)),
     el('td', { class: 'mono' }, doc.dps_rps ? `${doc.dps_rps.serie}/${doc.dps_rps.numero}` : '—'),
     el('td', { class: 'mono' }, doc.nfse?.numero || '—'),
@@ -285,7 +293,7 @@ function mostrarDica(evento, doc) {
   const m = doc.mensagens[0];
   const dica = $('dica');
   dica.replaceChildren(
-    el('strong', {}, doc.status === 'ERRO' ? 'Falha técnica' : 'Motivo da rejeição'),
+    el('strong', {}, { ERRO: 'Falha técnica', DENEGADO: 'Motivo da denegação' }[doc.status] || 'Motivo da rejeição'),
     `${m.codigo ? m.codigo + ' – ' : ''}${m.mensagem}`,
     el('em', {}, '💡 ', m.correcao || SUGESTOES_PADRAO[m.codigo] || SUGESTAO_GENERICA),
     doc.mensagens.length > 1 ? el('em', {}, `+ ${doc.mensagens.length - 1} mensagem(ns). Clique para ver tudo.`) : null,
@@ -333,10 +341,10 @@ function conteudoModal(doc) {
   // --- Mensagens (rejeicao / erro / alertas) ---
   const mensagens = doc.mensagens || [];
   if (mensagens.length) {
-    const titulo = doc.status === 'REJEITADO' ? 'Motivo da rejeição' : doc.status === 'ERRO' ? 'Falha técnica' : 'Mensagens';
+    const titulo = { REJEITADO: 'Motivo da rejeição', ERRO: 'Falha técnica', DENEGADO: 'Motivo da denegação' }[doc.status] || 'Mensagens';
     partes.push(el('h3', {}, titulo));
     for (const m of mensagens) {
-      const problema = doc.status === 'REJEITADO' || doc.status === 'ERRO';
+      const problema = ['REJEITADO', 'ERRO', 'DENEGADO'].includes(doc.status);
       partes.push(el('div', { class: `mensagem${problema ? '' : ' mensagem--info'}` },
         el('div', { class: 'mensagem__topo' },
           m.codigo ? el('span', { class: 'mensagem__codigo mono' }, m.codigo) : null,
@@ -358,11 +366,12 @@ function conteudoModal(doc) {
   partes.push(el('h3', {}, 'Dados'));
   const campos = [
     ['Referência', doc.referencia],
-    ['Padrão', doc.padrao],
+    ['Padrão', PADROES[doc.padrao] || doc.padrao],
     ['Emitente', `${nomeEmitente(doc.emitente_cnpj)} (${cnpj(doc.emitente_cnpj)})`],
     ['Ambiente', doc.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'],
-    ['DPS/RPS', doc.dps_rps ? `Série ${doc.dps_rps.serie} – Nº ${doc.dps_rps.numero}` : 'Sem número (rejeitado na entrada)'],
-    ['NFS-e nº', doc.nfse?.numero],
+    [doc.padrao === 'NFE' ? 'Série / número' : 'DPS/RPS', doc.dps_rps ? `Série ${doc.dps_rps.serie} – Nº ${doc.dps_rps.numero}` : 'Sem número (rejeitado na entrada)'],
+    [doc.padrao === 'NFE' ? 'NF-e nº' : 'NFS-e nº', doc.nfse?.numero],
+    ['Protocolo', doc.nfse?.protocolo],
     ['Chave de acesso', doc.nfse?.chave_acesso],
     ['Código de verificação', doc.nfse?.codigo_verificacao],
     ['Autorizada em', doc.nfse?.data_autorizacao ? data(doc.nfse.data_autorizacao) : null],
@@ -400,11 +409,13 @@ function conteudoModal(doc) {
   }
 
   // --- Acoes ---
-  const temNfse = ['AUTORIZADO', 'CANCELADO', 'SUBSTITUIDO'].includes(doc.status);
+  const temNfse = ['AUTORIZADO', 'CANCELADO', 'SUBSTITUIDO', 'DENEGADO'].includes(doc.status);
   if (temNfse) {
+    const prefixo = doc.padrao === 'NFE' ? 'nfe' : 'nfse';
     partes.push(el('div', { class: 'botoes' },
-      el('button', { class: 'botao', onclick: () => baixar(`documento.php?id=${doc.id}&formato=xml`, `nfse-${doc.nfse?.numero || doc.id}.xml`) }, 'Baixar XML'),
-      el('button', { class: 'botao', onclick: () => abrirPdf(doc) }, 'Abrir PDF'),
+      el('button', { class: 'botao', onclick: () => baixar(`documento.php?id=${doc.id}&formato=xml`, `${prefixo}-${doc.nfse?.numero || doc.id}.xml`) }, 'Baixar XML'),
+      // Nota denegada nao tem DANFE valido.
+      doc.status !== 'DENEGADO' ? el('button', { class: 'botao', onclick: () => abrirPdf(doc) }, 'Abrir PDF') : null,
     ));
   }
 

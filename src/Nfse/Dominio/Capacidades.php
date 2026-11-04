@@ -35,6 +35,7 @@ final class Capacidades
         return match ($padrao) {
             Padrao::NACIONAL => self::nacional(),
             Padrao::SALVADOR => self::salvador(),
+            Padrao::NFE => self::nfe(),
             default => throw new \InvalidArgumentException("Padrao desconhecido: {$padrao}"),
         };
     }
@@ -73,6 +74,33 @@ final class Capacidades
                 'Motivo (texto) deve ter entre 15 e 255 caracteres.',
                 'Fora do prazo de cancelamento use 101103 (solicitacao de analise fiscal).',
                 'Substituicao: emita uma nova NFS-e informando "substituicao.chave_substituida".',
+            ],
+        ];
+    }
+
+    private static function nfe(): array
+    {
+        return [
+            'emissao' => 'SINCRONA',
+            'consulta' => true,
+            'eventos' => [
+                TipoEvento::NFE_CANCELAMENTO => TipoEvento::DESCRICOES[TipoEvento::NFE_CANCELAMENTO],
+                TipoEvento::NFE_CARTA_CORRECAO => TipoEvento::DESCRICOES[TipoEvento::NFE_CARTA_CORRECAO],
+            ],
+            'eventos_nao_suportados' => [
+                '110112' => 'Cancelamento por substituicao (NFC-e): nao se aplica a NF-e modelo 55.',
+                'INUTILIZACAO' => 'Inutilizacao de numeracao: continua pela rota antiga /v1/nfe/inutilizar_padrao.php.',
+                '210200/210210/210220/210240' => 'Manifestacao do destinatario: fora do escopo desta API (ver Distribuicao DF-e).',
+            ],
+            'cancelamento_externo' => false,
+            'pdf' => 'OFICIAL_DANFE',
+            'observacoes' => [
+                'Envie a nota no mesmo formato JSON de sempre (ide, emit, dest, itens, totais, transp, pag, infAdic, reformaTributaria) + "referencia".',
+                'A API define o numero (ide.nNF) e o ambiente (ide.tpAmb). A serie vem de ide.serie (padrao da configuracao).',
+                'emit.CNPJ precisa ser um emitente liberado para o seu sistema.',
+                'Cancelamento (110111): informe "motivo" com 15 a 255 caracteres; dentro do prazo da SEFAZ (em geral 24h).',
+                'Carta de Correcao (110110): informe "motivo" com o texto da correcao (15 a 1000 caracteres). Ate 20 por nota.',
+                'DENEGADO: a nota nao tem valor e o numero foi consumido; nao pode ser reenviada.',
             ],
         ];
     }
