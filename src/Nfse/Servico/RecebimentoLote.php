@@ -124,6 +124,16 @@ final class RecebimentoLote
         }
 
         $cnpjInformado = $doc['emitente_cnpj'] ?? $corpo['emitente_cnpj'] ?? null;
+
+        // NF-e: o JSON ja traz o emitente em emit.CNPJ. Se vier tambem
+        // emitente_cnpj, os dois precisam ser iguais.
+        $cnpjEmit = $padrao === Padrao::NFE && !empty($doc['emit']['CNPJ']) ? NfseConfig::normalizarCnpj($doc['emit']['CNPJ']) : null;
+        if ($cnpjEmit !== null && $cnpjInformado !== null && NfseConfig::normalizarCnpj($cnpjInformado) !== $cnpjEmit) {
+            return self::recusado($doc['referencia'] ?? null, 'emit.CNPJ', "emit.CNPJ ({$cnpjEmit}) diferente de emitente_cnpj (" . NfseConfig::normalizarCnpj($cnpjInformado) . ').',
+                'Envie o mesmo CNPJ nos dois campos, ou so em emit.CNPJ.');
+        }
+        $cnpjInformado ??= $cnpjEmit;
+
         $cnpj = $cnpjInformado !== null ? NfseConfig::normalizarCnpj($cnpjInformado) : (count($permitidos) === 1 ? $permitidos[0] : '');
         if ($cnpj === '') {
             return self::recusado($doc['referencia'] ?? null, 'emitente_cnpj', 'Emitente nao informado.',
@@ -150,6 +160,9 @@ final class RecebimentoLote
 
         $doc['padrao'] = $padrao;
         $doc['emitente_cnpj'] = $cnpj;
+        if ($padrao === Padrao::NFE && is_array($doc['emit'] ?? null) && empty($doc['emit']['CNPJ']) && empty($doc['emit']['CPF'])) {
+            $doc['emit']['CNPJ'] = $cnpj; // emit sem CNPJ: usa o emitente escolhido
+        }
 
         // ---- 2. Validacao de conteudo ----
         $erros = ValidadorPayload::validar($doc, $padrao);
@@ -175,7 +188,7 @@ final class RecebimentoLote
 
     private function gravarNovo(string $consumidor, string $loteId, string $padrao, string $cnpj, int $tpAmb, array $doc): array
     {
-        $serie = $this->serie($padrao);
+        $serie = $this->serie($padrao, $doc);
         $dados = $this->dadosBase($consumidor, $loteId, $padrao, $cnpj, $tpAmb, $doc) + [
             'status' => StatusNfse::RECEBIDO,
             'serie' => $serie,
@@ -206,7 +219,7 @@ final class RecebimentoLote
 
         // Documento que nunca foi valido ainda nao tem numero: reserva agora.
         if ($existente['numero'] === null) {
-            $campos['serie'] = $this->serie($existente['padrao']);
+            $campos['serie'] = $this->serie($existente['padrao'], $doc);
             $campos['numero'] = $this->documentos->proximoNumero(
                 $existente['emitente_cnpj'], $existente['padrao'], (int)$existente['tp_amb'], $campos['serie']
             );
@@ -284,11 +297,17 @@ final class RecebimentoLote
         ];
     }
 
-    private function serie(string $padrao): string
+    /**
+     * Serie do documento. NF-e: ide.serie do JSON (ou a padrao da config).
+     * A numeracao e controlada por serie: cada serie tem a sua sequencia.
+     */
+    private function serie(string $padrao, array $doc): string
     {
-        return $padrao === Padrao::NACIONAL
-            ? (string)$this->cfg['nacional']['serie_dps']
-            : (string)$this->cfg['salvador']['serie_rps'];
+        return match ($padrao) {
+            Padrao::NACIONAL => (string)$this->cfg['nacional']['serie_dps'],
+            Padrao::SALVADOR => (string)$this->cfg['salvador']['serie_rps'],
+            Padrao::NFE => (string)(int)($doc['ide']['serie'] ?? $this->cfg['nfe']['serie']),
+        };
     }
 
     private function enfileirarEmissao(string $documentoId): void

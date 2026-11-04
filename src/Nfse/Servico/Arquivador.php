@@ -14,7 +14,7 @@ use Xande\NfeIntegracao\Nfse\Repositorio\EventoRepositorio;
  * Organizacao dos arquivos:
  *   {ambiente}/{cnpj}/{AAAA}/{MM}/{documento_id}/
  *       envio.xml                         DPS ou lote RPS assinado
- *       nfse.xml                          NFS-e autorizada
+ *       nfse.xml / nfe-proc.xml           NFS-e autorizada / NF-e autorizada (nfeProc)
  *       evento-101101-{id}-pedido.xml     pedido de evento
  *       evento-101101-{id}-retorno.xml    evento registrado pelo fisco
  *
@@ -42,7 +42,7 @@ final class Arquivador
 
         $arquivos = [
             'envio.xml' => $documento['xml_enviado'] ?? null,
-            'nfse.xml' => $documento['xml_autorizado'] ?? null,
+            ($documento['padrao'] === 'NFE' ? 'nfe-proc.xml' : 'nfse.xml') => $documento['xml_autorizado'] ?? null,
         ];
         foreach ($this->eventos->listarDoDocumento($documento['id']) as $evento) {
             $base = "evento-{$evento['tipo_evento']}-{$evento['id']}";

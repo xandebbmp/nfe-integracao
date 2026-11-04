@@ -4,7 +4,10 @@ declare(strict_types=1);
 namespace Xande\NfeIntegracao\Nfse\Dominio;
 
 /**
- * Padroes de NFS-e suportados pela API.
+ * Padroes (tipos de documento) suportados pela API.
+ *
+ *   NACIONAL / SALVADOR -> NFS-e (servicos)
+ *   NFE                 -> NF-e modelo 55 (produtos), SEFAZ do estado
  *
  * Para incluir um novo municipio:
  *   1. adicione a constante aqui e em TODOS;
@@ -16,8 +19,12 @@ final class Padrao
 {
     public const NACIONAL = 'NACIONAL';
     public const SALVADOR = 'SALVADOR';
+    public const NFE = 'NFE';
 
-    public const TODOS = [self::NACIONAL, self::SALVADOR];
+    public const TODOS = [self::NACIONAL, self::SALVADOR, self::NFE];
+
+    /** Padroes que sao NFS-e (servicos). */
+    public const NFSE = [self::NACIONAL, self::SALVADOR];
 
     private function __construct()
     {

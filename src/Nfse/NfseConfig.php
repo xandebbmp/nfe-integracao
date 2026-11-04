@@ -33,6 +33,9 @@ final class NfseConfig
         'regime_especial_tributacao' => 0,
         'incentivador_cultural' => false,
         'regime_especial_abrasf' => null,
+        // NF-e: UF do emitente (SEFAZ que autoriza) e inscricao estadual.
+        'uf' => '',
+        'ie' => '',
         'certificado' => ['arquivo' => '', 'senha' => ''],
     ];
 
@@ -67,6 +70,15 @@ final class NfseConfig
         }
 
         $cfg['emitentes'] = self::montarEmitentes($nfe, $nfse);
+
+        // NF-e (modelo 55): parametros tecnicos vem do config/nfe.php.
+        $cfg['nfe'] = array_replace([
+            'serie' => 1,
+            'schemes' => (string)($nfe['schemes'] ?? 'PL_010_V1.30'),
+            'versao' => (string)($nfe['versao'] ?? '4.00'),
+            'autxml_ba_cnpj' => (string)($nfe['autxml_ba_cnpj'] ?? '13937073000156'),
+            'timeout_segundos' => 60,
+        ], (array)($nfse['nfe'] ?? []));
         unset($cfg['emitente']); // use paraEmitente()
 
         // Consumidor padrao: quem ja usa o apiToken da NF-e continua funcionando.
@@ -134,6 +146,8 @@ final class NfseConfig
             $unico = $nfse['emitente'] ?? [];
             $unico['cnpj'] = ($unico['cnpj'] ?? '') !== '' ? $unico['cnpj'] : ($nfe['cnpj'] ?? '');
             $unico['razao_social'] = ($unico['razao_social'] ?? '') !== '' ? $unico['razao_social'] : ($nfe['razao'] ?? '');
+            $unico['uf'] = ($unico['uf'] ?? '') !== '' ? $unico['uf'] : ($nfe['siglaUF'] ?? '');
+            $unico['ie'] = ($unico['ie'] ?? '') !== '' ? $unico['ie'] : ($nfe['ie'] ?? '');
             $unico['certificado'] = $unico['certificado'] ?? [
                 'arquivo' => (string)($nfe['certPfxPath'] ?? ''),
                 'senha' => (string)($nfe['certPassword'] ?? ''),
@@ -149,6 +163,7 @@ final class NfseConfig
                 throw new RuntimeException("CNPJ de emitente invalido na configuracao: {$chave}");
             }
             $dados['cnpj'] = $cnpj;
+            $dados['uf'] = strtoupper((string)($dados['uf'] !== '' ? $dados['uf'] : ($nfe['siglaUF'] ?? '')));
             $emitentes[$cnpj] = $dados;
         }
 

@@ -1,7 +1,9 @@
 # NFS-e — Guia da API para integradores
 
 API aberta para sistemas externos emitirem e acompanharem NFS-e no
-**Padrão Nacional** e no padrão da **Prefeitura de Salvador-BA**.
+**Padrão Nacional** e no padrão da **Prefeitura de Salvador-BA**, e também
+**NF-e modelo 55** (produtos, seção 9) — tudo com a mesma fila, status,
+monitor e webhooks.
 
 Base: `https://<servidor>/v1/nfse/`
 
@@ -110,7 +112,7 @@ Content-Type: application/json
 
 | Campo | Nacional | Salvador | Observação |
 |---|---|---|---|
-| `padrao` (lote ou documento) | `NACIONAL` | `SALVADOR` | Obrigatório. Pode variar por documento. |
+| `padrao` (lote ou documento) | `NACIONAL` | `SALVADOR` | Obrigatório. Pode variar por documento. Para NF-e use `NFE` (seção 9). |
 | `emitente_cnpj` (lote ou documento) | cond. | cond. | CNPJ do prestador. Obrigatório quando o seu sistema pode emitir por mais de uma empresa (veja `emitentes.php`). Com uma só, pode omitir. |
 | `referencia` | obrig. | obrig. | Id do documento no **seu** sistema (até 60). Garante que não sai nota duplicada. |
 | `competencia` | opcional | — | `AAAA-MM-DD`. Padrão: hoje. |
@@ -220,6 +222,7 @@ vazia, mais de 50 documentos, sistema sem emitente liberado) ou quando
 | `REJEITADO` | Ler `mensagens`, corrigir e reenviar com a **mesma referência**. |
 | `ERRO` | Falha técnica. Chamar `consultar.php` primeiro; se continuar sem nota, reenviar. |
 | `CANCELADO` / `SUBSTITUIDO` | Nota não vale mais. |
+| `DENEGADO` | Só NF-e: SEFAZ denegou (irregularidade cadastral). Número usado, nota não vale e não pode ser reenviada. |
 
 Cada item de `mensagens`:
 
@@ -230,7 +233,7 @@ Cada item de `mensagens`:
 - Erros de entrada (da API): `CAMPO_OBRIGATORIO`, `FORMATO_INVALIDO`,
   `VALOR_INVALIDO`, `NAO_SUPORTADO_PELO_PADRAO` — sempre com `campo` e `correcao`.
 - `XSD`: estrutura recusada pelo schema oficial **antes** de ir ao fisco.
-- Demais códigos (ex.: `E0312`): vêm do Sefin/Salvador; `correcao` aparece
+- Demais códigos (ex.: `E0312`, ou `cStat` como `539` na NF-e): vêm do Sefin/Salvador/SEFAZ; `correcao` aparece
   quando o fisco a informa.
 
 ---
@@ -396,3 +399,98 @@ Cada evento `nfse`:
 
 `desde`: `agora` (só eventos novos), um id (continua dele) ou vazio (últimas
 50 linhas). O navegador reconecta sozinho e continua do último `id` recebido.
+
+---
+
+## 9. NF-e (modelo 55, produtos)
+
+A NF-e usa **as mesmas rotas, a mesma fila, os mesmos status, o mesmo
+monitor e os mesmos webhooks** da NFS-e. Muda só o `padrao` (`"NFE"`) e o
+conteúdo de cada documento, que é o **mesmo JSON** já usado pela rota antiga
+`/v1/nfe/emitir_json_padrao.php` (`ide`, `emit`, `dest`, `itens`, `totais`,
+`transp`, `pag`, `infAdic`, `reformaTributaria`) mais a `referencia`.
+
+As rotas antigas `/v1/nfe/*_padrao.php` continuam funcionando sem mudança.
+
+### Requisição
+
+```http
+POST /v1/nfse/emitir.php?aguardar=30
+X-NFE-API-TOKEN: ...
+```
+
+```json
+{
+  "padrao": "NFE",
+  "documentos": [
+    {
+      "referencia": "PEDIDO-2026-000555",
+      "ide": { "cUF": 29, "natOp": "VENDA", "mod": 55, "serie": 1,
+               "tpNF": 1, "idDest": 1, "cMunFG": "2927408", "tpImp": 1,
+               "tpEmis": 1, "finNFe": 1, "indFinal": 1, "indPres": 1 },
+      "emit": { "CNPJ": "41986662000160", "xNome": "...", "IE": "...", "CRT": 3,
+                "enderEmit": { "...": "..." } },
+      "dest": { "CNPJ": "...", "xNome": "...", "indIEDest": 9, "enderDest": { "...": "..." } },
+      "itens": [ { "nItem": 1, "prod": { "cProd": "...", "xProd": "...", "NCM": "...",
+                   "CFOP": "5102", "uCom": "UN", "qCom": 1, "vUnCom": 10 }, "imposto": { "...": "..." } } ],
+      "totais": { "ICMSTot": { "vNF": 10 } },
+      "transp": { "modFrete": 9 },
+      "pag": { "detPag": [ { "tPag": "01", "vPag": 10 } ] }
+    }
+  ]
+}
+```
+
+Exemplo completo: `json/nota_homologacao_emitir_padrao.json`.
+
+### O que a API controla (não precisa enviar)
+
+| Campo | Regra |
+|---|---|
+| `ide.nNF` | **Sempre** definido pela API (numeração por CNPJ + série + ambiente). Valor enviado é ignorado. |
+| `ide.tpAmb` | Vem da configuração do servidor (homologação/produção). |
+| `ide.serie` | Se não vier, usa `nfe.serie` da configuração (padrão `1`). |
+| `ide.dhEmi` | Se não vier, data/hora atual (America/Bahia). |
+| `ide.cNF` / chave | Gerados na montagem. |
+| `emit.CNPJ` | Escolhe o emitente. Precisa estar em `emitentes` e ser permitido ao seu sistema. Se vier `emitente_cnpj` diferente, o documento é recusado. Se `emit` vier sem CNPJ, a API usa `emitente_cnpj`. |
+
+Validações na entrada (documento volta `REJEITADO` com `campo` e `correcao`,
+sem consumir número): `mod` 55 (NFC-e/65 não é suportada), `natOp`, `cUF`,
+`cMunFG`, série 0–999, `emit` (xNome, IE, CRT, enderEmit), `dest` (xNome,
+CPF/CNPJ, indIEDest), itens (nItem único, cProd, xProd, NCM 8 dígitos ou
+`00`, CFOP 4 dígitos, uCom, qCom, vUnCom, imposto) e `totais.ICMSTot.vNF`.
+Depois, a montagem e o XSD oficial podem recusar com `MONTAGEM` ou `XSD`.
+
+### Resultado
+
+- `AUTORIZADO`: `nfse.chave` (44 dígitos), `nfse.protocolo` e o XML
+  `nfeProc` (também arquivado como `nfe-proc.xml`).
+- `DENEGADO` (SEFAZ 110, 205, 301, 302, 303): a nota existe e o número foi
+  usado, mas **não pode circular nem ser reenviada**. Não tem DANFE.
+- `REJEITADO` / `ERRO`: como na NFS-e (corrigir e reenviar a mesma `referencia`).
+- Se o SEFAZ responder "em processamento" (103/105), o worker consulta o
+  recibo sozinho a cada 5 s.
+- **Proteção contra nota em dobro:** o XML assinado e a chave são gravados
+  antes do envio. Em qualquer nova tentativa, a API consulta a chave primeiro
+  e só reenvia o mesmo XML se o SEFAZ disser que ela não existe (217).
+
+### PDF
+
+`GET pdf.php?id=...` devolve o **DANFE** oficial.
+
+### Eventos
+
+| `tipo_evento` | Evento | Regras |
+|---|---|---|
+| `110111` (padrão para NF-e) | Cancelamento | `motivo` 15–255 caracteres. Usa o protocolo da autorização. Prazo é do SEFAZ (rejeição devolvida como veio). |
+| `110110` | Carta de correção (CC-e) | `motivo` = texto da correção, 15–1000 caracteres. Pode haver várias (até 20); a `sequencia` é numerada pela API e aparece no evento. |
+
+```http
+POST /v1/nfse/evento.php
+{ "documento_id": "...", "tipo_evento": "110110",
+  "motivo": "Corrigir endereco de entrega para Rua B, 20" }
+```
+
+`motivo_codigo` não se aplica à NF-e. **Inutilização** de numeração continua
+na rota antiga (`/v1/nfe/inutilizar_padrao.php`). Manifestação do
+destinatário e NFC-e não fazem parte desta API.

@@ -8,7 +8,7 @@ O arquivo `.github/workflows/testes.yml` faz o GitHub rodar os testes
 1. Sobe uma máquina temporária com **PHP 8.3** e as extensões do NfePHP.
 2. Sobe um **PostgreSQL 16** descartável (apagado ao final).
 3. `composer install`.
-4. Confere a sintaxe de **todos** os arquivos PHP (`php -l`) e do JavaScript do monitor.
+4. Confere a sintaxe de **todos** os arquivos PHP (`php -l`), do JavaScript do monitor e dos scripts de implantação (`shellcheck`).
 5. Roda `php tests/nfse/executar.php` **com** a integração no banco
    (fila, worker, monitor, idempotência, arquivamento). Se a parte com banco
    for pulada por algum motivo, o teste falha (`NFSE_TESTE_EXIGIR_PG=1`):
@@ -61,8 +61,8 @@ A partir daí o botão de merge fica bloqueado enquanto o check estiver vermelho
   Teste vermelho é aviso de que algo quebrou: corrija o código, ou ajuste o
   teste se a regra de negócio mudou de verdade (e explique no PR).
 - Mudou uma regra? Acrescente uma verificação em `tests/nfse/executar.php`.
-- Novo script SQL em `database/scripts/` com `_nfse_` no nome entra
-  automaticamente nos testes, em ordem.
+- Todo script SQL novo em `database/scripts/` entra automaticamente nos
+  testes, em ordem.
 
 ## Custo
 

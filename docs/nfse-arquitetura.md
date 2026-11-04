@@ -144,6 +144,41 @@ CONSULTAR_PROCESSAMENTO ──► ConsultarSituacaoLoteRPS
 Se o envio caiu **antes** de receber o protocolo, a próxima tentativa faz
 `ConsultarNfseRPS` antes de reenviar.
 
+### 3.3 NF-e modelo 55 (SEFAZ, síncrono)
+
+A NF-e é só mais um padrão (`NFE`) na mesma estrutura: mesma fila, worker,
+status, monitor, webhooks, multiempresa e idempotência. O provedor é
+`src/Nfse/Nfe/ProvedorNfe.php`, que usa a biblioteca `sped-nfe` (a mesma das
+rotas antigas). O JSON de entrada é o mesmo da rota antiga; a montagem do XML
+(`src/Nfse/Nfe/NfeXmlBuilder.php`) é cópia fiel de
+`public/emitir_json_pl010.php` — os testes provam que gera o **mesmo XML e a
+mesma chave**.
+
+```
+EMITIR ──► monta (nNF/serie/tpAmb pela API) ► assina ► valida XSD
+         ► grava XML assinado + chave ► sefazEnviaLote (síncrono)
+              │
+              ├─ 100/150 ............... AUTORIZADO (nfeProc + protocolo)
+              ├─ 110/205/301/302/303 ... DENEGADO (final, sem reenvio)
+              ├─ 103/105 ............... PROCESSANDO → consulta o recibo a cada 5s
+              ├─ outra rejeição ........ REJEITADO
+              └─ timeout / 108 / 109 ... falha temporária → nova tentativa
+```
+
+**Proteção contra duplicidade:** como o XML assinado e a chave ficam gravados
+**antes** do envio, toda nova tentativa começa com `sefazConsultaChave`. Se a
+nota já existe, só monta o `nfeProc`; se o SEFAZ responde 217 (não consta),
+reenvia **o mesmo XML** (mesma chave). Nunca sai uma segunda nota com outro
+número.
+
+Eventos: cancelamento `110111` (usa `protocolo_autorizacao`) e CC-e `110110`
+(várias por nota, `sequencia` 1..20 controlada pela API). PDF: DANFE oficial
+(`sped-da`). Inutilização continua na rota antiga.
+
+> Os nomes `nfse_*` (tabelas, rotas `/v1/nfse/`, worker `nfse-worker`) ficaram
+> por histórico: hoje eles guardam NFS-e **e** NF-e. Renomear é possível, mas
+> mexe em implantação e integrações — ver dúvida D3.
+
 ---
 
 ## 4. Status padronizado
@@ -163,6 +198,7 @@ stateDiagram-v2
     ERRO --> AUTORIZADO: "consultar" achou a nota
     AUTORIZADO --> CANCELADO: evento 101101
     AUTORIZADO --> SUBSTITUIDO: nova NFS-e substituta (Nacional)
+    PROCESSANDO --> DENEGADO: só NF-e (SEFAZ 110/205/301/302/303)
 ```
 
 | Status | Significado para o consumidor | Pode reenviar? |
@@ -174,6 +210,7 @@ stateDiagram-v2
 | `ERRO` | Falha técnica persistente. **Use "consultar" antes de reenviar.** | Sim |
 | `CANCELADO` | Cancelada por evento. | Não |
 | `SUBSTITUIDO` | Substituída por outra NFS-e (Nacional). | Não |
+| `DENEGADO` | Só NF-e: denegada pelo SEFAZ; número usado, nota sem valor. | Não |
 
 **Idempotência por `referencia`:** o mesmo consumidor enviando a mesma
 `referencia` (ex.: número do pedido) nunca gera duas notas. Se o documento
@@ -282,7 +319,8 @@ src/Nfse/
 ├── Contrato/           ProvedorNfse (interface) e RetornoProvedor (resposta padronizada)
 ├── Nacional/           Padrão Nacional: DpsXmlBuilder, EventoXmlBuilder, SefinNacionalCliente, ProvedorNacional
 ├── Salvador/           Salvador: RpsXmlBuilder, SalvadorSoapCliente, ProvedorSalvador
-├── Infra/              Técnico: AssinadorXml, ValidadorXsd, CertificadoCliente, CurlTransporte, Xml
+├── Nfe/                NF-e modelo 55: NfeXmlBuilder (JSON → XML, igual à rota antiga), ProvedorNfe (sped-nfe)
+├── Infra/              Técnico: AssinadorXml, ValidadorXsd, CertificadoCliente, CurlTransporte, Xml, SoapGravador
 ├── Pdf/                EspelhoNfsePdf (PDF auxiliar para quem não tem PDF oficial)
 ├── Armazenamento/      Cópia dos XMLs: ArmazenamentoLocal, ArmazenamentoS3 (+ fábrica)
 ├── Repositorio/        TODO o SQL: documentos, fila, eventos, monitor, webhooks
@@ -325,6 +363,9 @@ Scripts (seguem `docs/padrao-scripts-sql.md`):
 - `0003_nfse_alterar_multiempresa_rejeicao_arquivo.sql` — documento sem
   número (rejeitado na entrada), cancelamento externo (origem, processo),
   emitente no monitor, job `ARQUIVAR` e `arquivado_em`.
+- `0004_nfe_alterar_documentos_para_nfe.sql` — padrão `NFE`, status
+  `DENEGADO`, chave de 44 dígitos, `protocolo_autorizacao` e `sequencia` do
+  evento (CC-e).
 
 | Tabela | Papel |
 |---|---|
@@ -375,40 +416,21 @@ php bin/nfse_homologar.php --padrao=SALVADOR                # lote, processament
 Cada execução grava requisições, respostas e XMLs em
 `storage/logs/homologacao/<data>-<padrao>/`.
 
-### Worker (systemd)
+### Implantação (kit pronto)
 
-```ini
-# /etc/systemd/system/nfse-worker@.service
-[Unit]
-Description=Worker NFS-e %i
-After=network-online.target postgresql.service
+Tudo o que é preciso para subir em um servidor Ubuntu 24.04 está em
+`deploy/` e o passo a passo para leigos em `docs/manual-implantacao.md`:
 
-[Service]
-WorkingDirectory=/var/www/nfe-integracao
-ExecStart=/usr/bin/php bin/nfse_worker.php
-Restart=always
-RestartSec=5
-User=www-data
-KillSignal=SIGTERM
-TimeoutStopSec=90
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Subir 2 workers: `systemctl enable --now nfse-worker@1 nfse-worker@2`.
-
-### nginx para o SSE
-
-```nginx
-location = /v1/nfse/monitor.php {
-    fastcgi_buffering off;
-    fastcgi_read_timeout 360s;
-    include fastcgi_params;
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-    fastcgi_pass unix:/run/php/php8.3-fpm-monitor.sock;  # pool separado, opcional
-}
-```
+| Arquivo | Para quê |
+|---|---|
+| `deploy/instalar_pacotes.sh` | Instala nginx, PHP 8.3 + extensões, PostgreSQL, Composer, certbot |
+| `deploy/aplicar_banco.sh` | Roda os scripts SQL em ordem (para no primeiro erro) |
+| `deploy/nginx/nfe-integracao.conf` | Site, com o SSE do monitor sem buffer |
+| `deploy/php-fpm/nfse-monitor.conf` | Pool PHP separado para o stream do monitor |
+| `deploy/systemd/nfse-worker@.service` | Worker como serviço (reinicia sozinho, parada segura) |
+| `deploy/backup_banco.sh` | Backup diário do banco com retenção |
+| `deploy/atualizar.sh` | Atualização segura: backup → pull → composer → banco → reinício → verificação |
+| `bin/nfse_verificar.php` | Confere a instalação inteira e diz como resolver cada problema |
 
 ### Consultas úteis
 

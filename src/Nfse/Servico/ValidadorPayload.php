@@ -43,6 +43,12 @@ final class ValidadorPayload
     {
         $validador = new self($doc, $padrao);
         $validador->referencia();
+
+        if ($padrao === 'NFE') {
+            $validador->nfe();
+            return $validador->erros;
+        }
+
         $validador->competencia();
         $validador->servico();
         $validador->valores();
@@ -232,6 +238,127 @@ final class ValidadorPayload
         if (!in_array(str_pad((string)($sub['codigo_motivo'] ?? ''), 2, '0', STR_PAD_LEFT), ['01', '02', '03', '04', '05', '99'], true)) {
             $this->erro(self::VALOR_INVALIDO, 'substituicao.codigo_motivo', 'Motivo da substituicao invalido.',
                 'Use 01, 02, 03, 04, 05 ou 99 (outros), conforme a tabela do Padrao Nacional.');
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // NF-e (modelo 55): mesmo JSON do script homologado
+    // (ide, emit, dest, itens, totais.ICMSTot, transp, pag, infAdic)
+    // ---------------------------------------------------------------
+
+    private function nfe(): void
+    {
+        foreach (['ide', 'emit', 'dest'] as $bloco) {
+            if (!is_array($this->doc[$bloco] ?? null)) {
+                $this->erro(self::CAMPO_OBRIGATORIO, $bloco, "Bloco \"{$bloco}\" da NF-e nao informado.",
+                    "Envie o objeto \"{$bloco}\" no mesmo formato do JSON de exemplo (json/nota_homologacao_emitir_padrao.json).");
+            }
+        }
+
+        $ide = is_array($this->doc['ide'] ?? null) ? $this->doc['ide'] : [];
+        if ($ide !== []) {
+            $modelo = (string)($ide['mod'] ?? '55');
+            if ($modelo !== '55') {
+                $this->erro(self::NAO_SUPORTADO, 'ide.mod', "Modelo {$modelo} nao suportado nesta rota.",
+                    'Esta API emite NF-e modelo 55. NFC-e (modelo 65) ainda nao e suportada.');
+            }
+            foreach (['natOp' => 'natureza da operacao', 'cUF' => 'codigo da UF', 'cMunFG' => 'municipio de ocorrencia (IBGE)'] as $campo => $nome) {
+                if (trim((string)($ide[$campo] ?? '')) === '') {
+                    $this->erro(self::CAMPO_OBRIGATORIO, "ide.{$campo}", "Campo ide.{$campo} ({$nome}) nao informado.",
+                        "Preencha ide.{$campo} conforme o leiaute da NF-e.");
+                }
+            }
+            if (isset($ide['serie']) && (!ctype_digit((string)$ide['serie']) || (int)$ide['serie'] > 999)) {
+                $this->erro(self::FORMATO_INVALIDO, 'ide.serie', "Serie '{$ide['serie']}' invalida.",
+                    'Use um numero de 0 a 999 (ou nao envie para usar a serie padrao).');
+            }
+        }
+
+        $emit = is_array($this->doc['emit'] ?? null) ? $this->doc['emit'] : [];
+        if ($emit !== []) {
+            foreach (['xNome' => 'razao social', 'IE' => 'inscricao estadual', 'CRT' => 'regime tributario (CRT)'] as $campo => $nome) {
+                if (trim((string)($emit[$campo] ?? '')) === '') {
+                    $this->erro(self::CAMPO_OBRIGATORIO, "emit.{$campo}", "Emitente sem {$nome}.",
+                        "Preencha emit.{$campo} com os dados cadastrais da empresa emitente.");
+                }
+            }
+            if (!is_array($emit['enderEmit'] ?? null)) {
+                $this->erro(self::CAMPO_OBRIGATORIO, 'emit.enderEmit', 'Endereco do emitente nao informado.',
+                    'Envie emit.enderEmit (xLgr, nro, xBairro, cMun, xMun, UF, CEP).');
+            }
+        }
+
+        $dest = is_array($this->doc['dest'] ?? null) ? $this->doc['dest'] : [];
+        if ($dest !== []) {
+            if (trim((string)($dest['xNome'] ?? '')) === '') {
+                $this->erro(self::CAMPO_OBRIGATORIO, 'dest.xNome', 'Nome/razao social do destinatario nao informado.',
+                    'Preencha o nome do cliente no cadastro.');
+            }
+            $documento = preg_replace('/[^A-Za-z0-9]/', '', (string)($dest['CNPJ'] ?? $dest['CPF'] ?? '')) ?? '';
+            if ($documento === '' && empty($dest['idEstrangeiro'])) {
+                $this->erro(self::CAMPO_OBRIGATORIO, 'dest.CNPJ', 'CNPJ/CPF do destinatario nao informado.',
+                    'Informe dest.CNPJ (14) ou dest.CPF (11).');
+            } elseif ($documento !== '' && !in_array(strlen($documento), [11, 14], true)) {
+                $this->erro(self::FORMATO_INVALIDO, 'dest.CNPJ', "CPF/CNPJ do destinatario '{$documento}' com tamanho invalido.",
+                    'CPF tem 11 digitos e CNPJ tem 14 caracteres. Confira o cadastro do cliente.');
+            }
+            if (!isset($dest['indIEDest'])) {
+                $this->erro(self::CAMPO_OBRIGATORIO, 'dest.indIEDest', 'Indicador da IE do destinatario nao informado.',
+                    'Use 1 (contribuinte ICMS), 2 (isento) ou 9 (nao contribuinte).');
+            }
+        }
+
+        $itens = $this->doc['itens'] ?? null;
+        if (!is_array($itens) || $itens === []) {
+            $this->erro(self::CAMPO_OBRIGATORIO, 'itens', 'Nota sem itens (produtos).',
+                'Envie "itens" com ao menos um produto (nItem, prod, imposto).');
+        } else {
+            $numeros = [];
+            foreach (array_values($itens) as $i => $item) {
+                $n = (int)($item['nItem'] ?? 0);
+                $rotulo = 'itens[' . $i . ']';
+                if ($n <= 0) {
+                    $this->erro(self::CAMPO_OBRIGATORIO, "{$rotulo}.nItem", "Item {$i} sem numero (nItem).",
+                        'Numere os itens a partir de 1 (1, 2, 3...).');
+                } elseif (isset($numeros[$n])) {
+                    $this->erro(self::VALOR_INVALIDO, "{$rotulo}.nItem", "nItem {$n} repetido.", 'Cada item precisa de um nItem diferente.');
+                }
+                $numeros[$n] = true;
+
+                $prod = is_array($item['prod'] ?? null) ? $item['prod'] : [];
+                foreach (['cProd' => 'codigo', 'xProd' => 'descricao', 'NCM' => 'NCM', 'CFOP' => 'CFOP', 'uCom' => 'unidade'] as $campo => $nome) {
+                    if (trim((string)($prod[$campo] ?? '')) === '') {
+                        $this->erro(self::CAMPO_OBRIGATORIO, "{$rotulo}.prod.{$campo}", "Item {$n}: {$nome} do produto nao informado.",
+                            "Preencha o {$nome} no cadastro do produto.");
+                    }
+                }
+                $ncm = (string)($prod['NCM'] ?? '');
+                if ($ncm !== '' && !preg_match('/^(\d{8}|00)$/', $ncm)) {
+                    $this->erro(self::FORMATO_INVALIDO, "{$rotulo}.prod.NCM", "Item {$n}: NCM '{$ncm}' invalido.",
+                        'O NCM tem 8 digitos, sem pontos (ex.: 8471.30.12 vira 84713012).');
+                }
+                $cfop = (string)($prod['CFOP'] ?? '');
+                if ($cfop !== '' && !preg_match('/^\d{4}$/', $cfop)) {
+                    $this->erro(self::FORMATO_INVALIDO, "{$rotulo}.prod.CFOP", "Item {$n}: CFOP '{$cfop}' invalido.",
+                        'O CFOP tem 4 digitos, sem ponto (ex.: 5.102 vira 5102).');
+                }
+                foreach (['qCom' => 'quantidade', 'vUnCom' => 'valor unitario'] as $campo => $nome) {
+                    if (!is_numeric($prod[$campo] ?? null) || (float)$prod[$campo] <= 0) {
+                        $this->erro(self::VALOR_INVALIDO, "{$rotulo}.prod.{$campo}", "Item {$n}: {$nome} ausente ou zero.",
+                            "Informe {$nome} maior que zero, com ponto decimal (ex.: 10.50).");
+                    }
+                }
+                if (!is_array($item['imposto'] ?? null)) {
+                    $this->erro(self::CAMPO_OBRIGATORIO, "{$rotulo}.imposto", "Item {$n}: impostos nao informados.",
+                        'Envie o bloco "imposto" do item (ICMS, PIS, COFINS).');
+                }
+            }
+        }
+
+        $vNF = $this->doc['totais']['ICMSTot']['vNF'] ?? null;
+        if (!is_numeric($vNF) || (float)$vNF <= 0) {
+            $this->erro(self::CAMPO_OBRIGATORIO, 'totais.ICMSTot.vNF', 'Valor total da nota (vNF) ausente ou zero.',
+                'Envie "totais": {"ICMSTot": {...}} com vNF igual a soma da nota.');
         }
     }
 

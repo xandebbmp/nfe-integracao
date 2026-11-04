@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Monitor Fiscal NFS-e</title>
+  <title>Monitor Fiscal</title>
   <link rel="stylesheet" href="monitor.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
   <!-- ===================== Tela de acesso ===================== -->
   <section id="tela-acesso" class="acesso" hidden>
     <form id="form-acesso" class="cartao acesso__cartao">
-      <h1>Monitor Fiscal NFS-e</h1>
+      <h1>Monitor Fiscal</h1>
       <p class="suave">Informe o token do painel (monitor_token em config/nfse.local.php).</p>
       <label for="campo-token">Token</label>
       <input id="campo-token" type="password" autocomplete="current-password" required>
@@ -27,7 +27,7 @@
   <div id="tela-painel" hidden>
     <header class="topo">
       <div class="topo__titulo">
-        <h1>Monitor Fiscal NFS-e</h1>
+        <h1>Monitor Fiscal</h1>
         <span id="selo-ambiente" class="selo"></span>
       </div>
       <div class="topo__acoes">
@@ -52,8 +52,9 @@
         <label>Padrão
           <select id="filtro-padrao">
             <option value="">Todos</option>
-            <option value="NACIONAL">Nacional</option>
-            <option value="SALVADOR">Salvador</option>
+            <option value="NFE">NF-e (produtos)</option>
+            <option value="NACIONAL">NFS-e Nacional</option>
+            <option value="SALVADOR">NFS-e Salvador</option>
           </select>
         </label>
         <label>Emitente
@@ -62,7 +63,7 @@
           </select>
         </label>
         <label class="filtros__busca">Buscar
-          <input id="filtro-busca" type="search" placeholder="Referência, nº da NFS-e ou chave">
+          <input id="filtro-busca" type="search" placeholder="Referência, número ou chave">
         </label>
       </section>
 
@@ -75,8 +76,8 @@
               <th>Referência</th>
               <th>Padrão</th>
               <th>Emitente</th>
-              <th>DPS/RPS</th>
-              <th>NFS-e</th>
+              <th>Série/Nº</th>
+              <th>Nota</th>
               <th>Status</th>
               <th>Última ação</th>
             </tr>

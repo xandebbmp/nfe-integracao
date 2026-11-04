@@ -185,6 +185,28 @@ O `EventSource` do navegador não envia cabeçalhos, então o token do monitor v
 ### C9 🟢 Infraestrutura do worker
 - **Decidir:** onde roda o worker (mesmo servidor da API?), quantos processos (sugestão: 2) e quem recebe alerta quando houver documentos parados ou webhooks em `FALHOU` (consultas prontas em `docs/nfse-arquitetura.md`, seção 10).
 
+## D. NF-e (modelo 55) na mesma estrutura
+
+### D1 🔴 Quem numera a NF-e: a API ou o ERP?
+- **Adotado:** a API numera (`ide.nNF` sempre definido por ela, por CNPJ + série + ambiente), como na NFS-e. Isso evita buraco e número repetido entre sistemas.
+- **Decidir:** algum ERP precisa manter a própria numeração? Se sim, ele deve usar uma **série diferente**.
+- **Informar:** último número usado em cada série/CNPJ para iniciar `nfse_numeracao` sem colidir com notas já emitidas pelas rotas antigas.
+
+### D2 🔴 CNPJ do emitente da nota de homologação
+- `json/nota_homologacao_emitir_padrao.json` usa `emit.CNPJ` **07047183000140**, mas `config/nfe.php` está com **41986662000160**.
+- **Decidir:** qual empresa homologa a NF-e e cadastrá-la em `emitentes` (com `uf`, `ie` e certificado).
+
+### D3 🟡 Nome das rotas
+- A NF-e entrou em `/v1/nfse/` com `"padrao": "NFE"`. Funciona, mas o nome confunde.
+- **Decidir:** criar apelido `/v1/fiscal/` (mesmos arquivos) ou manter como está.
+
+### D4 🟡 Inutilização de numeração
+- Continua na rota antiga (`/v1/nfe/inutilizar_padrao.php`). Como a API controla a numeração, buracos só surgem em casos raros (ex.: nota rejeitada e abandonada).
+- **Decidir:** trazer a inutilização para a fila/monitor?
+
+### D5 🟢 NFC-e (modelo 65), manifestação do destinatário, EPEC/contingência
+- **Fora do escopo agora:** `mod` 65 é recusado com `NAO_SUPORTADO_PELO_PADRAO`; contingência não é feita automaticamente (falha de comunicação vira nova tentativa e, ao final, `ERRO`).
+
 ---
 
 ## Fontes consultadas

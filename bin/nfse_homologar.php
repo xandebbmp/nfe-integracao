@@ -8,6 +8,7 @@ declare(strict_types=1);
  *
  *   NACIONAL: emitir -> consultar DPS -> consultar NFS-e -> PDF (DANFSe) -> cancelar -> conferir cancelamento
  *   SALVADOR: emitir lote -> aguardar processamento -> consultar por RPS -> PDF (espelho)
+ *   NFE:      emitir -> consultar chave -> PDF (DANFE) -> Carta de Correcao -> cancelar -> conferir
  *             (Salvador nao cancela por webservice)
  *
  * Tudo o que vai e volta do fisco fica gravado em
@@ -18,15 +19,17 @@ declare(strict_types=1);
  * Uso:
  *   php bin/nfse_homologar.php --padrao=NACIONAL
  *   php bin/nfse_homologar.php --padrao=SALVADOR --cnpj=41986662000160
+ *   php bin/nfse_homologar.php --padrao=NFE
  *
  * Opcoes:
- *   --padrao=NACIONAL|SALVADOR  obrigatorio
+ *   --padrao=NACIONAL|SALVADOR|NFE  obrigatorio
  *   --cnpj=...                  emitente (obrigatorio se houver mais de um configurado)
- *   --payload=arquivo.json      nota de teste (padrao: json/nfse/homologacao_<padrao>.json)
+ *   --payload=arquivo.json      nota de teste (padrao: json/nfse/homologacao_<padrao>.json;
+ *                               NFE: json/nota_homologacao_emitir_padrao.json)
  *   --serie=N                   serie da DPS/RPS (padrao: a da configuracao)
  *   --numero=N                  numero da DPS/RPS (padrao: gerado pela data/hora, nunca repete)
  *   --so-validar                so monta, assina e valida o XML no XSD (nao chama o fisco)
- *   --sem-cancelar              nao cancela a nota no final (Nacional)
+ *   --sem-cancelar              nao cancela a nota no final (Nacional e NF-e)
  *
  * Seguranca: so roda com tpAmb = 2 (homologacao). Em producao, recusa.
  */
@@ -40,6 +43,7 @@ use Xande\NfeIntegracao\Nfse\Dominio\TipoEvento;
 use Xande\NfeIntegracao\Nfse\Infra\AssinadorXml;
 use Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente;
 use Xande\NfeIntegracao\Nfse\Infra\CurlTransporte;
+use Xande\NfeIntegracao\Nfse\Infra\SoapGravador;
 use Xande\NfeIntegracao\Nfse\Infra\TransporteGravador;
 use Xande\NfeIntegracao\Nfse\Infra\ValidadorXsd;
 use Xande\NfeIntegracao\Nfse\Nacional\DpsXmlBuilder;
@@ -62,13 +66,13 @@ require $raiz . '/vendor/autoload.php';
 
 $opcoes = getopt('', ['padrao:', 'cnpj:', 'payload:', 'serie:', 'numero:', 'so-validar', 'sem-cancelar', 'ajuda']);
 if (isset($opcoes['ajuda']) || empty($opcoes['padrao'])) {
-    fwrite(STDOUT, "Uso: php bin/nfse_homologar.php --padrao=NACIONAL|SALVADOR [--cnpj=...] [--payload=...] [--so-validar] [--sem-cancelar]\n");
+    fwrite(STDOUT, "Uso: php bin/nfse_homologar.php --padrao=NACIONAL|SALVADOR|NFE [--cnpj=...] [--payload=...] [--so-validar] [--sem-cancelar]\n");
     exit(isset($opcoes['ajuda']) ? 0 : 2);
 }
 
 $padrao = strtoupper((string)$opcoes['padrao']);
 if (!in_array($padrao, Padrao::TODOS, true)) {
-    parar("Padrao invalido: {$padrao}. Use NACIONAL ou SALVADOR.");
+    parar("Padrao invalido: {$padrao}. Use NACIONAL, SALVADOR ou NFE.");
 }
 
 $cfgGeral = NfseConfig::carregar();
@@ -76,23 +80,35 @@ if ((int)$cfgGeral['tpAmb'] !== 2) {
     parar('tpAmb configurado e 1 (PRODUCAO). Este script so roda em HOMOLOGACAO (tpAmb = 2).');
 }
 
+$arquivoPayload = $opcoes['payload'] ?? ($padrao === Padrao::NFE
+    ? "{$raiz}/json/nota_homologacao_emitir_padrao.json"
+    : "{$raiz}/json/nfse/homologacao_" . strtolower($padrao) . '.json');
+$payload = json_decode((string)@file_get_contents($arquivoPayload), true);
+if (!is_array($payload)) {
+    parar("Nao consegui ler o JSON da nota de teste: {$arquivoPayload}");
+}
+
 $cnpjs = array_map('strval', array_keys($cfgGeral['emitentes']));
-$cnpj = isset($opcoes['cnpj']) ? NfseConfig::normalizarCnpj($opcoes['cnpj']) : (count($cnpjs) === 1 ? $cnpjs[0] : '');
+// NF-e: o emitente e o emit.CNPJ do JSON (se nao vier --cnpj).
+$cnpjDoJson = $padrao === Padrao::NFE && !empty($payload['emit']['CNPJ']) ? NfseConfig::normalizarCnpj($payload['emit']['CNPJ']) : '';
+$cnpj = isset($opcoes['cnpj']) ? NfseConfig::normalizarCnpj($opcoes['cnpj']) : ($cnpjDoJson ?: (count($cnpjs) === 1 ? $cnpjs[0] : ''));
+if ($cnpjDoJson !== '' && !in_array($cnpjDoJson, $cnpjs, true)) {
+    parar("O JSON da nota ({$arquivoPayload}) traz emit.CNPJ {$cnpjDoJson}, que nao esta configurado como emitente "
+        . '(configurados: ' . implode(', ', $cnpjs) . '). Configure esse CNPJ em config/nfse.local.php ou use outro JSON com --payload.');
+}
+if ($cnpjDoJson !== '' && $cnpjDoJson !== $cnpj) {
+    parar("O JSON da nota traz emit.CNPJ {$cnpjDoJson}, diferente do emitente {$cnpj}. Ajuste o JSON ou o --cnpj.");
+}
 if ($cnpj === '' || !in_array($cnpj, $cnpjs, true)) {
     parar('Informe --cnpj com um destes emitentes configurados: ' . implode(', ', $cnpjs));
 }
 $cfg = NfseConfig::paraEmitente($cfgGeral, $cnpj);
 $emitente = $cfg['emitente'];
 
-if (trim((string)$emitente['inscricao_municipal']) === '') {
+if ($padrao !== Padrao::NFE && trim((string)$emitente['inscricao_municipal']) === '') {
     aviso('Emitente sem inscricao municipal configurada. Salvador exige; no Nacional pode ser rejeitado se o municipio exigir.');
 }
 
-$arquivoPayload = $opcoes['payload'] ?? "{$raiz}/json/nfse/homologacao_" . strtolower($padrao) . '.json';
-$payload = json_decode((string)@file_get_contents($arquivoPayload), true);
-if (!is_array($payload)) {
-    parar("Nao consegui ler o JSON da nota de teste: {$arquivoPayload}");
-}
 $payload = array_filter($payload, static fn($chave) => !str_starts_with((string)$chave, '_'), ARRAY_FILTER_USE_KEY);
 $payload['referencia'] = ($payload['referencia'] ?? 'HOMOLOGACAO') . '-' . date('YmdHis');
 
@@ -137,9 +153,14 @@ $documento = [
     'referencia' => $payload['referencia'],
     'tp_amb' => 2,
     'status' => StatusNfse::RECEBIDO,
-    'serie' => (string)($opcoes['serie'] ?? ($padrao === Padrao::NACIONAL ? $cfg['nacional']['serie_dps'] : $cfg['salvador']['serie_rps'])),
-    // Numero pela data/hora: cada execucao usa um numero novo e nao conflita com a anterior.
-    'numero' => (int)($opcoes['numero'] ?? date('ymdHis')),
+    'serie' => (string)($opcoes['serie'] ?? match ($padrao) {
+        Padrao::NACIONAL => $cfg['nacional']['serie_dps'],
+        Padrao::SALVADOR => $cfg['salvador']['serie_rps'],
+        Padrao::NFE => (int)($payload['ide']['serie'] ?? $cfg['nfe']['serie']),
+    }),
+    // Numero pela data/hora: cada execucao usa um numero novo e nao conflita
+    // com a anterior. NF-e aceita no maximo 9 digitos: dia + hora (ex.: 4183522).
+    'numero' => (int)($opcoes['numero'] ?? ($padrao === Padrao::NFE ? date('dHis') : date('ymdHis'))),
     'payload' => $payload,
     'id_dps' => null,
     'xml_enviado' => null,
@@ -148,6 +169,7 @@ $documento = [
     'numero_nfse' => null,
     'codigo_verificacao' => null,
     'data_autorizacao' => null,
+    'protocolo_autorizacao' => null,
     'xml_autorizado' => null,
     'mensagens' => [],
 ];
@@ -161,10 +183,21 @@ $resultados = [];
 
 if (isset($opcoes['so-validar'])) {
     titulo('Validacao offline (montar, assinar e validar no XSD)');
-    $assinador = new AssinadorXml(
+    $assinador = $padrao === Padrao::NFE ? null : new AssinadorXml(
         $certificado->certificado(),
         (string)$cfg[$padrao === Padrao::NACIONAL ? 'nacional' : 'salvador']['algoritmo_assinatura']
     );
+
+    if ($padrao === Padrao::NFE) {
+        try {
+            $montado = (new ProvedorFactory($cfgGeral, $certificado))->para(Padrao::NFE, $cnpj)->montarEAssinar($documento);
+            file_put_contents("{$pasta}/envio-assinado.xml", $montado['xml']);
+            registrar('Montar, assinar e validar no XSD', true, "XML valido: envio-assinado.xml (chave {$montado['chave']})");
+        } catch (Throwable $e) {
+            registrar('Montar, assinar e validar no XSD', false, $e->getMessage());
+        }
+        finalizar();
+    }
 
     if ($padrao === Padrao::NACIONAL) {
         $montado = (new DpsXmlBuilder($cfg))->montar($documento);
@@ -191,17 +224,24 @@ if (isset($opcoes['so-validar'])) {
 // 3. Roteiro com o fisco
 // ===========================================================================
 
-$gravador = new TransporteGravador(
-    new CurlTransporte($certificado, (int)$cfg[$padrao === Padrao::NACIONAL ? 'nacional' : 'salvador']['timeout_segundos']),
-    $pasta
-);
-$provedor = (new ProvedorFactory($cfgGeral, $certificado, $gravador))->para($padrao, $cnpj);
-
-if ($padrao === Padrao::NACIONAL) {
-    roteiroNacional($provedor, $documento, isset($opcoes['sem-cancelar']));
+if ($padrao === Padrao::NFE) {
+    // NF-e fala SOAP pela biblioteca sped-nfe: grava com o SoapGravador.
+    $soap = (new SoapGravador($certificado->certificado()))->gravarEm($pasta);
+    $soap->timeout((int)$cfg['nfe']['timeout_segundos']);
+    $provedor = (new ProvedorFactory($cfgGeral, $certificado, null, $soap))->para($padrao, $cnpj);
 } else {
-    roteiroSalvador($provedor, $documento, $cfg);
+    $gravador = new TransporteGravador(
+        new CurlTransporte($certificado, (int)$cfg[$padrao === Padrao::NACIONAL ? 'nacional' : 'salvador']['timeout_segundos']),
+        $pasta
+    );
+    $provedor = (new ProvedorFactory($cfgGeral, $certificado, $gravador))->para($padrao, $cnpj);
 }
+
+match ($padrao) {
+    Padrao::NACIONAL => roteiroNacional($provedor, $documento, isset($opcoes['sem-cancelar'])),
+    Padrao::SALVADOR => roteiroSalvador($provedor, $documento, $cfg),
+    Padrao::NFE => roteiroNfe($provedor, $documento, isset($opcoes['sem-cancelar'])),
+};
 finalizar();
 
 // ===========================================================================
@@ -252,6 +292,58 @@ function roteiroNacional(ProvedorNfse $provedor, array &$documento, bool $semCan
         fwrite(STDOUT, "   ainda {$r->status}, nova consulta em 10s...\n");
         sleep(10);
     }
+    registrar('Conferir cancelamento', $r->status === StatusNfse::CANCELADO, descrever($r));
+}
+
+function roteiroNfe(ProvedorNfse $provedor, array &$documento, bool $semCancelar): void
+{
+    titulo('1. Emitir (NfeAutorizacao, sincrono)');
+    $r = aplicar($documento, $provedor->emitir($documento));
+    if ($r->status === StatusNfse::PROCESSANDO) {
+        // SEFAZ respondeu "lote recebido" (assincrono): acompanha pelo recibo.
+        for ($tentativa = 1; $tentativa <= 10 && $r->status === StatusNfse::PROCESSANDO; $tentativa++) {
+            sleep(5);
+            $r = aplicar($documento, $provedor->consultarProcessamento($documento));
+            fwrite(STDOUT, "   consulta do recibo {$tentativa}: {$r->status}\n");
+        }
+    }
+    if (!registrar('Emitir', $r->status === StatusNfse::AUTORIZADO, descrever($r, $documento))) {
+        return;
+    }
+
+    titulo('2. Consultar pela chave (NfeConsultaProtocolo)');
+    $r = $provedor->consultar($documento);
+    registrar('Consultar NF-e', $r->status === StatusNfse::AUTORIZADO, descrever($r));
+
+    titulo('3. PDF (DANFE)');
+    salvarPdf($provedor, $documento);
+
+    titulo('4. Carta de Correcao (evento 110110)');
+    $r = $provedor->registrarEvento($documento, [
+        'id' => 'cce-homologacao',
+        'tipo_evento' => TipoEvento::NFE_CARTA_CORRECAO,
+        'motivo_texto' => 'Correcao de teste em ambiente de homologacao: informacoes complementares.',
+        'sequencia' => 1,
+    ]);
+    registrar('Carta de Correcao', $r->status === StatusEvento::REGISTRADO, descrever($r));
+
+    if ($semCancelar) {
+        registrar('Cancelar', true, 'pulado (--sem-cancelar)');
+        return;
+    }
+
+    titulo('5. Cancelar (evento 110111)');
+    $r = $provedor->registrarEvento($documento, [
+        'id' => 'cancelamento-homologacao',
+        'tipo_evento' => TipoEvento::NFE_CANCELAMENTO,
+        'motivo_texto' => 'Cancelamento de nota emitida em teste de homologacao',
+    ]);
+    if (!registrar('Cancelar', $r->status === StatusEvento::REGISTRADO, descrever($r))) {
+        return;
+    }
+
+    titulo('6. Conferir cancelamento na consulta');
+    $r = $provedor->consultar($documento);
     registrar('Conferir cancelamento', $r->status === StatusNfse::CANCELADO, descrever($r));
 }
 
@@ -317,7 +409,7 @@ function salvarPdf(ProvedorNfse $provedor, array $documento): void
 function descrever(RetornoProvedor $r, ?array $documento = null): string
 {
     $partes = ["status {$r->status}" . ($r->falhaTemporaria ? ' (falha temporaria)' : '')];
-    foreach (['numero_nfse' => 'NFS-e', 'chave_acesso' => 'chave', 'protocolo_lote' => 'protocolo', 'codigo_verificacao' => 'verificacao'] as $campo => $nome) {
+    foreach (['numero_nfse' => 'numero', 'chave_acesso' => 'chave', 'protocolo_autorizacao' => 'protocolo', 'protocolo_lote' => 'protocolo do lote', 'codigo_verificacao' => 'verificacao'] as $campo => $nome) {
         $valor = $r->dados[$campo] ?? ($documento[$campo] ?? null);
         if ($valor) {
             $partes[] = "{$nome} {$valor}";

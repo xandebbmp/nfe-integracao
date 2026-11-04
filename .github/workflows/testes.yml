@@ -70,6 +70,9 @@ jobs:
       - name: Conferir sintaxe do JavaScript do monitor
         run: node --check public/monitor/monitor.js
 
+      - name: Conferir scripts de implantacao (shellcheck)
+        run: shellcheck -S warning deploy/*.sh
+
       - name: Rodar testes da NFS-e
         env:
           NFSE_TESTE_PG: "pgsql:host=127.0.0.1;port=5432;dbname=nfephp_teste;user=nfephp_app;password=senha_so_para_ci"

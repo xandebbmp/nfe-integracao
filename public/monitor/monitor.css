@@ -17,6 +17,7 @@
   --st-processando: #1f6feb;
   --st-autorizado: #1a7f37;
   --st-rejeitado: #cf222e;
+  --st-denegado: #8b0000;
   --st-erro: #bc4c00;
   --st-cancelado: #57606a;
   --st-substituido: #8250df;
@@ -39,6 +40,7 @@
     --st-processando: #4c9aff;
     --st-autorizado: #3fb950;
     --st-rejeitado: #ff6b6b;
+    --st-denegado: #e5534b;
     --st-erro: #f0883e;
     --st-cancelado: #8b949e;
     --st-substituido: #b392f0;

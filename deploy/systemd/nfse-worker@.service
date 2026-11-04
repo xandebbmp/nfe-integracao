@@ -1,0 +1,41 @@
+# ==========================================================================
+# systemd - Worker da NFS-e (processa a fila: emite, consulta, cancela...)
+#
+# Onde colocar:  /etc/systemd/system/nfse-worker@.service
+# Ligar 2 workers e iniciar junto com o servidor:
+#     systemctl daemon-reload
+#     systemctl enable --now nfse-worker@1 nfse-worker@2
+# Ver se esta rodando:   systemctl status nfse-worker@1
+# Ver o que ele fez:     journalctl -u nfse-worker@1 -f
+#
+# O "@1", "@2" e so um numero para ter mais de um worker em paralelo.
+# Manual completo: docs/manual-implantacao.md
+# ==========================================================================
+
+[Unit]
+Description=Worker NFS-e (fila de emissao) - instancia %i
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+# TROQUE se instalou o sistema em outra pasta.
+WorkingDirectory=/var/www/nfe-integracao
+ExecStart=/usr/bin/php bin/nfse_worker.php
+
+# Se cair por qualquer motivo, volta sozinho em 5 segundos.
+Restart=always
+RestartSec=5
+
+# Parada segura: o worker termina a nota que esta enviando antes de sair.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+# Protecoes basicas.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
