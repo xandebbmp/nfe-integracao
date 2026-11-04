@@ -431,6 +431,8 @@ SELECT * FROM nfse_webhooks_saida WHERE status = 'FALHOU' ORDER BY id DESC LIMIT
 php tests/nfse/executar.php
 ```
 
+No GitHub, os testes rodam sozinhos em todo PR (CI): ver `docs/ci.md`.
+
 Com banco descartável (fila, worker e monitor de verdade):
 
 ```bash

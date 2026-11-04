@@ -13,6 +13,9 @@ declare(strict_types=1);
  *   NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=nfephp_app;password=..." \
  *     php tests/nfse/executar.php
  *
+ * NFSE_TESTE_EXIGIR_PG=1 faz o teste FALHAR se a integracao for pulada
+ * (usado no CI, .github/workflows/testes.yml).
+ *
  * Nenhum teste fala com o Sefin ou com Salvador: as respostas sao simuladas
  * pelo TransporteFalso (tests/nfse/Apoio.php).
  */
@@ -315,6 +318,8 @@ echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
 $dsn = getenv('NFSE_TESTE_PG');
 if (!$dsn) {
     echo "  (pulado: defina NFSE_TESTE_PG para rodar)\n";
+    // No CI a integracao e obrigatoria: pular seria um falso "verde".
+    Apoio::verificar(!getenv('NFSE_TESTE_EXIGIR_PG'), 'NFSE_TESTE_EXIGIR_PG ativo, mas NFSE_TESTE_PG nao foi definido');
 } else {
     $pdo = new PDO($dsn, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
     $pdo->exec('DROP TABLE IF EXISTS nfse_webhooks_saida, nfse_monitor, nfse_jobs, nfse_eventos, nfse_numeracao, nfse_documentos, nfse_lotes CASCADE');

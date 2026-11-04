@@ -1,0 +1,78 @@
+# ==========================================================================
+# CI - Testes automaticos
+#
+# Roda em todo Pull Request e em todo push na main:
+#   1. instala PHP 8.3 e as extensoes usadas pelo NfePHP;
+#   2. sobe um PostgreSQL 16 descartavel (so existe durante o teste);
+#   3. confere a sintaxe de todos os arquivos PHP e do JS do monitor;
+#   4. roda tests/nfse/executar.php, inclusive a integracao com o banco.
+#
+# Nao fala com o Sefin nem com Salvador: as respostas do fisco sao simuladas.
+# Como ler o resultado e como bloquear merge com teste falhando: docs/ci.md
+# ==========================================================================
+name: Testes
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Se chegar um push novo no mesmo PR, cancela a execucao antiga.
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    name: Testes NFS-e (PHP 8.3 + PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nfephp_app
+          POSTGRES_PASSWORD: senha_so_para_ci
+          POSTGRES_DB: nfephp_teste
+        ports:
+          - 5432:5432
+        # Espera o banco ficar pronto antes de rodar os passos.
+        options: >-
+          --health-cmd "pg_isready -U nfephp_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, curl, dom, gd, mbstring, openssl, pdo_pgsql, pgsql, soap, xml, zlib
+          coverage: none
+          tools: composer:v2
+
+      - name: Instalar dependencias (composer)
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Conferir sintaxe dos arquivos PHP
+        run: |
+          find . -path ./vendor -prune -o -name '*.php' -print0 \
+            | xargs -0 -n1 php -l > /dev/null
+
+      - name: Conferir sintaxe do JavaScript do monitor
+        run: node --check public/monitor/monitor.js
+
+      - name: Rodar testes da NFS-e
+        env:
+          NFSE_TESTE_PG: "pgsql:host=127.0.0.1;port=5432;dbname=nfephp_teste;user=nfephp_app;password=senha_so_para_ci"
+          # Falha se a parte com banco for pulada por engano.
+          NFSE_TESTE_EXIGIR_PG: "1"
+        run: php tests/nfse/executar.php
