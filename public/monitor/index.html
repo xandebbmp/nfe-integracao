@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitor Fiscal NFS-e</title>
+  <link rel="stylesheet" href="monitor.css">
+</head>
+<body>
+
+  <!-- ===================== Tela de acesso ===================== -->
+  <section id="tela-acesso" class="acesso" hidden>
+    <form id="form-acesso" class="cartao acesso__cartao">
+      <h1>Monitor Fiscal NFS-e</h1>
+      <p class="suave">Informe o token do painel (monitor_token em config/nfse.local.php).</p>
+      <label for="campo-token">Token</label>
+      <input id="campo-token" type="password" autocomplete="current-password" required>
+      <label class="linha-check">
+        <input id="campo-lembrar" type="checkbox"> Lembrar neste navegador
+      </label>
+      <p id="erro-acesso" class="erro" hidden></p>
+      <button type="submit" class="botao botao--primario">Entrar</button>
+    </form>
+  </section>
+
+  <!-- ===================== Painel ===================== -->
+  <div id="tela-painel" hidden>
+    <header class="topo">
+      <div class="topo__titulo">
+        <h1>Monitor Fiscal NFS-e</h1>
+        <span id="selo-ambiente" class="selo"></span>
+      </div>
+      <div class="topo__acoes">
+        <span id="conexao" class="conexao conexao--desligada" title="Situação da conexão em tempo real">
+          <span class="conexao__ponto"></span><span id="conexao-texto">Desconectado</span>
+        </span>
+        <button id="botao-sair" class="botao">Sair</button>
+      </div>
+    </header>
+
+    <main class="conteudo">
+      <!-- Contadores por status (clique para filtrar) -->
+      <section id="contadores" class="contadores" aria-label="Totais por status"></section>
+
+      <!-- Filtros -->
+      <section class="filtros cartao">
+        <label>Status
+          <select id="filtro-status">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label>Padrão
+          <select id="filtro-padrao">
+            <option value="">Todos</option>
+            <option value="NACIONAL">Nacional</option>
+            <option value="SALVADOR">Salvador</option>
+          </select>
+        </label>
+        <label>Emitente
+          <select id="filtro-emitente">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label class="filtros__busca">Buscar
+          <input id="filtro-busca" type="search" placeholder="Referência, nº da NFS-e ou chave">
+        </label>
+      </section>
+
+      <!-- Lista de notas -->
+      <section class="cartao tabela-cartao">
+        <table class="tabela">
+          <thead>
+            <tr>
+              <th>Atualizado</th>
+              <th>Referência</th>
+              <th>Padrão</th>
+              <th>Emitente</th>
+              <th>DPS/RPS</th>
+              <th>NFS-e</th>
+              <th>Status</th>
+              <th>Última ação</th>
+            </tr>
+          </thead>
+          <tbody id="linhas"></tbody>
+        </table>
+        <p id="vazio" class="vazio" hidden>Nenhuma nota para os filtros escolhidos.</p>
+      </section>
+    </main>
+  </div>
+
+  <!-- Dica ao passar o mouse em nota rejeitada/erro -->
+  <div id="dica" class="dica" role="tooltip" hidden></div>
+
+  <!-- ===================== Modal de detalhes ===================== -->
+  <dialog id="modal" class="modal">
+    <div class="modal__topo">
+      <div>
+        <h2 id="modal-titulo"></h2>
+        <span id="modal-status"></span>
+      </div>
+      <button id="modal-fechar" class="botao" aria-label="Fechar">✕</button>
+    </div>
+    <div id="modal-corpo" class="modal__corpo"></div>
+  </dialog>
+
+  <script src="monitor.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "_leia_me": "Nota de TESTE para homologacao do Padrao Nacional. Ajuste codigo_tributacao_nacional e aliquota para um servico real da empresa. Campos iniciados com _ sao ignorados.",
+  "referencia": "HOMOLOGACAO-NACIONAL",
+  "tomador": {
+    "cpf_cnpj": "00000000000191",
+    "nome": "TOMADOR DE TESTE - HOMOLOGACAO",
+    "email": "teste@exemplo.com.br",
+    "endereco": {
+      "logradouro": "Avenida Tancredo Neves",
+      "numero": "1000",
+      "bairro": "Caminho das Arvores",
+      "codigo_municipio": "2927408",
+      "uf": "BA",
+      "cep": "41820020"
+    }
+  },
+  "servico": {
+    "descricao": "SERVICO DE TESTE EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
+    "codigo_tributacao_nacional": "010101"
+  },
+  "valores": {
+    "valor_servicos": 10.00,
+    "iss_retido": false
+  }
+}
