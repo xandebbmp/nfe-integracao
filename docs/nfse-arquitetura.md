@@ -362,6 +362,19 @@ worker podem estar em servidores diferentes sem disco compartilhado).
 
 ## 10. Operação
 
+### Homologação
+
+Roteiro completo em `docs/nfse-homologacao.md`. Resumo:
+
+```bash
+php bin/nfse_homologar.php --padrao=NACIONAL --so-validar   # sem chamar o fisco
+php bin/nfse_homologar.php --padrao=NACIONAL                # emitir, consultar, PDF, cancelar
+php bin/nfse_homologar.php --padrao=SALVADOR                # lote, processamento, consulta, PDF
+```
+
+Cada execução grava requisições, respostas e XMLs em
+`storage/logs/homologacao/<data>-<padrao>/`.
+
 ### Worker (systemd)
 
 ```ini

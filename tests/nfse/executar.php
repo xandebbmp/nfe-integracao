@@ -27,6 +27,7 @@ use Xande\NfeIntegracao\Nfse\Dominio\StatusEvento;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusNfse;
 use Xande\NfeIntegracao\Nfse\Infra\AssinadorXml;
 use Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente;
+use Xande\NfeIntegracao\Nfse\Infra\TransporteGravador;
 use Xande\NfeIntegracao\Nfse\Infra\ValidadorXsd;
 use Xande\NfeIntegracao\Nfse\Infra\Xml;
 use Xande\NfeIntegracao\Nfse\Nacional\EventoXmlBuilder;
@@ -292,6 +293,20 @@ try {
 }
 
 $pastaArquivos = sys_get_temp_dir() . '/nfse_teste_arquivos_' . getmypid();
+
+// Gravador de chamadas (usado pelo bin/nfse_homologar.php)
+$pastaGravacao = sys_get_temp_dir() . '/nfse_teste_gravacao_' . getmypid();
+$falso = new TransporteFalso();
+$falso->responder(201, respostaSefinAutorizada($chave));
+$falso->responder(200, '%PDF-1.4 teste', 'application/pdf');
+$gravador = new TransporteGravador($falso, $pastaGravacao);
+$gravador->enviar('POST', 'https://sefin.teste/SefinNacional/nfse', ['Content-Type' => 'application/json'],
+    json_encode(['dpsXmlGZipB64' => SefinNacionalCliente::compactar('<DPS>teste</DPS>')]));
+$gravador->enviar('GET', 'https://adn.teste/danfse/' . $chave);
+Apoio::igual('<DPS>teste</DPS>', @file_get_contents("{$pastaGravacao}/01-POST-sefinnacional-nfse.envio.xml"), 'gravador salva o XML enviado ja descompactado');
+Apoio::verificar(str_contains((string)@file_get_contents("{$pastaGravacao}/01-POST-sefinnacional-nfse.retorno.xml"), '<nNFSe>123</nNFSe>'), 'gravador salva o XML de retorno descompactado');
+Apoio::verificar(is_file("{$pastaGravacao}/02-GET-danfse.pdf"), 'gravador salva o PDF (sem a chave no nome do arquivo)');
+exec('rm -rf ' . escapeshellarg($pastaGravacao));
 
 // ===========================================================================
 echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
