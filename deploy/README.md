@@ -5,6 +5,9 @@ Arquivos para colocar o sistema no ar em um servidor **Ubuntu 24.04 LTS**.
 👉 **Siga o passo a passo em [`docs/manual-implantacao.md`](../docs/manual-implantacao.md).**
 Ele explica quando e como usar cada arquivo abaixo.
 
+Para montar primeiro no seu computador (Windows com WSL2, macOS ou Linux)
+e depois levar para a VPS: [`docs/manual-ambiente-local.md`](../docs/manual-ambiente-local.md).
+
 | Arquivo | Para quê | Manual |
 |---|---|---|
 | `instalar_pacotes.sh` | Instala nginx, PHP 8.3, PostgreSQL, Composer e certbot | Passo 3 |

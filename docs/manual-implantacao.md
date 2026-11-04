@@ -4,6 +4,10 @@ Este manual ensina, passo a passo, a colocar o sistema no ar em um servidor
 novo. **Não é preciso saber programar.** Basta seguir os passos na ordem,
 copiar os comandos e conferir se a tela mostra o que o manual diz.
 
+> **Quer testar no seu computador antes de contratar a VPS?** Siga o
+> [Manual do ambiente local](manual-ambiente-local.md) (Windows, Linux e
+> macOS). Ele usa este mesmo manual, com poucas diferenças.
+
 > **Tempo estimado:** 1h30 a 2h na primeira vez.
 > **Servidor:** Linux **Ubuntu 24.04 LTS** (é o sistema testado). Em outro
 > sistema os comandos podem ser diferentes.
