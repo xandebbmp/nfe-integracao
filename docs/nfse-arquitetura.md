@@ -375,40 +375,21 @@ php bin/nfse_homologar.php --padrao=SALVADOR                # lote, processament
 Cada execução grava requisições, respostas e XMLs em
 `storage/logs/homologacao/<data>-<padrao>/`.
 
-### Worker (systemd)
+### Implantação (kit pronto)
 
-```ini
-# /etc/systemd/system/nfse-worker@.service
-[Unit]
-Description=Worker NFS-e %i
-After=network-online.target postgresql.service
+Tudo o que é preciso para subir em um servidor Ubuntu 24.04 está em
+`deploy/` e o passo a passo para leigos em `docs/manual-implantacao.md`:
 
-[Service]
-WorkingDirectory=/var/www/nfe-integracao
-ExecStart=/usr/bin/php bin/nfse_worker.php
-Restart=always
-RestartSec=5
-User=www-data
-KillSignal=SIGTERM
-TimeoutStopSec=90
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Subir 2 workers: `systemctl enable --now nfse-worker@1 nfse-worker@2`.
-
-### nginx para o SSE
-
-```nginx
-location = /v1/nfse/monitor.php {
-    fastcgi_buffering off;
-    fastcgi_read_timeout 360s;
-    include fastcgi_params;
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-    fastcgi_pass unix:/run/php/php8.3-fpm-monitor.sock;  # pool separado, opcional
-}
-```
+| Arquivo | Para quê |
+|---|---|
+| `deploy/instalar_pacotes.sh` | Instala nginx, PHP 8.3 + extensões, PostgreSQL, Composer, certbot |
+| `deploy/aplicar_banco.sh` | Roda os scripts SQL em ordem (para no primeiro erro) |
+| `deploy/nginx/nfe-integracao.conf` | Site, com o SSE do monitor sem buffer |
+| `deploy/php-fpm/nfse-monitor.conf` | Pool PHP separado para o stream do monitor |
+| `deploy/systemd/nfse-worker@.service` | Worker como serviço (reinicia sozinho, parada segura) |
+| `deploy/backup_banco.sh` | Backup diário do banco com retenção |
+| `deploy/atualizar.sh` | Atualização segura: backup → pull → composer → banco → reinício → verificação |
+| `bin/nfse_verificar.php` | Confere a instalação inteira e diz como resolver cada problema |
 
 ### Consultas úteis
 
