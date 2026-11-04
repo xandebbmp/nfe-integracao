@@ -15,7 +15,7 @@ ou macOS) para testar e homologar com calma, e depois **levar para uma VPS**
 | **Linux Ubuntu 24.04** | Instala **direto** no computador | ~5 min |
 | **Outro Linux** (Fedora, Mint antigo, Arch...) | **Multipass** | ~20 min |
 
-Depois disso, a instalação do sistema leva mais ~1h.
+Depois disso, o **instalador automático** deixa tudo pronto em 5 a 15 minutos.
 
 ---
 
@@ -205,18 +205,104 @@ Depois siga **os mesmos passos do macOS**, a partir do
 
 # Etapa 2 — Instalar o sistema
 
-Agora, **dentro do Ubuntu** (janela do WSL, `multipass shell nfse` ou o
-terminal do Linux), siga o [Manual de Implantação — Parte A](manual-implantacao.md#parte-a--instalação),
+Há dois caminhos. **Use o rápido.** O manual existe para quem quer entender
+cada passo ou precisa resolver algum problema.
+
+## Caminho rápido (recomendado): instalador automático
+
+Um comando instala e configura tudo: programas, banco de dados, senhas,
+tokens, site e worker. Ele só pergunta **4 coisas**: o arquivo do
+certificado, a senha dele, o CNPJ (já vem preenchido) e a inscrição municipal.
+
+### 2.1 Baixar o sistema
+
+Dentro do Ubuntu (janela do WSL, `multipass shell nfse` ou o terminal do Linux):
+
+```bash
+sudo apt update && sudo apt install -y git
+```
+
+```bash
+sudo git clone https://github.com/xandebbmp/nfe-integracao.git /var/www/nfe-integracao
+```
+
+Ele pede o usuário do GitHub e, no lugar da senha, um **token**: veja como
+criar no [passo 2 do Manual de Implantação](manual-implantacao.md#passo-2--baixar-o-sistema).
+
+> ⚠️ Baixe para `/var/www/nfe-integracao`, **nunca** para `/mnt/c/...`
+> (no Windows, a pasta do Windows deixa tudo lento e bagunça as permissões).
+
+### 2.2 Deixar o certificado acessível ao Ubuntu
+
+- **macOS / Multipass:** no **Terminal do Mac** (fora do Ubuntu), troque o nome do arquivo:
+
+```bash
+multipass transfer ~/Downloads/CERTIFICADO.pfx nfse:/tmp/empresa.pfx
+```
+
+- **Windows (WSL2):** nada a fazer. O instalador lê direto do Windows,
+  pelo caminho `/mnt/c/Users/SEU_USUARIO/Downloads/CERTIFICADO.pfx`.
+- **Linux direto:** nada a fazer. Você vai informar o caminho completo, ex.:
+  `/home/SEU_USUARIO/Downloads/CERTIFICADO.pfx` (escreva o caminho inteiro;
+  o atalho `~` não funciona nesta pergunta).
+
+### 2.3 Rodar o instalador
+
+```bash
+cd /var/www/nfe-integracao && sudo bash deploy/instalar_local.sh
+```
+
+Responda às perguntas:
+
+| Pergunta | O que responder |
+|---|---|
+| `Arquivo [...]` | **macOS:** só aperte **Enter** (já sugere `/tmp/empresa.pfx`). **Windows/Linux:** digite o caminho do passo 2.2. |
+| `Senha do certificado` | A senha do `.pfx`. Ela **não aparece** enquanto você digita; é normal. Se errar, ele pergunta de novo. |
+| `CNPJ do emitente [...]` | Aperte **Enter** para aceitar o CNPJ lido do certificado (ou digite outro, com ou sem pontos). |
+| `Inscricao municipal` | A inscrição municipal da empresa (pode deixar em branco e preencher depois). |
+
+Leva de 5 a 15 minutos. Ele mostra cada etapa (`== 1/9 ... ==` até `== 9/9 ... ==`).
+
+✅ **Deve aparecer** no final:
+
+```text
+Instalacao local concluida!
+
+  Abra no navegador do seu computador:
+    http://ENDERECO:8080/monitor/
+  Token do Monitor: ...
+```
+
+Abra o endereço mostrado no navegador do seu computador e entre com o
+**Token do Monitor**. O endereço e os tokens ficam guardados; para ver de novo:
+
+```bash
+sudo cat /root/nfse-credenciais-local.txt
+```
+
+> **Certificado em formato antigo?** Alguns certificados A1 vêm num formato
+> que os sistemas atuais não abrem. O instalador **detecta e converte
+> sozinho** (o arquivo original não é alterado).
+
+> **Apareceu "concluida COM PENDENCIAS"?** Ele mostra logo acima os itens
+> `[ERRO]` e **como resolver** cada um. Corrija e rode o instalador de novo:
+> ele mantém tudo o que já foi feito (senhas e tokens também) e só refaz o que falta.
+
+**Pronto.** Vá para a [Etapa 3](#etapa-3--usar-e-homologar-no-computador).
+
+## Caminho manual (alternativo)
+
+Siga o [Manual de Implantação — Parte A](manual-implantacao.md#parte-a--instalação),
 **com as diferenças abaixo**. Os passos que não aparecem na tabela são feitos exatamente
 como estão no manual.
 
 | Passo do manual | No computador local |
 |---|---|
 | **1 — Entrar no servidor** | **Pule.** Você já está no Ubuntu. |
-| **2 — Baixar o sistema** | Igual. ⚠️ Baixe para `/var/www/nfe-integracao`, **nunca** para `/mnt/c/...` (no Windows, a pasta do Windows deixa tudo lento e bagunça as permissões). |
+| **2 — Baixar o sistema** | Igual. ⚠️ Baixe para `/var/www/nfe-integracao`, **nunca** para `/mnt/c/...`. |
 | **3 a 5** | Iguais. |
 | **6 — Enviar o certificado** | **Não use `scp`.** Veja [Certificado no computador local](#certificado-no-computador-local), abaixo. |
-| **7 e 8** | Iguais. |
+| **7 e 8** | Iguais. No `config/nfse.local.php`, acrescente `'tpAmb' => 2,` para garantir homologação. |
 | **9 — Colocar o site no ar** | Igual, **mas use a porta 8080**. Veja [Porta 8080](#porta-8080), abaixo. |
 | **10 — HTTPS** | **Pule.** Não existe domínio no computador local. |
 | **11 — Worker** | Igual. |

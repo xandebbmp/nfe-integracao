@@ -17,6 +17,7 @@ e depois levar para a VPS: [`docs/manual-ambiente-local.md`](../docs/manual-ambi
 | `systemd/nfse-worker@.service` | Worker que envia as notas, como serviço | Passo 11 |
 | `backup_banco.sh` | Backup do banco (manual ou diário) | Parte D |
 | `atualizar.sh` | Atualiza o sistema com segurança | Parte D |
+| `instalar_local.sh` | **Só para o computador local:** instala e configura tudo com um comando (homologação, porta 8080, sem HTTPS) | [Ambiente local](../docs/manual-ambiente-local.md), Etapa 2 |
 
 Para conferir a instalação a qualquer momento:
 
