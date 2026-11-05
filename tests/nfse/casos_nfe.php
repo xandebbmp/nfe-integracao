@@ -16,6 +16,7 @@ use Xande\NfeIntegracao\Nfse\Nfe\ProvedorNfe;
 use Xande\NfeIntegracao\Nfse\ProvedorFactory;
 use Xande\NfeIntegracao\Nfse\Repositorio\DocumentoRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\EventoRepositorio;
+use Xande\NfeIntegracao\Nfse\Servico\DocumentoApresentador;
 use Xande\NfeIntegracao\Nfse\Servico\ProcessadorJobs;
 use Xande\NfeIntegracao\Nfse\Servico\RecebimentoLote;
 use Xande\NfeIntegracao\Nfse\Servico\Solicitacoes;
@@ -239,4 +240,23 @@ function testesNfeIntegracao(PDO $pdo, array $cfgGeral, ProcessadorJobs $worker,
     while ($worker->processarProximo()) {
     }
     Apoio::igual(StatusNfse::CANCELADO, $documentos->buscar($nota['id'])['status'], 'cancelamento registrado -> NF-e CANCELADA');
+
+    // Download dos XMLs (nota e eventos) com nome no padrao do mercado.
+    $notaFinal = $documentos->buscar($nota['id']);
+    $saida = DocumentoApresentador::documento($notaFinal, false, $eventos->listarDoDocumento($nota['id']));
+    $chave = $notaFinal['chave_acesso'];
+    Apoio::igual("{$chave}-procNFe.xml", $saida['links']['xml_nome'], 'XML da NF-e: nome <chave>-procNFe.xml');
+    $nomes = array_map(static fn(array $e): ?string => $e['links']['xml_nome'], $saida['eventos']);
+    Apoio::verificar(in_array("{$chave}-110110-01-procEventoNFe.xml", $nomes, true) && in_array("{$chave}-110110-02-procEventoNFe.xml", $nomes, true),
+        'XML das CC-e: nome com tipo e sequencia (01, 02)');
+    Apoio::verificar(in_array("{$chave}-110111-01-procEventoNFe.xml", $nomes, true), 'XML do cancelamento: <chave>-110111-01-procEventoNFe.xml');
+    $registrados = array_filter($saida['eventos'], static fn(array $e): bool => $e['status'] === StatusEvento::REGISTRADO);
+    Apoio::verificar($registrados !== [] && array_filter($registrados, static fn(array $e): bool => $e['links']['xml'] === null) === [],
+        'todo evento registrado tem link para baixar o XML');
+    $rejeitados = array_filter($saida['eventos'], static fn(array $e): bool => $e['status'] !== StatusEvento::REGISTRADO);
+    Apoio::verificar(array_filter($rejeitados, static fn(array $e): bool => $e['links']['xml'] !== null) === [],
+        'evento nao registrado (rejeitado/em andamento) nao oferece XML');
+    $cce = $eventos->buscar($r1['evento']['id']);
+    Apoio::verificar(str_contains((string)$cce['xml_retorno'], 'procEventoNFe'), 'XML guardado da CC-e e o procEventoNFe (evento + retorno da SEFAZ)');
+    Apoio::igual('Carta de Correção Eletrônica (CC-e)', DocumentoApresentador::evento($cce, $notaFinal)['descricao'], 'evento mostra a descricao do tipo');
 }

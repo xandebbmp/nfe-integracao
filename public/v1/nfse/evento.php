@@ -53,8 +53,9 @@ $api->aguardar((int)($corpo['aguardar'] ?? 0), static function () use ($eventos,
 });
 
 $evento = $eventos->buscar($eventoId);
+$documentoAtual = (new DocumentoRepositorio($api->pdo()))->buscar($documento['id']);
 $api->responder($resultado['http'], [
     'mensagem' => $resultado['mensagem'],
-    'evento' => DocumentoApresentador::evento($evento),
-    'documento' => DocumentoApresentador::documento((new DocumentoRepositorio($api->pdo()))->buscar($documento['id'])),
+    'evento' => DocumentoApresentador::evento($evento, $documentoAtual),
+    'documento' => DocumentoApresentador::documento($documentoAtual),
 ]);
