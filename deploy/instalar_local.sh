@@ -281,6 +281,8 @@ configurar_sistema() {
 
   TOKEN_ERP="$(openssl rand -hex 32)"
   TOKEN_MONITOR="$(openssl rand -hex 32)"
+  TOKEN_ADMIN="$(openssl rand -hex 32)"
+  CHAVE_CERTIFICADOS="$(openssl rand -base64 32)"
   local razao_php
   razao_php="$(RAZAO="$RAZAO_CERT" php -r 'echo var_export(trim(explode(":", getenv("RAZAO"))[0]), true);')"
 
@@ -306,6 +308,10 @@ return [
     ],
 
     'monitor_token' => '${TOKEN_MONITOR}',
+
+    // Painel admin (/admin/) e chave que protege os certificados enviados por ele.
+    'admin_token' => '${TOKEN_ADMIN}',
+    'chave_certificados' => '${CHAVE_CERTIFICADOS}',
 
     'armazenamento' => [
         'tipo' => 'local',
@@ -368,9 +374,10 @@ verificar_e_resumir() {
   fi
 
   # Tokens: le do arquivo (vale tambem quando a config ja existia).
-  local token_erp token_monitor
+  local token_erp token_monitor token_admin
   token_erp="$(php -r '$c = require "config/nfse.local.php"; echo reset($c["consumidores"])["token"] ?? "";')"
   token_monitor="$(php -r '$c = require "config/nfse.local.php"; echo $c["monitor_token"] ?? "";')"
+  token_admin="$(php -r '$c = require "config/nfse.local.php"; echo $c["admin_token"] ?? "";')"
 
   umask 077
   cat > "$ARQUIVO_CREDENCIAIS" <<TXT
@@ -379,6 +386,9 @@ Ambiente LOCAL da API Fiscal - gerado em $(date '+%d/%m/%Y %H:%M')
 
 Monitor:          ${endereco}/monitor/
 Token do Monitor: ${token_monitor}
+
+Painel admin:     ${endereco}/admin/
+Token do Admin:   ${token_admin}
 
 API:              ${endereco}/v1/nfse/
 Token do ERP:     ${token_erp}
@@ -395,6 +405,7 @@ TXT
   echo "  Abra no navegador do seu computador:"
   echo "    ${NEGRITO}${endereco}/monitor/${FIM}"
   echo "  Token do Monitor: ${token_monitor}"
+  echo "  Painel admin: ${endereco}/admin/   |  Token do Admin: ${token_admin:-"(vazio: veja docs/manual-operacao.md)"}"
   echo
   echo "  API: ${endereco}/v1/nfse/   |  Token do ERP: ${token_erp}"
   echo "  (tudo isso foi salvo em ${ARQUIVO_CREDENCIAIS}; para ver: sudo cat ${ARQUIVO_CREDENCIAIS})"

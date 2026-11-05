@@ -23,6 +23,7 @@ declare(strict_types=1);
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 require __DIR__ . '/Apoio.php';
 require __DIR__ . '/casos_nfe.php';
+require __DIR__ . '/casos_clientes.php';
 
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoLocal;
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoS3;
@@ -325,7 +326,7 @@ if (!$dsn) {
     Apoio::verificar(!getenv('NFSE_TESTE_EXIGIR_PG'), 'NFSE_TESTE_EXIGIR_PG ativo, mas NFSE_TESTE_PG nao foi definido');
 } else {
     $pdo = new PDO($dsn, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-    $pdo->exec('DROP TABLE IF EXISTS nfse_webhooks_saida, nfse_monitor, nfse_jobs, nfse_eventos, nfse_numeracao, nfse_documentos, nfse_lotes CASCADE');
+    $pdo->exec('DROP TABLE IF EXISTS fiscal_uso, fiscal_admin_log, fiscal_clientes, nfse_webhooks_saida, nfse_monitor, nfse_jobs, nfse_eventos, nfse_numeracao, nfse_documentos, nfse_lotes CASCADE');
     // Aplica TODOS os scripts do banco, na ordem (0001, 0002, 0003...),
     // igual ao deploy/aplicar_banco.sh.
     $scripts = glob("{$raiz}/database/scripts/*.sql");
@@ -486,6 +487,7 @@ if (!$dsn) {
     exec('rm -rf ' . escapeshellarg($pastaArquivos));
 
     testesNfeIntegracao($pdo, $cfgGeral, $worker, $soapNfe);
+    testesClientesIntegracao($pdo, $cfgGeral);
 }
 
 // ===========================================================================

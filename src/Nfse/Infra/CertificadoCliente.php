@@ -36,6 +36,29 @@ final class CertificadoCliente
             throw new RuntimeException('Certificado digital (.pfx) nao encontrado ou vazio. Verifique o caminho do certificado do emitente (certPfxPath ou emitentes.*.certificado).');
         }
 
+        return self::doConteudo($conteudo, $senha);
+    }
+
+    /**
+     * Certificado de um emitente: do painel admin (criptografado no banco)
+     * ou do arquivo .pfx indicado na configuracao.
+     */
+    public static function doEmitente(array $emitente, string $chaveCertificados): self
+    {
+        $cifrado = $emitente['certificado']['cifrado'] ?? null;
+        if (is_string($cifrado) && $cifrado !== '') {
+            $aberto = (new CofreCertificado($chaveCertificados))->decifrar($cifrado);
+            return self::doConteudo($aberto['pfx'], $aberto['senha']);
+        }
+        $arquivo = (string)($emitente['certificado']['arquivo'] ?? '');
+        if ($arquivo === '') {
+            throw new RuntimeException('A empresa ' . ($emitente['cnpj'] ?? '') . ' nao tem certificado: envie o .pfx pelo painel admin.');
+        }
+        return self::doArquivo($arquivo, (string)($emitente['certificado']['senha'] ?? ''));
+    }
+
+    public static function doConteudo(string $conteudo, string $senha): self
+    {
         $certificado = Certificate::readPfx($conteudo, $senha);
         if ($certificado->isExpired()) {
             throw new RuntimeException('Certificado digital vencido em ' . $certificado->getValidTo()->format('d/m/Y') . '.');

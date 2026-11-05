@@ -16,6 +16,7 @@ declare(strict_types=1);
  *   ?aguardar=30  espera ate 30s pelo resultado (max. config api.max_aguardar_segundos)
  *
  * Respostas:
+ *   403  empresa cliente bloqueada (EMISSAO_BLOQUEADA) ou vencida (EMISSAO_VENCIDA)
  *   202  lote aceito (ha documentos processando ou recusados)
  *   200  lote aceito e todos os documentos ja finalizados (quando usar aguardar)
  *   422  requisicao invalida, ou nenhum documento pode ser gravado
@@ -31,6 +32,7 @@ declare(strict_types=1);
 
 use Xande\NfeIntegracao\Nfse\Api\Api;
 use Xande\NfeIntegracao\Nfse\Repositorio\DocumentoRepositorio;
+use Xande\NfeIntegracao\Nfse\Servico\ControleEmissao;
 use Xande\NfeIntegracao\Nfse\Servico\DocumentoApresentador;
 use Xande\NfeIntegracao\Nfse\Servico\RecebimentoLote;
 
@@ -38,6 +40,16 @@ require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
 $api = Api::iniciar(['POST']);
 $consumidor = $api->exigirConsumidor($api->autenticar());
+
+// Empresa cliente bloqueada (manual) ou com uso vencido: recusa o lote inteiro.
+// Consulta, PDF, XML e cancelamento continuam funcionando.
+if (!empty($api->cfg['consumidores'][$consumidor]['cliente'])) {
+    $bloqueio = (new ControleEmissao($api->pdo(), (int)$api->cfg['tpAmb']))->bloqueioDoCliente($consumidor);
+    if ($bloqueio !== null) {
+        $api->erro(403, $bloqueio['codigo'], $bloqueio['mensagem']);
+    }
+}
+
 $corpo = $api->corpoJson();
 
 $resultado = (new RecebimentoLote($api->pdo(), $api->cfg))->receber($consumidor, $corpo);

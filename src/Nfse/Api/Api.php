@@ -52,7 +52,10 @@ final class Api
             ]]);
         });
 
-        $api = new self(NfseConfig::carregar());
+        // Config dos arquivos + empresas clientes cadastradas no painel admin.
+        $pdo = ConnectionFactory::make();
+        $api = new self(NfseConfig::comClientes(NfseConfig::carregar(), $pdo));
+        $api->pdo = $pdo;
 
         $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         if (!in_array($metodo, $metodos, true)) {
@@ -85,9 +88,13 @@ final class Api
         }
 
         if ($token !== '') {
+            // Empresas clientes (painel admin): o banco guarda so o sha256 do token.
+            $hash = hash('sha256', $token);
             foreach ($this->cfg['consumidores'] as $nome => $dados) {
                 $esperado = (string)($dados['token'] ?? '');
-                if ($esperado !== '' && hash_equals($esperado, $token)) {
+                $esperadoHash = (string)($dados['token_hash'] ?? '');
+                if (($esperado !== '' && hash_equals($esperado, $token))
+                    || ($esperadoHash !== '' && hash_equals($esperadoHash, $hash))) {
                     return ['consumidor' => (string)$nome, 'painel' => false];
                 }
             }
@@ -105,6 +112,29 @@ final class Api
         }
 
         $this->erro(401, 'NAO_AUTORIZADO', 'Token de API ausente ou invalido.');
+    }
+
+    /**
+     * Exige o token de ADMINISTRADOR (painel /admin/): cabecalho X-ADMIN-TOKEN.
+     * Configure 'admin_token' em config/nfse.local.php (openssl rand -hex 32).
+     */
+    public function exigirAdmin(): void
+    {
+        $esperado = (string)($this->cfg['admin_token'] ?? '');
+        $token = self::cabecalho('X-ADMIN-TOKEN');
+        if ($esperado === '' || strlen($esperado) < 24) {
+            $this->erro(503, 'ADMIN_DESLIGADO', "Painel admin desligado: configure 'admin_token' (24+ caracteres) em config/nfse.local.php.");
+        }
+        if ($token === '' || !hash_equals($esperado, $token)) {
+            usleep(300_000); // dificulta tentativa e erro
+            $this->erro(401, 'NAO_AUTORIZADO', 'Token de administrador invalido.');
+        }
+    }
+
+    /** IP de quem chamou (para o historico do painel admin). */
+    public static function ip(): string
+    {
+        return (string)($_SERVER['REMOTE_ADDR'] ?? '');
     }
 
     /** Exige um consumidor (o token do painel nao pode emitir). */
