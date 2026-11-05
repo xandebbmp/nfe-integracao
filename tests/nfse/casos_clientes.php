@@ -122,4 +122,32 @@ function testesClientesIntegracao(PDO $pdo, array $cfgGeral): void
     Apoio::igual(1, $detalhe['autorizadas_mes']['nfe'] - $antesPainel, 'painel: autorizadas do mes por tipo');
     Apoio::verificar(($detalhe['status_mes']['REJEITADO'] ?? 0) >= 1, 'painel: documentos do mes por status (rejeitados aparecem, mas nao cobram)');
     Apoio::verificar(count($detalhe['historico']) >= 5 && $detalhe['historico'][0]['ip'] === 'ip', 'historico: alteracoes registradas com IP');
+
+    // ---- Numeracao inicial ----
+    $r = $admin->definirNumeracao(['cnpj' => $cnpj, 'padrao' => 'NFE', 'serie' => '001', 'ultimo_numero' => 1520], 'ip');
+    Apoio::igual([true, true, 1521], [$r['ok'], $r['aplicado'] ?? null, $r['proximo_numero'] ?? null], 'numeracao: informa o ultimo usado (1520) -> proxima 1521');
+    $serie1 = array_values(array_filter($r['cliente']['numeracao'], static fn($n) => $n['padrao'] === 'NFE' && $n['serie'] === '1'))[0] ?? [];
+    Apoio::igual(1520, $serie1['ultimo_numero'] ?? null, 'numeracao: serie "001" e a mesma serie "1" da NF-e');
+
+    $nota = $recebimento->receber($cnpj, ['padrao' => 'NFE', 'documentos' => [payloadNfe(['referencia' => 'CLI-NUM-1', 'ide' => ['serie' => 1]])]]);
+    $numero = $pdo->query("SELECT numero FROM nfse_documentos WHERE id = '{$nota['documentos'][0]['id']}'")->fetchColumn();
+    Apoio::igual(1521, (int)$numero, 'numeracao: a proxima NF-e emitida sai com o numero 1521');
+
+    $r = $admin->definirNumeracao(['cnpj' => $cnpj, 'padrao' => 'NFE', 'serie' => '1', 'ultimo_numero' => 100], 'ip');
+    Apoio::igual([true, false, 1522], [$r['ok'], $r['aplicado'] ?? null, $r['proximo_numero'] ?? null], 'numeracao: numero menor NAO volta para tras (evita nota repetida)');
+    Apoio::verificar(str_contains((string)($r['mensagem'] ?? ''), 'Mantido'), 'numeracao: avisa que manteve o numero maior');
+
+    $r = $admin->definirNumeracao(['cnpj' => $cnpj, 'padrao' => 'NACIONAL', 'ultimo_numero' => 77], 'ip');
+    Apoio::igual([true, (string)$cfgGeral['nacional']['serie_dps'], 78],
+        [$r['ok'], array_values(array_filter($r['cliente']['numeracao'], static fn($n) => $n['padrao'] === 'NACIONAL'))[0]['serie'] ?? null, $r['proximo_numero'] ?? null],
+        'numeracao: sem serie, usa a serie padrao do tipo (DPS)');
+
+    Apoio::igual('DADOS_INVALIDOS', $admin->definirNumeracao(['cnpj' => $cnpj, 'padrao' => 'NFE', 'serie' => 'AB', 'ultimo_numero' => 1], 'ip')['codigo'] ?? null,
+        'numeracao: serie de NF-e com letras e recusada');
+    Apoio::igual('DADOS_INVALIDOS', $admin->definirNumeracao(['cnpj' => $cnpj, 'padrao' => 'NFE', 'ultimo_numero' => -5], 'ip')['codigo'] ?? null,
+        'numeracao: numero negativo e recusado');
+    Apoio::igual('NAO_ENCONTRADO', $admin->definirNumeracao(['cnpj' => '99999999000191', 'padrao' => 'NFE', 'ultimo_numero' => 1], 'ip')['codigo'] ?? null,
+        'numeracao: empresa nao cadastrada e recusada');
+    $ultimoLog = $admin->detalhe($cnpj)['historico'][0];
+    Apoio::igual(['NUMERACAO', 77], [$ultimoLog['acao'], $ultimoLog['detalhes']['informado'] ?? null], 'numeracao: ajuste registrado no historico');
 }

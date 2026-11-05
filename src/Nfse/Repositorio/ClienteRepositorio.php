@@ -214,6 +214,66 @@ final class ClienteRepositorio
         return $saida;
     }
 
+    // ---------------------------------------------------------------- numeracao
+
+    /**
+     * Series em uso pela empresa no ambiente: ultimo numero reservado e o
+     * maior numero que ja apareceu numa nota (conferencia).
+     *
+     * @return list<array{padrao: string, serie: string, ultimo_numero: int, maior_em_notas: ?int, atualizado_em: string}>
+     */
+    public function numeracoes(string $cnpj, int $tpAmb): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT n.padrao, n.serie, n.ultimo_numero, n.atualizado_em,
+                    (SELECT max(d.numero) FROM nfse_documentos d
+                      WHERE d.emitente_cnpj = n.emitente_cnpj AND d.padrao = n.padrao
+                        AND d.tp_amb = n.tp_amb AND d.serie = n.serie) AS maior_em_notas
+               FROM nfse_numeracao n
+              WHERE n.emitente_cnpj = :cnpj AND n.tp_amb = :amb
+              ORDER BY n.padrao, n.serie'
+        );
+        $stmt->execute([':cnpj' => $cnpj, ':amb' => $tpAmb]);
+        return array_map(static fn(array $l): array => [
+            'padrao' => (string)$l['padrao'],
+            'serie' => (string)$l['serie'],
+            'ultimo_numero' => (int)$l['ultimo_numero'],
+            'maior_em_notas' => $l['maior_em_notas'] !== null ? (int)$l['maior_em_notas'] : null,
+            'atualizado_em' => (string)$l['atualizado_em'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * Informa o ULTIMO numero ja usado (fora da API) numa serie. Nunca volta
+     * para tras: se a API ja reservou um numero maior, ele e mantido.
+     * Chame dentro de uma transacao.
+     *
+     * @return array{antes: ?int, depois: int}
+     */
+    public function ajustarNumeracao(string $cnpj, string $padrao, int $tpAmb, string $serie, int $ultimo): array
+    {
+        $chave = [':cnpj' => $cnpj, ':padrao' => $padrao, ':amb' => $tpAmb, ':serie' => $serie];
+        $stmt = $this->pdo->prepare(
+            'SELECT ultimo_numero FROM nfse_numeracao
+              WHERE emitente_cnpj = :cnpj AND padrao = :padrao AND tp_amb = :amb AND serie = :serie
+              FOR UPDATE'
+        );
+        $stmt->execute($chave);
+        $antes = $stmt->fetchColumn();
+
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO nfse_numeracao (emitente_cnpj, padrao, tp_amb, serie, ultimo_numero)
+             VALUES (:cnpj, :padrao, :amb, :serie, :ultimo)
+             ON CONFLICT (emitente_cnpj, padrao, tp_amb, serie)
+             DO UPDATE SET ultimo_numero = GREATEST(nfse_numeracao.ultimo_numero, EXCLUDED.ultimo_numero),
+                           atualizado_em = CURRENT_TIMESTAMP
+             RETURNING ultimo_numero'
+        );
+        $stmt->execute($chave + [':ultimo' => $ultimo]);
+
+        return ['antes' => $antes === false ? null : (int)$antes, 'depois' => (int)$stmt->fetchColumn()];
+    }
+
     // ---------------------------------------------------------------- historico
 
     public function registrarLog(?string $cnpj, string $acao, array $detalhes, ?string $ip): void

@@ -31,6 +31,7 @@ const TIPOS = [
 
 const ACOES_HISTORICO = {
   CADASTRO: 'Cadastro', ALTERACAO: 'Alteração', CERTIFICADO: 'Certificado enviado', TOKEN: 'Token gerado',
+  NUMERACAO: 'Numeração ajustada',
 };
 
 const estado = { token: '', clientes: [], ambiente: '', mes: '', filtroSituacao: '' };
@@ -323,7 +324,7 @@ function desenharCliente(c) {
   partes.push(formControle, formDados, el('div', { class: 'acoes' }, botaoSalvar, mensagemSalvar));
 
   if (!novo) {
-    partes.push(secaoCertificado(c), secaoToken(c), secaoUso(c), secaoHistorico(c));
+    partes.push(secaoCertificado(c), secaoToken(c), secaoNumeracao(c), secaoUso(c), secaoHistorico(c));
   } else {
     partes.push(el('p', { class: 'suave' }, 'Depois de cadastrar, envie o certificado e gere o token de acesso.'));
   }
@@ -430,6 +431,71 @@ function secaoToken(c) {
   );
 }
 
+// ---- Numeracao inicial ----
+function secaoNumeracao(c) {
+  const series = c.numeracao || [];
+  const nomeTipo = (padrao) => (TIPOS.find((t) => t.padrao === padrao) || {}).nome || padrao;
+
+  const tabela = series.length
+    ? el('table', { class: 'mini' },
+      el('thead', {}, el('tr', {}, el('th', {}, 'Tipo'), el('th', {}, 'Série'), el('th', { class: 'num' }, 'Último usado'),
+        el('th', { class: 'num' }, 'Próxima nota'), el('th', {}, 'Atualizado em'))),
+      el('tbody', {}, ...series.map((n) => el('tr', {},
+        el('td', {}, nomeTipo(n.padrao)), el('td', { class: 'mono' }, n.serie),
+        el('td', { class: 'num mono' }, n.ultimo_numero), el('td', { class: 'num mono' }, el('strong', {}, n.ultimo_numero + 1)),
+        el('td', {}, dataHora(n.atualizado_em))))))
+    : el('p', { class: 'suave' }, 'Nenhuma série usada ainda neste ambiente: a primeira nota de cada série sai com o número 1.');
+
+  const tipo = el('select', {}, ...TIPOS.map((t) => el('option', { value: t.padrao }, t.nome)));
+  const serie = el('input', { type: 'text', maxlength: 5 });
+  const ultimo = el('input', { type: 'number', min: 0, placeholder: 'Ex.: 1520' });
+  const mensagem = el('span', {});
+  const botao = el('button', { class: 'botao', type: 'button' }, 'Aplicar');
+
+  // Serie padrao do tipo escolhido (a mesma que a API usa quando a nota nao informa).
+  const atualizarSerie = () => { serie.value = (c.series_padrao || {})[tipo.value] || '1'; };
+  tipo.addEventListener('change', atualizarSerie);
+  atualizarSerie();
+
+  botao.addEventListener('click', async () => {
+    const informado = Number(ultimo.value);
+    if (ultimo.value === '' || !Number.isInteger(informado) || informado < 0) {
+      mensagem.className = 'erro'; mensagem.textContent = 'Informe o último número já usado (0 se a série nunca foi usada).'; return;
+    }
+    const serieNormal = tipo.value === 'NFE' ? String(Number(serie.value)) : serie.value.trim();
+    const atual = series.find((n) => n.padrao === tipo.value && n.serie === serieNormal);
+    const proximo = Math.max(informado, atual ? atual.ultimo_numero : 0) + 1;
+    const aviso = atual && atual.ultimo_numero > informado
+      ? `\n\nAtenção: a API já usou até o número ${atual.ultimo_numero} nesta série. O número NÃO volta para trás.`
+      : '';
+    if (!confirm(`${nomeTipo(tipo.value)}, série ${serieNormal || '?'} (${estado.ambiente === 'PRODUCAO' ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO'}):\n`
+      + `a próxima nota sairá com o número ${proximo}.${aviso}\n\nConfirmar?`)) return;
+
+    botao.disabled = true;
+    mensagem.className = 'suave'; mensagem.textContent = 'Aplicando...';
+    try {
+      const r = await api('numeracao.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, padrao: tipo.value, serie: serie.value, ultimo_numero: informado } });
+      desenharCliente(r.cliente);
+      alert(r.mensagem);
+    } catch (e) {
+      mensagem.className = 'erro'; mensagem.textContent = e.message;
+      botao.disabled = false;
+    }
+  });
+
+  return el('section', { class: 'secao' },
+    el('h3', {}, `Numeração (${estado.ambiente === 'PRODUCAO' ? 'produção' : 'homologação'})`),
+    tabela,
+    el('p', { class: 'suave' }, 'A empresa já emitia por outro sistema? Informe o ÚLTIMO número usado em cada série. '
+      + 'A API continua do seguinte e nunca volta para trás (assim não sai nota com número repetido).'),
+    el('div', { class: 'campos' },
+      el('label', {}, 'Tipo de nota', tipo),
+      el('label', {}, 'Série', serie),
+      el('label', {}, 'Último número já usado', ultimo)),
+    el('div', { class: 'acoes' }, botao, mensagem),
+  );
+}
+
 // ---- Uso ----
 function secaoUso(c) {
   const meses = Object.keys(c.uso_mensal || {}).sort().reverse();
@@ -463,6 +529,10 @@ function secaoHistorico(c) {
       detalhe = Object.entries(h.detalhes).map(([k, v]) => (v && typeof v === 'object' && 'para' in v ? `${k}: ${JSON.stringify(v.de)} → ${JSON.stringify(v.para)}` : `${k}: ${v}`)).join('; ');
     } else if (h.acao === 'TOKEN') {
       detalhe = `final ••••${h.detalhes.final}`;
+    } else if (h.acao === 'NUMERACAO') {
+      const d = h.detalhes;
+      const nome = (TIPOS.find((t) => t.padrao === d.padrao) || {}).nome || d.padrao;
+      detalhe = `${nome}, série ${d.serie}: informado ${d.informado}; antes ${d.antes ?? '—'}, agora ${d.depois} (próxima ${d.depois + 1})`;
     } else if (h.acao === 'CERTIFICADO') {
       detalhe = `${h.detalhes.titular}, válido até ${dataCurta(h.detalhes.validade)}`;
     }
