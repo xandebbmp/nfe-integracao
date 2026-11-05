@@ -33,7 +33,7 @@ final class NotificadorWebhook
     {
         $this->enfileirar($documento, [
             'tipo' => 'evento.atualizado',
-            'evento' => DocumentoApresentador::evento($evento),
+            'evento' => DocumentoApresentador::evento($evento, $documento),
             'documento' => DocumentoApresentador::documento($documento),
         ]);
     }

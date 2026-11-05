@@ -20,7 +20,7 @@ enviada, autorizada, rejeitada, denegada, consultada ou cancelada.
 | Filtros | Status, padrão (NF-e, NFS-e Nacional, NFS-e Salvador), emitente (multiempresa) e busca por referência, nº da NFS-e ou chave. |
 | Tabela | Uma linha por nota, ordenada pela última atualização. Notas novas ou alteradas piscam ao chegar. |
 | ⚠ na linha | Nota **rejeitada**, **denegada** (NF-e) ou com **erro**: passe o mouse para ver o motivo e a sugestão de correção. |
-| Modal (clique na linha) | Motivo da rejeição com **"Como corrigir"** para cada mensagem, dados da nota, eventos (inclusive cancelamento registrado manualmente), linha do tempo completa e botões **Baixar XML** / **Abrir PDF**. |
+| Modal (clique na linha) | Motivo da rejeição com **"Como corrigir"** para cada mensagem, dados da nota, eventos (inclusive cancelamento registrado manualmente) com **Baixar XML do evento** em cada cancelamento/CC-e registrado, linha do tempo completa e botões **Baixar XML** / **Abrir PDF**. Na NF-e os arquivos saem como `<chave>-procNFe.xml` e `<chave>-<tipo>-<seq>-procEventoNFe.xml`. |
 
 ### De onde vem a sugestão de correção
 1. **Erro de entrada** (dados enviados pelo sistema de origem): a própria API

@@ -33,7 +33,8 @@ documentos. Tokens são cadastrados em `config/nfse.local.php`.
 | POST | `emitir.php[?aguardar=N]` | Enviar lote com 1+ documentos |
 | GET | `lote.php?id=...[&aguardar=N][&xml=1]` | Situação de todos os documentos do lote |
 | GET | `documento.php?id=...[&historico=1][&xml=0]` | Um documento (JSON; `xml=0` omite o XML autorizado) |
-| GET | `documento.php?id=...&formato=xml` | Apenas o XML autorizado |
+| GET | `documento.php?id=...&formato=xml[&download=1]` | Apenas o XML autorizado (NF-e: `<chave>-procNFe.xml`) |
+| GET | `documento.php?id=...&evento=<evento_id>&formato=xml[&download=1]` | XML de um evento registrado (cancelamento, CC-e) |
 | GET | `pdf.php?id=...[&download=1]` | PDF da NFS-e |
 | POST | `consultar.php` | Consultar o documento no fisco |
 | POST | `evento.php` | Cancelamento e demais eventos (via webservice) |
@@ -473,6 +474,21 @@ Depois, a montagem e o XSD oficial podem recusar com `MONTAGEM` ou `XSD`.
 - **Proteção contra nota em dobro:** o XML assinado e a chave são gravados
   antes do envio. Em qualquer nova tentativa, a API consulta a chave primeiro
   e só reenvia o mesmo XML se o SEFAZ disser que ela não existe (217).
+
+### Download dos XMLs
+
+| O quê | Rota | Nome do arquivo |
+|---|---|---|
+| Nota autorizada (nota + protocolo) | `documento.php?id=...&formato=xml` | `<chave>-procNFe.xml` |
+| Evento registrado (cancelamento, CC-e) | `documento.php?id=...&evento=<evento_id>&formato=xml` | `<chave>-<tipo>-<seq>-procEventoNFe.xml` (ex.: `...-110111-01-procEventoNFe.xml`) |
+
+- Acrescente `&download=1` para o navegador oferecer "salvar como".
+- O JSON do documento já traz os links prontos: `links.xml` e `links.xml_nome`
+  na nota, e `eventos[].links.xml` e `eventos[].links.xml_nome` em cada evento.
+  O link do evento é `null` enquanto ele não estiver `REGISTRADO`.
+- Na NFS-e funciona igual: `nfse-<chave>.xml` e `nfse-<chave>-evento-<tipo>.xml`.
+  Cancelamento registrado manualmente (Salvador) não tem XML.
+- Evento rejeitado, em andamento ou de outra nota: `404`.
 
 ### PDF
 

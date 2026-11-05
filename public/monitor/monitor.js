@@ -120,6 +120,11 @@ function temProblema(doc) {
 // Comunicacao com a API
 // ==========================================================================
 
+/** Links da API vem como "/v1/nfse/rota.php?..."; api() espera so "rota.php?...". */
+function apiCaminho(link) {
+  return link.replace(/^.*\/v1\/nfse\//, '');
+}
+
 async function api(caminho, formato = 'json') {
   const resposta = await fetch(API + caminho, { headers: { 'X-NFE-API-TOKEN': estado.token } });
   if (resposta.status === 401) {
@@ -390,10 +395,16 @@ function conteudoModal(doc) {
       partes.push(el('div', { class: 'mensagem mensagem--info' },
         el('div', { class: 'mensagem__topo' },
           el('span', { class: 'mensagem__codigo mono' }, ev.tipo_evento),
+          el('strong', {}, ev.descricao || ''),
+          ev.sequencia ? el('span', { class: 'mensagem__campo' }, `nº ${ev.sequencia}`) : null,
           el('span', {}, ev.status),
           ev.origem === 'EXTERNO' ? el('span', { class: 'mensagem__campo' }, `registrado manualmente – processo ${ev.numero_processo}`) : null),
         el('p', { class: 'mensagem__texto' }, ev.motivo_texto || ''),
         ...(ev.mensagens || []).map((m) => el('p', { class: 'suave' }, `${m.codigo || ''} ${m.mensagem}`)),
+        // XML do evento registrado (cancelamento, Carta de Correcao...).
+        ev.links?.xml ? el('div', { class: 'botoes' },
+          el('button', { class: 'botao', onclick: () => baixar(apiCaminho(ev.links.xml), ev.links.xml_nome || `evento-${ev.tipo_evento}.xml`) }, 'Baixar XML do evento'),
+        ) : null,
       ));
     }
   }
@@ -415,7 +426,7 @@ function conteudoModal(doc) {
   if (temNfse) {
     const prefixo = doc.padrao === 'NFE' ? 'nfe' : 'nfse';
     partes.push(el('div', { class: 'botoes' },
-      el('button', { class: 'botao', onclick: () => baixar(`documento.php?id=${doc.id}&formato=xml`, `${prefixo}-${doc.nfse?.numero || doc.id}.xml`) }, 'Baixar XML'),
+      el('button', { class: 'botao', onclick: () => baixar(`documento.php?id=${doc.id}&formato=xml`, doc.links?.xml_nome || `${prefixo}-${doc.nfse?.numero || doc.id}.xml`) }, 'Baixar XML'),
       // Nota denegada nao tem DANFE valido.
       doc.status !== 'DENEGADO' ? el('button', { class: 'botao', onclick: () => abrirPdf(doc) }, 'Abrir PDF') : null,
     ));

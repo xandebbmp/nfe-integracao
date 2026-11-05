@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace Xande\NfeIntegracao\Nfse\Servico;
 
+use Xande\NfeIntegracao\Nfse\Dominio\StatusEvento;
 use Xande\NfeIntegracao\Nfse\Dominio\StatusNfse;
+use Xande\NfeIntegracao\Nfse\Dominio\TipoEvento;
 
 /**
  * Converte a linha do banco no JSON publico da API.
@@ -47,6 +49,8 @@ final class DocumentoApresentador
             'mensagens' => $doc['mensagens'] ?? [],
             'links' => [
                 'documento' => '/v1/nfse/documento.php?id=' . $doc['id'],
+                // Nome sugerido para salvar o XML (NF-e: <chave>-procNFe.xml).
+                'xml_nome' => $temNfse ? NomeArquivoXml::documento($doc) : null,
                 'xml' => $temNfse ? '/v1/nfse/documento.php?id=' . $doc['id'] . '&formato=xml' : null,
                 'pdf' => $temNfse && $doc['status'] !== StatusNfse::DENEGADO ? '/v1/nfse/pdf.php?id=' . $doc['id'] : null,
             ],
@@ -55,7 +59,7 @@ final class DocumentoApresentador
         ];
 
         if ($eventos !== []) {
-            $saida['eventos'] = array_map([self::class, 'evento'], $eventos);
+            $saida['eventos'] = array_map(static fn(array $e): array => self::evento($e, $doc), $eventos);
         }
 
         if ($incluirXml) {
@@ -65,12 +69,14 @@ final class DocumentoApresentador
         return $saida;
     }
 
-    public static function evento(array $evento): array
+    /** @param array|null $documento a nota do evento (usada no nome do arquivo XML) */
+    public static function evento(array $evento, ?array $documento = null): array
     {
         return [
             'id' => $evento['id'],
             'documento_id' => $evento['documento_id'],
             'tipo_evento' => $evento['tipo_evento'],
+            'descricao' => TipoEvento::DESCRICOES[$evento['tipo_evento']] ?? $evento['tipo_evento'],
             'status' => $evento['status'],
             'motivo_codigo' => $evento['motivo_codigo'],
             'motivo_texto' => $evento['motivo_texto'],
@@ -79,6 +85,14 @@ final class DocumentoApresentador
             'numero_processo' => $evento['numero_processo'] ?? null,
             'observacao' => $evento['observacao'] ?? null,
             'mensagens' => $evento['mensagens'] ?? [],
+            // XML do evento registrado (cancelamento, CC-e...). Cancelamento
+            // registrado manualmente (portal de Salvador) nao tem XML.
+            'links' => [
+                'xml' => $evento['status'] === StatusEvento::REGISTRADO && !empty($evento['xml_retorno'])
+                    ? '/v1/nfse/documento.php?id=' . $evento['documento_id'] . '&evento=' . $evento['id'] . '&formato=xml'
+                    : null,
+                'xml_nome' => $documento !== null ? NomeArquivoXml::evento($documento, $evento) : null,
+            ],
             'criado_em' => $evento['criado_em'] ?? null,
             'atualizado_em' => $evento['atualizado_em'] ?? null,
         ];
