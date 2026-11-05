@@ -106,7 +106,7 @@ o mesmo CNPJ, o cadastro do banco tem prioridade
 | Regras, provedores e banco (back) | `src/Nfse/` — `Nfe/`, `Nacional/`, `Salvador/`, `Servico/`, `Repositorio/`, `Dominio/`, `Infra/`, `Api/` |
 | Rotas da API | `public/v1/nfse/*.php` |
 | Rotas do admin | `public/v1/admin/*.php` |
-| Front (sem build) | `public/admin/` (painel) e `public/monitor/` (tempo real) |
+| Front (sem build) | `public/admin/` (painel) e `public/monitor/` (tempo real). Como rodar: `docs/manual-operacao.md`, seção 13 |
 | Worker, homologação, verificador | `bin/nfse_worker.php`, `bin/nfse_homologar.php`, `bin/nfse_verificar.php` |
 | Banco | `database/scripts/0001` a `0005` (padrão em `docs/padrao-scripts-sql.md`) |
 | Servidor | `deploy/`: nginx, Apache, systemd, pm2, php-fpm, instaladores, backup, atualizar |

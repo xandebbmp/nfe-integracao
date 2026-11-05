@@ -24,9 +24,10 @@ Este manual explica **cada peça que roda no servidor**:
 10. [Como outra aplicação chama a API (autenticação e validação)](#10-como-outra-aplicação-chama-a-api)
 11. [Webhooks: avisos para o sistema do cliente](#11-webhooks)
 12. [Painel admin: empresas, bloqueios, limites e cobrança](#12-painel-admin)
-13. [Checklist: está tudo funcionando?](#13-checklist-está-tudo-funcionando)
-14. [Operação do dia a dia e problemas comuns](#14-operação-do-dia-a-dia)
-15. [Segurança](#15-segurança)
+13. [Como rodar cada front (painel admin e monitor)](#13-como-rodar-cada-front)
+14. [Checklist: está tudo funcionando?](#14-checklist-está-tudo-funcionando)
+15. [Operação do dia a dia e problemas comuns](#15-operação-do-dia-a-dia)
+16. [Segurança](#16-segurança)
 
 ---
 
@@ -512,7 +513,111 @@ curl -X POST https://SEU_DOMINIO/v1/admin/clientes.php -H "X-ADMIN-TOKEN: <admin
 
 ---
 
-## 13. Checklist: está tudo funcionando?
+## 13. Como rodar cada front
+
+O projeto tem **dois fronts**. Os dois são páginas HTML/CSS/JS puras:
+- **sem build**: não tem `npm install`, `npm run build` nem Node;
+- **sem servidor próprio**: o mesmo nginx/Apache que serve a API entrega as
+  páginas.
+
+Para "rodar" um front, basta o servidor estar no ar (seções 2 e 4) e abrir
+o endereço no navegador.
+
+| Front | Endereço | Arquivos | Senha pedida na tela | Para quem |
+|---|---|---|---|---|
+| **Painel admin** | `https://SEU_DOMINIO/admin/` | `public/admin/` (`index.html`, `admin.css`, `admin.js`) | `admin_token` do `config/nfse.local.php` | Você: empresas, certificados, tokens, bloqueios, numeração e cobrança |
+| **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
+
+### Passo a passo (servidor)
+
+1. Confira se o servidor está no ar:
+
+   ```bash
+   systemctl status nginx php8.3-fpm postgresql
+   ```
+
+2. Confira se os tokens estão configurados no `config/nfse.local.php`
+   (`admin_token` e `monitor_token`, com 24 caracteres ou mais) e recarregue:
+
+   ```bash
+   sudo systemctl reload php8.3-fpm
+   ```
+
+3. Abra o endereço no navegador e digite o token.
+   - **Painel:** marque "Lembrar neste navegador" para não digitar de novo.
+     Sair apaga o token salvo.
+   - **Monitor:** o selo **"Ao vivo"** verde indica que o tempo real (SSE)
+     está funcionando.
+
+**Para ver o token configurado** (no servidor):
+
+```bash
+sudo grep -E "admin_token|monitor_token" /var/www/nfe-integracao/config/nfse.local.php
+```
+
+**Para trocar um token:** gere outro com `openssl rand -hex 32`, troque no
+arquivo e rode `sudo systemctl reload php8.3-fpm`. Quem estava logado
+precisa entrar de novo.
+
+### Como o front fala com a API
+
+As páginas chamam a API **no mesmo domínio**, por caminho relativo:
+- o painel usa `../v1/admin/`;
+- o monitor usa `../v1/nfse/`.
+
+Por isso:
+- **Front e API ficam juntos no mesmo servidor e domínio.** Não é preciso
+  configurar endereço da API nem CORS.
+- Para hospedar o front em **outro domínio** (por exemplo, dentro do seu
+  sistema), seria preciso liberar CORS na API. Hoje isso não está
+  configurado: peça antes de fazer.
+- Para **embutir no seu sistema** (Scriptcase ou outro), o mais simples é um
+  link ou um `<iframe>` apontando para `https://SEU_DOMINIO/admin/` ou
+  `/monitor/`.
+
+### Restringir quem acessa (recomendado)
+
+Os dois fronts mostram dados de todas as empresas. Além do token, limite
+por IP ou VPN. No nginx, dentro do `server { ... }`:
+
+```nginx
+location ^~ /admin/      { allow 200.100.50.0/24; deny all; }
+location ^~ /v1/admin/   { allow 200.100.50.0/24; deny all; include snippets/fastcgi-php.conf; fastcgi_pass unix:/run/php/php8.3-fpm.sock; }
+location ^~ /monitor/    { allow 200.100.50.0/24; deny all; }
+```
+
+Troque pelo IP ou faixa do seu escritório ou VPN e rode
+`sudo nginx -t && sudo systemctl reload nginx`.
+
+### Alterar o visual ou os textos
+
+- **Cores:** ficam no bloco `:root` do `public/monitor/monitor.css`, que vale
+  para os dois fronts. O que é só do painel está em `public/admin/admin.css`.
+- **Textos e telas:** `public/admin/admin.js` e `public/monitor/monitor.js`,
+  com comentários em português. Nomes de status e de tipos de nota ficam
+  nas constantes do início de cada arquivo.
+- **Depois de alterar:** não há build. Atualize o servidor
+  (`sudo bash deploy/atualizar.sh`) e recarregue a página no navegador com
+  Ctrl+F5.
+
+### Ver um front sem servidor completo (só para conferir a tela)
+
+Num computador com PHP 8.3, as dependências instaladas (`composer install`)
+e acesso a um PostgreSQL com as tabelas criadas
+(`config/database.local.php`), dá para subir um servidor de teste do próprio
+PHP:
+
+```bash
+php -S 127.0.0.1:8080 -t public
+```
+
+Abra `http://127.0.0.1:8080/admin/` ou `/monitor/`. Isso serve só para
+conferir a tela: o tempo real e os envios ao fisco precisam do worker e da
+configuração completa do servidor.
+
+---
+
+## 14. Checklist: está tudo funcionando?
 
 1. Verificador completo (configuração, banco, certificados, tokens, fisco):
 
@@ -539,7 +644,7 @@ curl -X POST https://SEU_DOMINIO/v1/admin/clientes.php -H "X-ADMIN-TOKEN: <admin
 
 ---
 
-## 14. Operação do dia a dia
+## 15. Operação do dia a dia
 
 | Quero... | Comando ou lugar |
 |---|---|
@@ -562,7 +667,7 @@ curl -X POST https://SEU_DOMINIO/v1/admin/clientes.php -H "X-ADMIN-TOKEN: <admin
 
 ---
 
-## 15. Segurança
+## 16. Segurança
 
 - **HTTPS sempre** (certbot). Os tokens viajam no cabeçalho.
 - O **painel admin** e o **monitor**: de preferência, deixe acessíveis só
