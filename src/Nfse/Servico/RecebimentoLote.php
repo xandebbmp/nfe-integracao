@@ -25,8 +25,10 @@ use Xande\NfeIntegracao\Nfse\Repositorio\MonitorRepositorio;
  *   JA_EXISTENTE  referencia ja autorizada/em andamento: nada muda (sem nota
  *                 duplicada).
  *   RECUSADO      nem da para gravar (padrao desconhecido, emitente nao
- *                 autorizado, referencia repetida no mesmo lote...). Volta
- *                 so na resposta, nao entra no monitor.
+ *                 autorizado, referencia repetida no mesmo lote...) ou a
+ *                 empresa nao pode emitir agora (bloqueada, vencida, tipo nao
+ *                 contratado, limite mensal - ver ControleEmissao). Volta so
+ *                 na resposta, nao entra no monitor.
  *
  * Tudo acontece em UMA transacao: ou o lote inteiro e registrado, ou nada.
  */
@@ -41,12 +43,17 @@ final class RecebimentoLote
     private DocumentoRepositorio $documentos;
     private FilaRepositorio $fila;
     private MonitorRepositorio $monitor;
+    private ControleEmissao $controle;
+
+    /** @var array<string, int> CNPJ => documentos aceitos neste lote (franquia) */
+    private array $aceitosNoLote = [];
 
     public function __construct(private PDO $pdo, private array $cfg)
     {
         $this->documentos = new DocumentoRepositorio($pdo);
         $this->fila = new FilaRepositorio($pdo);
         $this->monitor = new MonitorRepositorio($pdo);
+        $this->controle = new ControleEmissao($pdo, (int)$cfg['tpAmb']);
     }
 
     /**
@@ -68,9 +75,10 @@ final class RecebimentoLote
 
         $permitidos = NfseConfig::cnpjsPermitidos($this->cfg, $consumidor);
         if ($permitidos === []) {
-            return ['ok' => false, 'erro' => "O sistema {$consumidor} nao tem emitente (CNPJ) liberado. Configure 'cnpjs' do consumidor em config/nfse.local.php."];
+            return ['ok' => false, 'erro' => "O acesso {$consumidor} nao tem emitente (CNPJ) liberado. Confira o cadastro no painel admin (ou 'cnpjs' do consumidor em config/nfse.local.php)."];
         }
 
+        $this->aceitosNoLote = [];
         $this->pdo->beginTransaction();
         try {
             $loteId = $this->documentos->criarLote($consumidor, count($lista));
@@ -177,10 +185,18 @@ final class RecebimentoLote
             return ['situacao_recebimento' => self::JA_EXISTENTE, 'id' => $existente['id'], 'referencia' => $referencia];
         }
 
+        // Empresa cliente: bloqueio, vencimento, tipo contratado e franquia.
+        // (Depois da idempotencia: reenvio de nota ja existente nao consome nada.)
+        $recusa = $this->controle->recusaDocumento($cnpj, $padrao, $this->aceitosNoLote[$cnpj] ?? 0);
+        if ($recusa !== null) {
+            return self::recusado($referencia, $recusa['campo'], $recusa['mensagem'], $recusa['correcao'], $recusa['codigo']);
+        }
+
         if ($erros !== []) {
             return $this->gravarInvalido($consumidor, $loteId, $padrao, $cnpj, $tpAmb, $doc, $erros, $existente);
         }
 
+        $this->aceitosNoLote[$cnpj] = ($this->aceitosNoLote[$cnpj] ?? 0) + 1;
         return $existente !== null
             ? $this->reenviar($loteId, $doc, $existente)
             : $this->gravarNovo($consumidor, $loteId, $padrao, $cnpj, $tpAmb, $doc);
@@ -315,12 +331,12 @@ final class RecebimentoLote
         $this->fila->enfileirar(FilaRepositorio::EMITIR, $documentoId, null, 0, (int)$this->cfg['fila']['max_tentativas']);
     }
 
-    private static function recusado(mixed $referencia, string $campo, string $mensagem, string $correcao): array
+    private static function recusado(mixed $referencia, string $campo, string $mensagem, string $correcao, string $codigo = 'NAO_ARMAZENADO'): array
     {
         return [
             'situacao_recebimento' => self::RECUSADO,
             'referencia' => is_scalar($referencia) ? (string)$referencia : null,
-            'erros' => [['codigo' => 'NAO_ARMAZENADO', 'campo' => $campo, 'mensagem' => $mensagem, 'correcao' => $correcao]],
+            'erros' => [['codigo' => $codigo, 'campo' => $campo, 'mensagem' => $mensagem, 'correcao' => $correcao]],
         ];
     }
 }

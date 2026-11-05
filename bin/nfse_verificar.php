@@ -154,6 +154,7 @@ if ($pdo !== null) {
         '0002 (tabelas da NFS-e)' => "SELECT to_regclass('public.nfse_documentos') IS NOT NULL",
         '0003 (multiempresa / arquivamento)' => "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nfse_documentos' AND column_name = 'arquivado_em')",
         '0004 (NF-e na fila / monitor)' => "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nfse_documentos' AND column_name = 'protocolo_autorizacao')",
+        '0005 (empresas clientes / uso para cobranca)' => "SELECT to_regclass('public.fiscal_clientes') IS NOT NULL",
     ];
     foreach ($checagens as $script => $sql) {
         if ($existe($sql)) {
@@ -175,6 +176,27 @@ if ($pdo !== null) {
     }
 }
 
+// Empresas clientes (painel admin): entram nas verificacoes abaixo.
+if ($pdo !== null) {
+    try {
+        $cfg = \Xande\NfeIntegracao\Nfse\NfseConfig::comClientes($cfg, $pdo);
+    } catch (Throwable $e) {
+        item('ERRO', 'Empresas do painel admin nao puderam ser lidas: ' . $e->getMessage(), 'rode: bash deploy/aplicar_banco.sh');
+    }
+}
+if (strlen((string)$cfg['admin_token']) < 24) {
+    item('ATENCAO', 'Painel admin desligado (admin_token vazio ou curto).', "para usar /admin/: coloque 'admin_token' em config/nfse.local.php (gere com: openssl rand -hex 32)");
+} else {
+    item('OK', 'Painel admin ligado (/admin/)');
+}
+try {
+    new \Xande\NfeIntegracao\Nfse\Infra\CofreCertificado((string)$cfg['chave_certificados']);
+    item('OK', 'Chave dos certificados configurada');
+} catch (Throwable) {
+    item('ATENCAO', 'Chave dos certificados ausente ou invalida: o painel admin nao aceita certificados.',
+        "coloque 'chave_certificados' em config/nfse.local.php (gere com: php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;')");
+}
+
 // ===========================================================================
 secao('4. Empresas (emitentes) e certificados');
 // ===========================================================================
@@ -188,12 +210,13 @@ foreach ($cfg['emitentes'] as $cnpj => $emitente) {
     }
 
     $arquivo = (string)($emitente['certificado']['arquivo'] ?? '');
-    if (str_starts_with(realpath($arquivo) ?: $arquivo, realpath("{$raiz}/public") ?: "{$raiz}/public")) {
+    $doBanco = !empty($emitente['certificado']['cifrado']);
+    if (!$doBanco && str_starts_with(realpath($arquivo) ?: $arquivo, realpath("{$raiz}/public") ?: "{$raiz}/public")) {
         item('ERRO', "{$nome}: o certificado esta dentro da pasta public (visivel na internet!).", 'mova o .pfx para storage/certs/ e ajuste o caminho.');
     }
 
     try {
-        $certificado = \Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente::doArquivo($arquivo, (string)($emitente['certificado']['senha'] ?? ''))->certificado();
+        $certificado = \Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente::doEmitente($emitente, (string)$cfg['chave_certificados'])->certificado();
         $dias = (int)floor(($certificado->getValidTo()->getTimestamp() - time()) / 86400);
         $cnpjCertificado = \Xande\NfeIntegracao\Nfse\NfseConfig::normalizarCnpj($certificado->getCnpj() ?? '');
 
@@ -223,6 +246,9 @@ if ($consumidores === []) {
 }
 foreach ($consumidores as $nome => $dados) {
     $token = (string)($dados['token'] ?? '');
+    if (!empty($dados['token_hash'])) {
+        $token = str_repeat('x', 64); // token gerado pelo painel admin (64 caracteres)
+    }
     if (strlen($token) < 24 || str_contains(strtoupper($token), 'TOKEN')) {
         item('ERRO', "Sistema {$nome}: token vazio, curto ou de exemplo.", 'gere um token forte com: openssl rand -hex 32');
         continue;

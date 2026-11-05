@@ -51,6 +51,11 @@ return [
 
     'monitor_token' => 'TOKEN_DO_PAINEL',
 
+    // Painel admin (/admin/): empresas clientes, bloqueios e uso.
+    'admin_token' => 'TOKEN_DO_ADMINISTRADOR',
+    // php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'
+    'chave_certificados' => 'CHAVE_GERADA',
+
     // Arquivamento dos XMLs em nuvem (exemplo S3):
     // 'armazenamento' => [
     //     'tipo' => 's3',

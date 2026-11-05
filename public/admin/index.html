@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel Administrativo</title>
+  <!-- Mesmo visual do monitor + ajustes do painel -->
+  <link rel="stylesheet" href="../monitor/monitor.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- ===================== Acesso ===================== -->
+  <section id="tela-acesso" class="acesso" hidden>
+    <form id="form-acesso" class="cartao acesso__cartao">
+      <h1>Painel Administrativo</h1>
+      <p class="suave">Informe o token de administrador (admin_token em config/nfse.local.php).</p>
+      <label for="campo-token">Token de administrador</label>
+      <input id="campo-token" type="password" autocomplete="current-password" required>
+      <label class="linha-check"><input id="campo-lembrar" type="checkbox"> Lembrar neste navegador</label>
+      <p id="erro-acesso" class="erro" hidden></p>
+      <button type="submit" class="botao botao--primario">Entrar</button>
+    </form>
+  </section>
+
+  <!-- ===================== Painel ===================== -->
+  <div id="tela-painel" hidden>
+    <header class="topo">
+      <div class="topo__titulo">
+        <h1>Painel Administrativo</h1>
+        <span id="selo-ambiente" class="selo"></span>
+        <span id="mes-atual" class="suave"></span>
+      </div>
+      <div class="topo__acoes">
+        <a class="botao" href="../monitor/">Monitor</a>
+        <button id="botao-relatorio" class="botao">Relatório de cobrança</button>
+        <button id="botao-nova" class="botao botao--forte">+ Nova empresa</button>
+        <button id="botao-sair" class="botao">Sair</button>
+      </div>
+    </header>
+
+    <main class="conteudo">
+      <section id="contadores" class="contadores" aria-label="Resumo"></section>
+
+      <section class="filtros filtros--admin cartao">
+        <label>Situação
+          <select id="filtro-situacao">
+            <option value="">Todas</option>
+            <option value="LIBERADA">Liberada</option>
+            <option value="BLOQUEADA">Bloqueada</option>
+            <option value="VENCIDA">Vencida</option>
+            <option value="LIMITE_ATINGIDO">Limite atingido</option>
+          </select>
+        </label>
+        <label class="filtros__busca">Buscar
+          <input id="filtro-busca" type="search" placeholder="Razão social, fantasia ou CNPJ">
+        </label>
+      </section>
+
+      <section class="cartao tabela-cartao">
+        <table class="tabela">
+          <thead>
+            <tr>
+              <th>Empresa</th>
+              <th>Plano</th>
+              <th>Situação</th>
+              <th title="Notas autorizadas no mês">NF-e</th>
+              <th title="Notas autorizadas no mês">NFS-e Nac.</th>
+              <th title="Notas autorizadas no mês">NFS-e SSA</th>
+              <th>Franquia do mês</th>
+              <th>Liberado até</th>
+              <th>Certificado</th>
+              <th>Token</th>
+            </tr>
+          </thead>
+          <tbody id="linhas"></tbody>
+        </table>
+        <p id="vazio" class="vazio" hidden>Nenhuma empresa. Clique em "+ Nova empresa".</p>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===================== Modal ===================== -->
+  <dialog id="modal" class="modal modal--largo">
+    <div class="modal__topo">
+      <div>
+        <h2 id="modal-titulo"></h2>
+        <span id="modal-subtitulo" class="suave"></span>
+      </div>
+      <button id="modal-fechar" class="botao" aria-label="Fechar">✕</button>
+    </div>
+    <div id="modal-corpo" class="modal__corpo"></div>
+  </dialog>
+
+  <script src="admin.js"></script>
+</body>
+</html>

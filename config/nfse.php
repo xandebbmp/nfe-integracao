@@ -154,6 +154,16 @@ $cfg = [
 
     // Token para o painel do monitor (pode ir na query string do EventSource).
     'monitor_token' => '',
+
+    // Painel de administracao (/admin/): cadastro das empresas clientes,
+    // tokens, certificados, bloqueios, limites e uso para cobranca.
+    // Vazio = painel desligado. Gere com: openssl rand -hex 32
+    'admin_token' => '',
+
+    // Chave que criptografa os certificados enviados pelo painel admin.
+    // Gere UMA vez com:  php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'
+    // Guarde copia com os backups (sem ela, os certificados precisam ser reenviados).
+    'chave_certificados' => '',
 ];
 
 $localConfigFile = __DIR__ . '/nfse.local.php';

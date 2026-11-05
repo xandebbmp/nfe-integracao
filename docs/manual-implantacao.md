@@ -8,6 +8,10 @@ copiar os comandos e conferir se a tela mostra o que o manual diz.
 > [Manual do ambiente local](manual-ambiente-local.md) (Windows, Linux e
 > macOS). Ele usa este mesmo manual, com poucas diferenças.
 
+> **Como cada peça funciona e se configura** (worker, tempo real, nginx ou
+> Apache, systemd ou pm2, autenticação, painel admin e cobrança):
+> [Manual de operação](manual-operacao.md).
+
 > **Tempo estimado:** 1h30 a 2h na primeira vez.
 > **Servidor:** Linux **Ubuntu 24.04 LTS** (é o sistema testado). Em outro
 > sistema os comandos podem ser diferentes.
@@ -321,7 +325,12 @@ Rode o comando abaixo **uma vez para cada token** e guarde os resultados:
 openssl rand -hex 32
 ```
 
-Exemplo: rode uma vez para o **ERP** e outra para o **Monitor**.
+Exemplo: rode uma vez para o **ERP**, outra para o **Monitor** e outra para
+o **painel admin**. Para a **chave dos certificados**, use este comando:
+
+```bash
+php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'
+```
 
 ### 7.3 Arquivo de configuração da NFS-e
 
@@ -353,6 +362,11 @@ return [
 
     'monitor_token' => 'TOKEN_DO_MONITOR_GERADO_NO_PASSO_7_2',
 
+    // Painel admin (/admin/): empresas clientes, tokens, bloqueios e cobranca.
+    'admin_token' => 'TOKEN_DO_ADMIN_GERADO_NO_PASSO_7_2',
+    // Criptografa os certificados enviados pelo painel. GUARDE UMA COPIA.
+    'chave_certificados' => 'CHAVE_GERADA_NO_PASSO_7_2',
+
     // Copia dos XMLs numa pasta do servidor (mude para a nuvem depois).
     'armazenamento' => [
         'tipo' => 'local',
@@ -362,8 +376,10 @@ return [
 
 Salve e saia.
 
-> **Mais de uma empresa?** Veja o modelo completo, com o bloco
-> `emitentes`, em `config/nfse.local.php.example`.
+> **Mais de uma empresa?** Cadastre cada empresa cliente no **painel admin**
+> (`https://SEU_DOMINIO/admin/`). Lá você envia o certificado, gera o token e
+> define bloqueios e limites, sem mexer neste arquivo. Veja o
+> [Manual de operação](manual-operacao.md#12-painel-admin).
 
 ### 7.4 Proteger os arquivos de configuração (contêm senhas)
 

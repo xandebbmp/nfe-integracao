@@ -366,6 +366,10 @@ Scripts (seguem `docs/padrao-scripts-sql.md`):
 - `0004_nfe_alterar_documentos_para_nfe.sql` — padrão `NFE`, status
   `DENEGADO`, chave de 44 dígitos, `protocolo_autorizacao` e `sequencia` do
   evento (CC-e).
+- `0005_controle_criar_clientes_uso.sql` — empresas clientes (token próprio,
+  certificado criptografado, bloqueio, vencimento, franquia, tipos), uso para
+  cobrança (`fiscal_uso`, preenchido por gatilho) e histórico do painel admin.
+  Ver `docs/manual-operacao.md`, seção 12.
 
 | Tabela | Papel |
 |---|---|
@@ -376,6 +380,9 @@ Scripts (seguem `docs/padrao-scripts-sql.md`):
 | `nfse_jobs` | Fila do worker. |
 | `nfse_monitor` | Feed append-only do painel. |
 | `nfse_webhooks_saida` | Avisos pendentes para os consumidores. |
+| `fiscal_clientes` | Empresas clientes: dados, certificado (cifrado), hash do token, regras de emissão. |
+| `fiscal_uso` | Uma linha por nota autorizada (base da cobrança), gravada por gatilho. |
+| `fiscal_admin_log` | Histórico das alterações feitas no painel admin. |
 
 Decisões: status em `VARCHAR + CHECK` (fácil de evoluir e vira *union type*
 em TypeScript), datas `TIMESTAMPTZ`, identificadores fiscais como texto

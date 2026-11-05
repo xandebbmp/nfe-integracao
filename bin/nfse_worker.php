@@ -32,12 +32,32 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 $umaVez = in_array('--uma-vez', $argv, true);
 $workerId = gethostname() . ':' . getmypid();
 
-$cfg = NfseConfig::carregar();
 $pdo = ConnectionFactory::make();
-
+$cfgArquivos = NfseConfig::carregar();
 $fila = new FilaRepositorio($pdo);
-$processador = new ProcessadorJobs($pdo, $cfg, new ProvedorFactory($cfg), $workerId);
-$entregador = new EntregadorWebhook($pdo, $cfg);
+
+// Monta (ou remonta) o que depende do cadastro de empresas clientes.
+// O painel admin pode incluir empresas, trocar certificado ou webhook a
+// qualquer hora: o worker rele a cada minuto, sem precisar reiniciar.
+$cfg = [];
+$processador = null;
+$entregador = null;
+$assinaturaCadastro = '';
+$recarregar = static function () use ($pdo, $cfgArquivos, $workerId, &$cfg, &$processador, &$entregador, &$assinaturaCadastro): void {
+    $novo = NfseConfig::comClientes($cfgArquivos, $pdo);
+    $assinatura = md5(serialize([$novo['emitentes'], $novo['consumidores']]));
+    if ($assinatura === $assinaturaCadastro) {
+        return;
+    }
+    if ($assinaturaCadastro !== '') {
+        registrar('Cadastro de empresas mudou: configuracao recarregada.');
+    }
+    $cfg = $novo;
+    $processador = new ProcessadorJobs($pdo, $cfg, new ProvedorFactory($cfg), $workerId);
+    $entregador = new EntregadorWebhook($pdo, $cfg);
+    $assinaturaCadastro = $assinatura;
+};
+$recarregar();
 
 // Parada graciosa.
 $continuar = true;
@@ -64,6 +84,7 @@ while ($continuar) {
         if ($liberados > 0) {
             registrar("{$liberados} job(s) travado(s) devolvido(s) para a fila.");
         }
+        $recarregar();
         $ultimaLimpeza = time();
     }
 

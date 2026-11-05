@@ -20,7 +20,9 @@ X-NFE-API-TOKEN: <seu-token>
 ```
 
 (ou `Authorization: Bearer <seu-token>`). Cada sistema só vê os próprios
-documentos. Tokens são cadastrados em `config/nfse.local.php`.
+documentos. **Cada empresa cliente recebe o próprio token** no painel admin e
+só emite pelo próprio CNPJ. A ordem completa das validações está no
+[Manual de operação, seção 10](manual-operacao.md#10-como-outra-aplicação-chama-a-api). Tokens são cadastrados em `config/nfse.local.php`.
 
 ---
 
@@ -42,6 +44,17 @@ documentos. Tokens são cadastrados em `config/nfse.local.php`.
 | GET | `documentos.php` | Lista (carga inicial do painel) |
 | GET | `monitor.php?token=...[&desde=agora]` | Stream em tempo real (SSE) |
 | — | `/monitor/` | Página pronta do painel (ver `docs/nfse-monitor.md`) |
+
+Controle por empresa (painel admin):
+
+| Resposta | Quando |
+|---|---|
+| `403 EMISSAO_BLOQUEADA` | Empresa bloqueada manualmente (a mensagem traz o motivo) |
+| `403 EMISSAO_VENCIDA` | Passou da data "liberado até" |
+| documento `RECUSADO` `TIPO_NAO_CONTRATADO` | Tipo de nota não contratado pela empresa |
+| documento `RECUSADO` `LIMITE_MENSAL` | Limite de notas do mês atingido |
+
+Consulta, PDF, XML e cancelamento continuam funcionando com a empresa bloqueada.
 
 Erros têm sempre o formato:
 
