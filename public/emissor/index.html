@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emitir Nota de Serviço</title>
+  <link rel="stylesheet" href="../monitor/monitor.css">
+  <link rel="stylesheet" href="emissor.css">
+</head>
+<body>
+
+  <!-- ===================== Entrar ===================== -->
+  <section id="tela-entrar" class="acesso" hidden>
+    <form id="form-entrar" class="cartao acesso__cartao">
+      <h1>Emitir Nota de Serviço</h1>
+      <p class="suave">Entre com o e-mail e a senha que você recebeu.</p>
+      <label for="campo-email">E-mail</label>
+      <input id="campo-email" type="email" autocomplete="username" required>
+      <label for="campo-senha">Senha</label>
+      <input id="campo-senha" type="password" autocomplete="current-password" required>
+      <p id="erro-entrar" class="erro" hidden></p>
+      <button type="submit" class="botao botao--primario">Entrar</button>
+    </form>
+  </section>
+
+  <!-- ===================== Emissor ===================== -->
+  <div id="tela-emissor" hidden>
+    <header class="topo">
+      <div class="topo__titulo">
+        <h1 id="nome-empresa"></h1>
+        <span id="selo-ambiente" class="selo"></span>
+      </div>
+      <div class="topo__acoes">
+        <span id="nome-usuario" class="suave"></span>
+        <button id="botao-senha" class="botao">Trocar senha</button>
+        <button id="botao-sair" class="botao">Sair</button>
+      </div>
+    </header>
+
+    <main class="emissor">
+      <p id="aviso-geral" class="aviso-geral" hidden></p>
+
+      <!-- Formulario: 3 passos -->
+      <form id="form-nota" class="cartao passos" novalidate>
+        <h2>Nova nota de serviço</h2>
+
+        <div class="passo">
+          <span class="passo__numero">1</span>
+          <div class="passo__corpo">
+            <label for="campo-valor">Quanto foi o serviço?</label>
+            <div class="valor"><span>R$</span><input id="campo-valor" inputmode="decimal" placeholder="0,00" autocomplete="off" required></div>
+            <p class="erro-campo" data-campo="valor" hidden></p>
+          </div>
+        </div>
+
+        <div class="passo">
+          <span class="passo__numero">2</span>
+          <div class="passo__corpo">
+            <label for="campo-documento">Para quem? (CPF ou CNPJ do cliente)</label>
+            <input id="campo-documento" inputmode="numeric" placeholder="000.000.000-00 ou 00.000.000/0000-00" autocomplete="off" required>
+            <p class="erro-campo" data-campo="tomador.documento" hidden></p>
+            <div id="recentes" class="recentes"></div>
+            <div id="dados-tomador" class="dados-tomador" hidden>
+              <label for="campo-nome">Nome / razão social</label>
+              <input id="campo-nome" maxlength="150" required>
+              <p class="erro-campo" data-campo="tomador.nome" hidden></p>
+              <label for="campo-email-tomador">E-mail do cliente <span class="suave">(opcional, para enviar a nota)</span></label>
+              <input id="campo-email-tomador" type="email" maxlength="120">
+              <p class="erro-campo" data-campo="tomador.email" hidden></p>
+              <p id="origem-tomador" class="suave pequeno"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="passo">
+          <span class="passo__numero">3</span>
+          <div class="passo__corpo">
+            <label id="rotulo-servico" for="campo-servico" hidden>Tipo de serviço</label>
+            <select id="campo-servico" hidden></select>
+            <label for="campo-descricao">O que foi feito?</label>
+            <textarea id="campo-descricao" rows="4" maxlength="2000" placeholder="Ex.: Consultoria em gestão financeira - novembro/2026" required></textarea>
+            <p class="erro-campo" data-campo="descricao" hidden></p>
+          </div>
+        </div>
+
+        <p id="erro-nota" class="erro" hidden></p>
+        <button id="botao-emitir" type="submit" class="botao botao--primario botao--grande">Emitir nota</button>
+      </form>
+
+      <!-- Resultado da emissao -->
+      <section id="resultado" class="cartao resultado" hidden></section>
+
+      <!-- Notas emitidas -->
+      <section class="cartao">
+        <div class="cabecalho-lista">
+          <h2>Minhas notas</h2>
+          <button id="botao-atualizar" class="botao">Atualizar</button>
+        </div>
+        <div id="lista-notas"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="modal" class="modal">
+    <div class="modal__topo">
+      <h2 id="modal-titulo"></h2>
+      <button id="modal-fechar" class="botao" aria-label="Fechar">✕</button>
+    </div>
+    <div id="modal-corpo" class="modal__corpo"></div>
+  </dialog>
+
+  <script src="emissor.js"></script>
+</body>
+</html>

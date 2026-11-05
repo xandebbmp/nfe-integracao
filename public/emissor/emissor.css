@@ -1,0 +1,60 @@
+/* Emissor simples: so o que difere do monitor (../monitor/monitor.css). */
+
+.emissor { max-width: 760px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+.emissor h2 { margin: 0 0 12px; font-size: 18px; }
+.cartao { padding: 18px; }
+.pequeno { font-size: 12px; }
+a.botao { text-decoration: none; color: inherit; display: inline-flex; align-items: center; }
+.botao--grande { font-size: 17px; padding: 14px; }
+.botao--perigo { color: var(--st-rejeitado); }
+.botao:disabled { opacity: .55; cursor: not-allowed; }
+
+.aviso-geral { margin: 0; padding: 12px 14px; border-radius: var(--raio); background: color-mix(in srgb, var(--st-rejeitado) 12%, var(--cartao));
+  border: 1px solid var(--st-rejeitado); color: var(--texto); }
+
+/* Passos 1-2-3 */
+.passo { display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--borda); }
+.passo:first-of-type { border-top: 0; }
+.passo__numero { width: 30px; height: 30px; border-radius: 50%; background: var(--destaque); color: #fff; display: grid; place-items: center; font-weight: 700; }
+.passo__corpo { display: grid; gap: 6px; min-width: 0; }
+.passo__corpo label { font-weight: 600; }
+.passo input, .passo textarea, .passo select { font-size: 16px; padding: 10px 12px; width: 100%; }
+.passo textarea { resize: vertical; font-family: inherit; }
+.valor { display: flex; align-items: center; gap: 8px; }
+.valor span { font-size: 20px; font-weight: 700; color: var(--suave); }
+.valor input { font-size: 24px; font-weight: 700; max-width: 260px; }
+.erro-campo { margin: 0; color: var(--st-rejeitado); font-size: 13px; }
+.campo--erro { border-color: var(--st-rejeitado) !important; }
+
+.recentes { display: flex; flex-wrap: wrap; gap: 6px; }
+.recentes button { border: 1px solid var(--borda); background: var(--cartao); color: var(--texto); border-radius: 99px; padding: 4px 10px;
+  font-size: 13px; cursor: pointer; }
+.recentes button:hover { border-color: var(--destaque); }
+.dados-tomador { display: grid; gap: 6px; margin-top: 4px; }
+
+/* Resultado */
+.resultado { text-align: center; display: grid; gap: 10px; justify-items: center; }
+.resultado__icone { font-size: 44px; line-height: 1; }
+.resultado__titulo { font-size: 20px; font-weight: 700; margin: 0; }
+.resultado .botoes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.correcao-box { text-align: left; background: color-mix(in srgb, var(--st-autorizado) 10%, var(--cartao)); border-radius: 8px; padding: 10px 12px; }
+.girando { width: 34px; height: 34px; border: 4px solid var(--borda); border-top-color: var(--destaque); border-radius: 50%; animation: girar 1s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* Lista de notas */
+.cabecalho-lista { display: flex; justify-content: space-between; align-items: center; }
+.nota { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--borda); }
+.nota__titulo { font-weight: 600; }
+.nota__valor { font-weight: 700; text-align: right; }
+.nota__info { color: var(--suave); font-size: 13px; }
+.nota__acoes { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.nota__acoes .botao { padding: 5px 10px; font-size: 13px; }
+.nota__erro { grid-column: 1 / -1; color: var(--st-rejeitado); font-size: 13px; }
+
+.campos-modal { display: grid; gap: 8px; }
+.campos-modal label { display: grid; gap: 4px; font-size: 13px; color: var(--suave); }
+
+@media (max-width: 600px) {
+  .topo { flex-wrap: wrap; gap: 8px; }
+  #nome-usuario { display: none; }
+}

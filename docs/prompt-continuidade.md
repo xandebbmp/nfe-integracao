@@ -59,7 +59,7 @@ Navegador ─► /monitor/ (tempo real via SSE)   ·   /admin/ (empresas, bloque
 
 ### 3. Controle por empresa cliente (já implementado)
 
-Script `0005_controle_criar_clientes_uso.sql`:
+Script `0005_controle_criar_clientes_uso.sql` (o `0006` acrescenta o emissor simples, seção 3.1):
 
 - **`fiscal_clientes`**, uma linha por empresa:
   - dados fiscais;
@@ -99,6 +99,26 @@ Emitentes e consumidores do `config/nfse.local.php` continuam valendo. Para
 o mesmo CNPJ, o cadastro do banco tem prioridade
 (`NfseConfig::comClientes`). O worker relê o cadastro a cada minuto.
 
+### 3.1 Emissor simples (já implementado)
+
+Script `0006_emissor_criar_usuarios_servicos_tomadores.sql` e tela
+`/emissor/`: o **próprio cliente** emite **NFS-e Nacional** informando só
+**valor, tomador e descrição**.
+- **Tomador:** pelo CPF ou CNPJ. O CNPJ completa sozinho pela BrasilAPI, e
+  os tomadores já usados ficam salvos.
+- **Serviço:** código de tributação, alíquota e ISS retido vêm de
+  `fiscal_clientes_servicos`, cadastrados no painel admin.
+- **Login:** e-mail e senha por pessoa (`fiscal_usuarios`, bcrypt, bloqueio
+  depois de 5 erros) e sessão de 12 horas (`fiscal_sessoes`, só o hash).
+- **Caminho da nota:** passa por `RecebimentoLote`, igual à API, e vale a
+  idempotência pela `chave` do formulário.
+- **Rotas:** `/v1/emissor/*.php` (cabeçalho `X-EMISSOR-SESSAO`) e, no admin,
+  `/v1/admin/emissor_servico.php` e `emissor_usuario.php`.
+- **Código:** `src/Nfse/Servico/EmissorSimples.php`, `AdministracaoEmissor.php`,
+  `Repositorio/EmissorRepositorio.php` e `Infra/ConsultaCnpj.php`.
+- **Manual do cliente final:** `docs/manual-emissor.md`.
+- **Fora por enquanto:** NFS-e Salvador e NF-e (produto) pelo emissor simples.
+
 ### 4. Onde está cada coisa
 
 | Parte | Caminho |
@@ -106,9 +126,9 @@ o mesmo CNPJ, o cadastro do banco tem prioridade
 | Regras, provedores e banco (back) | `src/Nfse/` — `Nfe/`, `Nacional/`, `Salvador/`, `Servico/`, `Repositorio/`, `Dominio/`, `Infra/`, `Api/` |
 | Rotas da API | `public/v1/nfse/*.php` |
 | Rotas do admin | `public/v1/admin/*.php` |
-| Front (sem build) | `public/admin/` (painel) e `public/monitor/` (tempo real). Como rodar: `docs/manual-operacao.md`, seção 13 |
+| Front (sem build) | `public/admin/` (painel), `public/monitor/` (tempo real) e `public/emissor/` (emissor simples do cliente). Como rodar: `docs/manual-operacao.md`, seção 13 |
 | Worker, homologação, verificador | `bin/nfse_worker.php`, `bin/nfse_homologar.php`, `bin/nfse_verificar.php` |
-| Banco | `database/scripts/0001` a `0005` (padrão em `docs/padrao-scripts-sql.md`) |
+| Banco | `database/scripts/0001` a `0006` (padrão em `docs/padrao-scripts-sql.md`) |
 | Servidor | `deploy/`: nginx, Apache, systemd, pm2, php-fpm, instaladores, backup, atualizar |
 | Testes | `tests/nfse/executar.php` (+ `casos_nfe.php`, `casos_clientes.php`, `Apoio.php`) |
 | CI | `.github/workflows/testes.yml` (PHP 8.3 + PostgreSQL 16, roda em todo PR) |
@@ -185,7 +205,7 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 163/163 com banco e 73/73 sem.
+  - Situação atual: 193/193 com banco e 75/75 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
   `node --check public/admin/admin.js public/monitor/monitor.js` e
   `shellcheck -S warning deploy/*.sh`.

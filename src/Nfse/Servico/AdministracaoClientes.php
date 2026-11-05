@@ -59,6 +59,7 @@ final class AdministracaoClientes
             'status_mes' => $this->clientes->statusDoMes($cliente['cnpj'], $tpAmb),
             'historico' => $this->clientes->historico($cliente['cnpj']),
             'numeracao' => $this->clientes->numeracoes($cliente['cnpj'], $tpAmb),
+            'emissor' => (new AdministracaoEmissor($this->pdo))->resumo($cliente['cnpj']),
             'series_padrao' => $this->seriesPadrao(),
         ];
     }

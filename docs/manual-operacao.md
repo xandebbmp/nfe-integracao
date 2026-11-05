@@ -459,6 +459,57 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
    atual do servidor (homologação e produção têm numeração separada).
    Empresa nova, que nunca emitiu? Não precisa fazer nada: começa do 1.
 6. (Opcional) **Webhook:** a URL e o segredo do sistema do cliente.
+7. (Opcional) **Emissor simples:** se o cliente vai emitir NFS-e Nacional
+   pela tela pronta (valor, tomador e descrição), veja a seção 12.1.
+
+### 12.1 Emissor simples (NFS-e Nacional em 3 passos)
+
+Tela pronta em `https://SEU_DOMINIO/emissor/` para o **próprio cliente**
+emitir NFS-e Nacional preenchendo só três coisas:
+1. **valor**;
+2. **tomador**: digita o CPF ou CNPJ, e no CNPJ o nome e o endereço vêm da
+   Receita, pela BrasilAPI;
+3. **descrição**.
+
+O resto vem do cadastro. A nota segue o **mesmo caminho da API**: fila,
+worker, monitor, bloqueios, franquia, cobrança e webhooks.
+
+**Configurar uma empresa (painel admin → empresa → "Emissor simples"):**
+
+1. **Serviços da empresa → + Adicionar serviço:**
+   - nome curto;
+   - **código de tributação nacional** (6 dígitos);
+   - alíquota do ISS;
+   - ISS retido (sim ou não);
+   - descrição sugerida.
+
+   Os dados vêm do contador. Se a empresa presta mais de um serviço,
+   cadastre todos; o cliente escolhe na hora, e o serviço padrão já vem
+   marcado.
+2. **Quem pode entrar → Criar acesso:** nome e e-mail da pessoa. O painel
+   mostra a **senha uma única vez**. Entregue o endereço, o e-mail e a senha.
+3. Confira se a empresa tem **certificado** enviado e o tipo **NFS-e
+   Nacional** contratado. Sem isso, a tela do cliente mostra o aviso e não
+   deixa emitir.
+
+**Segurança do emissor:**
+- senha guardada só como hash (bcrypt);
+- 5 senhas erradas seguidas bloqueiam o login por 15 minutos;
+- a sessão expira depois de 12 horas sem uso;
+- cada pessoa vê **só as notas da própria empresa**;
+- "Desativar" ou "Nova senha" derrubam na hora a sessão aberta.
+
+**Rede:** o servidor precisa acessar `https://brasilapi.com.br` para
+completar o CNPJ. Se não conseguir, a pessoa digita o nome e a emissão
+funciona do mesmo jeito.
+
+Rotas usadas pela tela, todas com o cabeçalho `X-EMISSOR-SESSAO` recebido
+no login:
+- `entrar`, `sair`, `painel`, `tomador`;
+- `emitir`, `nota`, `pdf`, `xml`, `cancelar`, `senha`.
+
+Todas ficam em `/v1/emissor/`. Os comentários de cada arquivo explicam o
+formato. O manual para o cliente final é o `docs/manual-emissor.md`.
 
 ### As quatro formas de bloqueio
 
@@ -499,6 +550,8 @@ Para planilha, acrescente `&formato=csv`.
 | `GET /v1/admin/cliente.php?cnpj=` | Detalhe, uso de 12 meses e histórico |
 | `POST /v1/admin/certificado.php` | Enviar o `.pfx` (multipart: `cnpj`, `senha`, `arquivo`) |
 | `POST /v1/admin/token.php` | Gerar um token novo |
+| `POST /v1/admin/emissor_servico.php` | Serviços da empresa para o emissor simples |
+| `POST /v1/admin/emissor_usuario.php` | Acessos ao emissor simples (criar, nova senha, ativar e desativar) |
 | `POST /v1/admin/numeracao.php` | Último número já usado numa série: `{"cnpj","padrao","serie","ultimo_numero"}` |
 | `GET /v1/admin/uso.php?mes=AAAA-MM[&formato=csv]` | Relatório de cobrança |
 
@@ -515,7 +568,7 @@ curl -X POST https://SEU_DOMINIO/v1/admin/clientes.php -H "X-ADMIN-TOKEN: <admin
 
 ## 13. Como rodar cada front
 
-O projeto tem **dois fronts**. Os dois são páginas HTML/CSS/JS puras:
+O projeto tem **três fronts**. Os dois são páginas HTML/CSS/JS puras:
 - **sem build**: não tem `npm install`, `npm run build` nem Node;
 - **sem servidor próprio**: o mesmo nginx/Apache que serve a API entrega as
   páginas.
@@ -526,6 +579,7 @@ o endereço no navegador.
 | Front | Endereço | Arquivos | Senha pedida na tela | Para quem |
 |---|---|---|---|---|
 | **Painel admin** | `https://SEU_DOMINIO/admin/` | `public/admin/` (`index.html`, `admin.css`, `admin.js`) | `admin_token` do `config/nfse.local.php` | Você: empresas, certificados, tokens, bloqueios, numeração e cobrança |
+| **Emissor simples** | `https://SEU_DOMINIO/emissor/` | `public/emissor/` (`index.html`, `emissor.css`, `emissor.js`) | E-mail e senha da pessoa, criados no painel admin | O próprio cliente: emitir NFS-e Nacional em 3 passos (manual: `docs/manual-emissor.md`) |
 | **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
 
 ### Passo a passo (servidor)

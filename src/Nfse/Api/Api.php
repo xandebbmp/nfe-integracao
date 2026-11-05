@@ -131,6 +131,25 @@ final class Api
         }
     }
 
+    /**
+     * Exige a sessao do emissor simples (cabecalho X-EMISSOR-SESSAO, recebido
+     * no login). Devolve o usuario, com o CNPJ da empresa dele.
+     */
+    public function exigirSessaoEmissor(\Xande\NfeIntegracao\Nfse\Servico\EmissorSimples $emissor): array
+    {
+        $usuario = $emissor->usuarioDaSessao(self::cabecalho('X-EMISSOR-SESSAO'));
+        if ($usuario === null) {
+            $this->erro(401, 'SESSAO_EXPIRADA', 'Sua sessao terminou. Entre de novo.');
+        }
+        return $usuario;
+    }
+
+    /** Valor de um cabecalho da requisicao. */
+    public static function lerCabecalho(string $nome): string
+    {
+        return self::cabecalho($nome);
+    }
+
     /** IP de quem chamou (para o historico do painel admin). */
     public static function ip(): string
     {

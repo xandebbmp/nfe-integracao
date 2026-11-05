@@ -143,15 +143,15 @@ final class NfseConfig
             $cfg['emitentes'][$cnpj] = $emitente;
 
             // O proprio cliente e o "consumidor": token dele, so o CNPJ dele.
-            if (!empty($c['token_hash'])) {
-                $cfg['consumidores'][$cnpj] = [
-                    'token_hash' => (string)$c['token_hash'],
-                    'cnpjs' => [$cnpj],
-                    'webhook_url' => (string)($c['webhook_url'] ?? ''),
-                    'webhook_segredo' => (string)($c['webhook_segredo'] ?? ''),
-                    'cliente' => true,
-                ];
-            }
+            // Mesmo sem token (cliente que so usa o emissor simples), o
+            // consumidor existe para as notas do emissor e os webhooks.
+            $cfg['consumidores'][$cnpj] = [
+                'token_hash' => (string)($c['token_hash'] ?? ''),
+                'cnpjs' => [$cnpj],
+                'webhook_url' => (string)($c['webhook_url'] ?? ''),
+                'webhook_segredo' => (string)($c['webhook_segredo'] ?? ''),
+                'cliente' => true,
+            ];
         }
 
         return $cfg;

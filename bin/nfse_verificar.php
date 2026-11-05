@@ -246,6 +246,10 @@ if ($consumidores === []) {
 }
 foreach ($consumidores as $nome => $dados) {
     $token = (string)($dados['token'] ?? '');
+    if (!empty($dados['cliente']) && empty($dados['token_hash'])) {
+        item('OK', "Empresa {$nome}: sem token de API (pode usar o emissor simples em /emissor/)");
+        continue;
+    }
     if (!empty($dados['token_hash'])) {
         $token = str_repeat('x', 64); // token gerado pelo painel admin (64 caracteres)
     }
