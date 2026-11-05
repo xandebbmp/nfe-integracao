@@ -58,6 +58,8 @@ final class AdministracaoClientes
             'uso_mensal' => $this->clientes->usoMensal($cliente['cnpj'], $tpAmb, 12),
             'status_mes' => $this->clientes->statusDoMes($cliente['cnpj'], $tpAmb),
             'historico' => $this->clientes->historico($cliente['cnpj']),
+            'numeracao' => $this->clientes->numeracoes($cliente['cnpj'], $tpAmb),
+            'series_padrao' => $this->seriesPadrao(),
         ];
     }
 
@@ -191,7 +193,80 @@ final class AdministracaoClientes
             'mensagem' => 'Copie e entregue ao cliente agora: este token nao sera mostrado de novo.'];
     }
 
+    /**
+     * Numeracao inicial: informa o ULTIMO numero ja usado numa serie (no
+     * sistema antigo, no portal, nas rotas antigas...). A proxima nota da
+     * API sai com o numero seguinte. Nunca volta para tras (evita nota com
+     * numero repetido). Vale para o ambiente atual do servidor (tpAmb).
+     *
+     * @param array{cnpj?: string, padrao?: string, serie?: mixed, ultimo_numero?: mixed} $entrada
+     */
+    public function definirNumeracao(array $entrada, string $ip): array
+    {
+        $cnpj = NfseConfig::normalizarCnpj($entrada['cnpj'] ?? '');
+        if ($this->clientes->buscar($cnpj) === null) {
+            return self::falha(404, 'NAO_ENCONTRADO', 'Empresa nao cadastrada.');
+        }
+
+        $padrao = strtoupper(trim((string)($entrada['padrao'] ?? '')));
+        if (!in_array($padrao, Padrao::TODOS, true)) {
+            return self::falha(422, 'DADOS_INVALIDOS', 'Tipo de nota invalido: use ' . implode(', ', Padrao::TODOS) . '.');
+        }
+
+        $serie = trim((string)($entrada['serie'] ?? ''));
+        if ($serie === '') {
+            $serie = $this->seriesPadrao()[$padrao];
+        }
+        if ($padrao === Padrao::NFE) {
+            if (!preg_match('/^\d{1,3}$/', $serie)) {
+                return self::falha(422, 'DADOS_INVALIDOS', 'Serie da NF-e deve ser um numero de 0 a 999.');
+            }
+            $serie = (string)(int)$serie; // "001" e "1" sao a mesma serie
+        } elseif (!preg_match('/^[0-9A-Za-z]{1,5}$/', $serie)) {
+            return self::falha(422, 'DADOS_INVALIDOS', 'Serie deve ter de 1 a 5 letras ou numeros.');
+        }
+
+        $maximo = $padrao === Padrao::NFE ? 999_999_999 : 999_999_999_999_999;
+        $ultimo = filter_var($entrada['ultimo_numero'] ?? null, FILTER_VALIDATE_INT);
+        if ($ultimo === false || $ultimo < 0 || $ultimo >= $maximo) {
+            return self::falha(422, 'DADOS_INVALIDOS', 'Informe o ULTIMO numero ja usado (0 se a serie nunca foi usada), ate ' . number_format($maximo - 1, 0, ',', '.') . '.');
+        }
+
+        $tpAmb = (int)$this->cfg['tpAmb'];
+        $this->pdo->beginTransaction();
+        try {
+            $r = $this->clientes->ajustarNumeracao($cnpj, $padrao, $tpAmb, $serie, $ultimo);
+            $aplicado = $r['depois'] === $ultimo && ($r['antes'] === null || $r['antes'] <= $ultimo);
+            $this->clientes->registrarLog($cnpj, 'NUMERACAO', [
+                'padrao' => $padrao, 'serie' => $serie, 'ambiente' => $tpAmb,
+                'informado' => $ultimo, 'antes' => $r['antes'], 'depois' => $r['depois'],
+            ], $ip);
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+
+        $proximo = $r['depois'] + 1;
+        $mensagem = $aplicado
+            ? "Pronto: a proxima nota desta serie sai com o numero {$proximo}."
+            : "Mantido: a API ja usou ate o numero {$r['antes']} nesta serie, maior que o informado ({$ultimo}). A proxima nota sai com o numero {$proximo}.";
+
+        return ['ok' => true, 'http' => 200, 'aplicado' => $aplicado, 'proximo_numero' => $proximo,
+            'mensagem' => $mensagem, 'cliente' => $this->detalhe($cnpj)];
+    }
+
     // ------------------------------------------------------------ apoio
+
+    /** Serie usada quando a nota nao informa (configuracao do servidor). */
+    private function seriesPadrao(): array
+    {
+        return [
+            Padrao::NFE => (string)(int)($this->cfg['nfe']['serie'] ?? 1),
+            Padrao::NACIONAL => (string)($this->cfg['nacional']['serie_dps'] ?? '1'),
+            Padrao::SALVADOR => (string)($this->cfg['salvador']['serie_rps'] ?? '1'),
+        ];
+    }
 
     private function resumo(array $c, array $usoMesPorTipo): array
     {

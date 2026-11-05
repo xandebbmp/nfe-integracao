@@ -431,6 +431,7 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   - dados cadastrais e webhook;
   - certificado;
   - token;
+  - numeração de cada série (último usado e próxima nota);
   - uso dos últimos 12 meses;
   - documentos do mês por status;
   - histórico de alterações, com data e IP.
@@ -449,7 +450,14 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
 3. **Certificado:** envie o `.pfx` e a senha.
 4. **Acesso à API → Gerar token.** Copie e entregue ao cliente: o token
    **não aparece de novo**. Perdeu? Gere outro; o antigo para de valer na hora.
-5. (Opcional) **Webhook:** a URL e o segredo do sistema do cliente.
+5. **Numeração:** se a empresa **já emitia** por outro sistema, informe o
+   **último número usado** em cada série (NF-e, DPS ou RPS). A API continua
+   do seguinte. Antes de aplicar, a tela mostra qual será o próximo número.
+   O número **nunca volta para trás**: se a API já usou um maior, ele é
+   mantido, para não sair nota com número repetido. Vale para o ambiente
+   atual do servidor (homologação e produção têm numeração separada).
+   Empresa nova, que nunca emitiu? Não precisa fazer nada: começa do 1.
+6. (Opcional) **Webhook:** a URL e o segredo do sistema do cliente.
 
 ### As quatro formas de bloqueio
 
@@ -490,6 +498,7 @@ Para planilha, acrescente `&formato=csv`.
 | `GET /v1/admin/cliente.php?cnpj=` | Detalhe, uso de 12 meses e histórico |
 | `POST /v1/admin/certificado.php` | Enviar o `.pfx` (multipart: `cnpj`, `senha`, `arquivo`) |
 | `POST /v1/admin/token.php` | Gerar um token novo |
+| `POST /v1/admin/numeracao.php` | Último número já usado numa série: `{"cnpj","padrao","serie","ultimo_numero"}` |
 | `GET /v1/admin/uso.php?mes=AAAA-MM[&formato=csv]` | Relatório de cobrança |
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
