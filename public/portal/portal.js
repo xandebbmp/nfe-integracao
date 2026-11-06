@@ -9,7 +9,7 @@
      3. Menu, telas e tema
      4. Tela inicial
      5. Tela "Emitir nota"
-     6. Minhas notas, Servicos, Tomadores, Minha empresa e Usuarios
+     6. Minhas notas, Recorrencias, Servicos, Tomadores, Minha empresa e Usuarios
      7. Inicio do portal
 
    Demonstracao sem servidor: portal-demo.js define window.PORTAL_DEMO e
@@ -327,6 +327,7 @@
     if (nome === 'tomadores') { carregarListaTomadores(); }
     if (nome === 'empresa') { carregarEmpresa(); }
     if (nome === 'usuarios') { carregarUsuarios(); }
+    if (nome === 'recorrencias') { carregarRecorrencias(); }
 
     fecharMenuCelular();
     window.scrollTo(0, 0);
@@ -429,7 +430,7 @@
     el('menu-rejeitadas').hidden = rejeitadas === 0;
 
     var avisos = r.avisos || [];
-    var icones = { NOTA_REJEITADA: 'error_outline', SEM_CERTIFICADO: 'gpp_maybe', CERTIFICADO_VENCENDO: 'verified_user' };
+    var icones = { NOTA_REJEITADA: 'error_outline', SEM_CERTIFICADO: 'gpp_maybe', CERTIFICADO_VENCENDO: 'verified_user', RECORRENCIA_PENDENTE: 'event_repeat' };
     el('inicio-avisos').innerHTML = avisos.length === 0
       ? '<div class="atalho"><i class="icone">task_alt</i><div><b>Tudo certo por aqui</b><small>Nenhuma nota com problema e certificado em dia.</small></div></div>'
       : avisos.map(function (a) {
@@ -864,7 +865,7 @@
   });
 
   // ==================================================================
-  // 6. MINHAS NOTAS, SERVICOS, TOMADORES, MINHA EMPRESA E USUARIOS
+  // 6. MINHAS NOTAS, SERVICOS, TOMADORES, MINHA EMPRESA, USUARIOS E RECORRENCIAS
   // ==================================================================
 
   // ---- Utilidades das telas de lista ----
@@ -1619,6 +1620,206 @@
       var campo = { SENHA_ATUAL_INCORRETA: 'atual', SENHA_FRACA: 'nova', SENHA_REPETIDA: 'nova' }[erro.codigo];
       if (campo) { mostrarErrosForm(formMinhaSenha, [{ campo: campo, mensagem: erro.message }], mapa, 'ms-erro'); }
       else { mostrarErro('ms-erro', erro.message); }
+    }).then(function () { botao.disabled = false; });
+  });
+
+  // ---- Recorrencias ----
+  var listaRecorrencias = [];
+  var tomadoresRec = [];
+  var servicosRec = [];
+  var SITUACAO_REC = {
+    PENDENTE: ['Esperando você', 'alerta'],
+    AGENDADA: ['Agendada', 'info'],
+    PAUSADA: ['Pausada', 'neutro'],
+    ENCERRADA: ['Encerrada', 'neutro']
+  };
+
+  function hojeIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function carregarRecorrencias() {
+    api('GET', 'recorrencias.php').then(function (r) {
+      listaRecorrencias = r.recorrencias || [];
+      desenharRecorrencias();
+    }).catch(function (erro) {
+      if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
+    });
+  }
+
+  function desenharRecorrencias() {
+    var pendentes = listaRecorrencias.filter(function (r) { return r.situacao === 'PENDENTE'; }).length;
+    el('menu-recorrencias').textContent = pendentes;
+    el('menu-recorrencias').hidden = pendentes === 0;
+
+    var caixa = el('recorrencias-lista');
+    if (!listaRecorrencias.length) {
+      caixa.innerHTML = '<div class="cartao vazio" style="grid-column:1/-1"><i class="icone">event_repeat</i><h2>Nenhuma nota recorrente</h2>'
+        + '<p class="secundario">Cadastre uma vez a mensalidade de um cliente e ela se repete todo mês: sozinha ou esperando a sua confirmação.</p>'
+        + '<button type="button" class="btn btn--primario" data-nova><i class="icone icone--p">add</i> Criar a primeira</button></div>';
+      caixa.querySelector('[data-nova]').addEventListener('click', function () { abrirFormRecorrencia(null); });
+      return;
+    }
+    caixa.innerHTML = listaRecorrencias.map(function (r) {
+      var s = SITUACAO_REC[r.situacao] || [r.situacao, 'neutro'];
+      var valor = Number((r.valores || {}).valor_servicos || 0);
+      var quando = r.situacao === 'PENDENTE'
+        ? '<b>Nota de ' + escapar(r.competencia_proxima) + ' pronta</b><span>O dia chegou em ' + escapar(dataCurta(r.proxima_em)) + '.</span>'
+        : (r.situacao === 'AGENDADA'
+          ? '<b>Próxima: ' + escapar(dataCurta(r.proxima_em)) + '</b><span>Competência ' + escapar(r.competencia_proxima) + ' · todo dia ' + r.dia + (r.fim ? ' até ' + escapar(mesPorExtenso(r.fim)) : '') + '</span>'
+          : '<span>Todo dia ' + r.dia + (r.fim ? ' até ' + escapar(mesPorExtenso(r.fim)) : '') + '</span>');
+      var acoes = '';
+      if (r.situacao === 'PENDENTE') {
+        acoes += '<button type="button" class="btn btn--primario" data-acao="emitir"><i class="icone icone--p">send</i> Emitir agora</button>'
+          + '<button type="button" class="btn btn--secundario" data-acao="pular">Pular mês</button>';
+      }
+      acoes += '<button type="button" class="btn btn--secundario" data-acao="editar"><i class="icone icone--p">edit</i> Editar</button>';
+      if (r.situacao === 'PAUSADA') {
+        acoes += '<button type="button" class="btn btn--icone" data-acao="retomar" title="Retomar" aria-label="Retomar ' + escapar(r.nome) + '"><i class="icone">play_arrow</i></button>';
+      } else if (r.situacao !== 'ENCERRADA') {
+        acoes += '<button type="button" class="btn btn--icone" data-acao="pausar" title="Pausar" aria-label="Pausar ' + escapar(r.nome) + '"><i class="icone">pause</i></button>';
+      }
+      acoes += '<button type="button" class="btn btn--icone" data-acao="remover" title="Apagar" aria-label="Apagar ' + escapar(r.nome) + '"><i class="icone">delete_outline</i></button>';
+      return '<article class="cartao servico' + (r.situacao === 'PENDENTE' ? ' recorrencia--pendente' : '') + '" data-id="' + r.id + '">'
+        + '<div class="servico__topo"><div><h3>' + escapar(r.nome) + '</h3><span class="sub secundario">' + escapar((r.tomador || {}).nome || '') + ' · ' + escapar(r.servico_nome) + '</span></div>'
+        + '<span class="servico__valor">' + reais(valor) + '</span></div>'
+        + '<div class="servico__codigos"><span class="pilula pilula--' + s[1] + '">' + s[0] + '</span>'
+        + '<span class="pilula pilula--neutro">' + (r.modo === 'AUTOMATICA' ? 'Sai sozinha' : 'Pede confirmação') + '</span>'
+        + (r.emitidas ? '<span class="pilula pilula--neutro">' + r.emitidas + (r.emitidas === 1 ? ' emitida' : ' emitidas') + '</span>' : '') + '</div>'
+        + '<div class="recorrencia__quando">' + quando + '</div>'
+        + (r.ultima_mensagem ? '<div class="recorrencia__erro"><b>Não saiu sozinha:</b> ' + escapar(r.ultima_mensagem) + ' Corrija e clique em "Emitir agora", ou o sistema tenta de novo amanhã.</div>' : '')
+        + '<div class="servico__acoes">' + acoes + '</div></article>';
+    }).join('');
+  }
+
+  el('recorrencias-lista').addEventListener('click', function (evento) {
+    var botao = evento.target.closest('[data-acao]');
+    if (!botao) { return; }
+    var cartao = botao.closest('[data-id]');
+    var id = Number(cartao.getAttribute('data-id'));
+    var r = listaRecorrencias.filter(function (x) { return x.id === id; })[0];
+    var acao = botao.getAttribute('data-acao');
+    var executar = function () {
+      botao.disabled = true;
+      api('POST', 'recorrencias.php', { acao: acao, id: id }).then(function (resposta) {
+        avisar(escapar(resposta.mensagem));
+        carregarRecorrencias();
+      }).catch(function (erro) {
+        avisar(escapar(erro.message), 'error_outline');
+        carregarRecorrencias();
+      });
+    };
+    if (acao === 'editar') { abrirFormRecorrencia(r); return; }
+    // O que nao tem volta (nota emitida, apagar) pede confirmacao no proprio cartao.
+    if (acao === 'emitir') {
+      confirmarRemocao(cartao.querySelector('.servico__acoes'), 'Emitir ' + reais((r.valores || {}).valor_servicos) + ' para ' + ((r.tomador || {}).nome || 'o tomador') + '?', executar, 'Emitir');
+      var sim = cartao.querySelector('[data-sim]');
+      sim.classList.remove('btn--perigo');
+      sim.classList.add('btn--primario');
+      return;
+    }
+    if (acao === 'remover') {
+      confirmarRemocao(cartao.querySelector('.servico__acoes'), 'Apagar esta recorrência?', executar, 'Apagar');
+      return;
+    }
+    executar();
+  });
+
+  // ---- Formulario da recorrencia ----
+  var formRecorrencia = el('form-recorrencia');
+  var CAMPOS_REC = {
+    nome: 'recf-nome', 'tomador.cpf_cnpj': 'recf-tomador', 'tomador.nome': 'recf-tomador', 'tomador.email': 'recf-tomador',
+    'tomador.endereco.cep': 'recf-tomador', 'tomador.endereco.codigo_municipio': 'recf-tomador',
+    servico_id: 'recf-servico', descricao: 'recf-descricao', 'servico.descricao': 'recf-descricao',
+    'valores.valor_servicos': 'recf-valor', primeira_em: 'recf-primeira', fim: 'recf-fim', competencia: 'recf-competencia'
+  };
+  var valoresEditando = {};   // mantem retencoes que a tela nao mostra
+
+  function carregarListasRecorrencia(r) {
+    return Promise.all([api('GET', 'tomadores.php'), api('GET', 'servicos.php')]).then(function (res) {
+      tomadoresRec = res[0].tomadores || [];
+      servicosRec = res[1].servicos || [];
+      var tomAtual = r && r.tomador ? r.tomador : null;
+      // Tomador da recorrencia que saiu da lista continua aparecendo.
+      if (tomAtual && !tomadoresRec.some(function (t) { return t.cpf_cnpj === tomAtual.cpf_cnpj; })) { tomadoresRec.push(tomAtual); }
+      el('recf-tomador').innerHTML = '<option value="">' + (tomadoresRec.length ? 'Escolha um tomador…' : 'Nenhum tomador salvo ainda') + '</option>'
+        + tomadoresRec.map(function (t) { return '<option value="' + escapar(t.cpf_cnpj) + '">' + escapar(t.nome + ' — ' + formatarDoc(t.cpf_cnpj)) + '</option>'; }).join('');
+      el('recf-servico').innerHTML = '<option value="">' + (servicosRec.length ? 'Escolha um serviço…' : 'Nenhum serviço salvo ainda') + '</option>'
+        + servicosRec.map(function (s) { return '<option value="' + s.id + '">' + escapar(s.nome) + '</option>'; }).join('');
+    });
+  }
+
+  function abrirFormRecorrencia(r) {
+    formRecorrencia.reset();
+    mostrarErrosForm(formRecorrencia, [], {}, 'recorrencia-erro');
+    el('recorrencia-titulo').textContent = r ? 'Editar recorrência' : 'Nova recorrência';
+    el('recf-id').value = r ? r.id : '';
+    el('recf-primeira').min = hojeIso();
+    valoresEditando = r ? Object.assign({}, r.valores) : {};
+    carregarListasRecorrencia(r).then(function () {
+      if (r) {
+        el('recf-nome').value = r.nome;
+        el('recf-tomador').value = (r.tomador || {}).cpf_cnpj || '';
+        el('recf-servico').value = String(r.servico_id);
+        el('recf-descricao').value = r.descricao;
+        el('recf-valor').value = formatarValor((r.valores || {}).valor_servicos || 0);
+        el('recf-iss-retido').checked = !!(r.valores || {}).iss_retido;
+        el('recf-primeira').value = r.proxima_em >= hojeIso() ? r.proxima_em : '';
+        el('recf-fim').value = r.fim || '';
+        el('recf-competencia').value = r.competencia;
+        formRecorrencia.querySelector('input[name="recf-modo"][value="' + r.modo + '"]').checked = true;
+      }
+      dica('recf-primeira-dica', r && !el('recf-primeira').value ? 'Vazio = continua em ' + dataCurta(r.proxima_em) + '. Repete todo mês neste dia.' : 'Repete todo mês neste dia (até o dia 28).');
+      abrirJanela('janela-recorrencia');
+      el('recf-nome').focus();
+    }).catch(function (erro) { avisar(escapar(erro.message), 'error_outline'); });
+  }
+
+  el('botao-nova-recorrencia').addEventListener('click', function () { abrirFormRecorrencia(null); });
+  el('recf-valor').addEventListener('blur', function () { if (this.value.trim()) { this.value = formatarValor(lerValor(this.value)); } });
+
+  // Escolheu o servico: traz descricao e valor de costume (sem apagar o que ja foi digitado).
+  el('recf-servico').addEventListener('change', function () {
+    var s = servicosRec.filter(function (x) { return String(x.id) === el('recf-servico').value; })[0];
+    if (!s) { return; }
+    if (!el('recf-descricao').value.trim()) { el('recf-descricao').value = s.descricao; }
+    if (!el('recf-valor').value.trim() && s.valor_padrao) { el('recf-valor').value = formatarValor(s.valor_padrao); }
+    if (!el('recf-nome').value.trim()) {
+      var t = tomadoresRec.filter(function (x) { return x.cpf_cnpj === el('recf-tomador').value; })[0];
+      el('recf-nome').value = s.nome + (t ? ' — ' + t.nome.split(' ')[0] : '');
+    }
+  });
+
+  formRecorrencia.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var t = tomadoresRec.filter(function (x) { return x.cpf_cnpj === el('recf-tomador').value; })[0] || {};
+    var tomador = {};
+    ['cpf_cnpj', 'nome', 'email', 'telefone', 'cep', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'uf', 'codigo_municipio'].forEach(function (c) {
+      if (t[c]) { tomador[c] = t[c]; }
+    });
+    var corpo = {
+      acao: 'salvar',
+      nome: el('recf-nome').value.trim(),
+      tomador: tomador,
+      servico_id: Number(el('recf-servico').value) || 0,
+      descricao: el('recf-descricao').value.trim(),
+      valores: Object.assign({}, valoresEditando, { valor_servicos: lerValor(el('recf-valor').value), iss_retido: el('recf-iss-retido').checked }),
+      primeira_em: el('recf-primeira').value,
+      fim: el('recf-fim').value,
+      competencia: el('recf-competencia').value,
+      modo: formRecorrencia.querySelector('input[name="recf-modo"]:checked').value
+    };
+    if (el('recf-id').value) { corpo.id = Number(el('recf-id').value); }
+    var botao = el('botao-salvar-recorrencia');
+    botao.disabled = true;
+    api('POST', 'recorrencias.php', corpo).then(function (r) {
+      fecharJanela('janela-recorrencia');
+      avisar(escapar(r.mensagem));
+      carregarRecorrencias();
+    }).catch(function (erro) {
+      mostrarErrosForm(formRecorrencia, erro.erros, CAMPOS_REC, 'recorrencia-erro');
+      if (!erro.erros || !erro.erros.length) { mostrarErro('recorrencia-erro', erro.message); }
     }).then(function () { botao.disabled = false; });
   });
 

@@ -185,7 +185,9 @@ php bin/nfse_verificar.php
 3. Entrega os **webhooks** pendentes (seção 11).
 4. A cada minuto, devolve à fila os trabalhos de um worker que morreu no
    meio e relê o cadastro de empresas do painel admin.
-5. Sem trabalho, **dorme** até o banco avisar (`LISTEN/NOTIFY`) ou 5 s
+5. A cada 5 minutos, emite as **notas recorrentes automáticas** do dia
+   (seção 13, "Recorrências"). Pausado no painel, não emite.
+6. Sem trabalho, **dorme** até o banco avisar (`LISTEN/NOTIFY`) ou 5 s
    passarem. Nota nova é atendida na hora, sem ficar consultando o banco.
 
 **Proteção contra nota em dobro:** antes de reenviar algo que pode ter
@@ -366,6 +368,7 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 | `0008` | Registro dos scripts aplicados (botão **Atualizar banco**) |
 | `0009` | Configurações alteradas pelo painel (`sistema_ajustes`) |
 | `0010` | Portal: papel de administrador dos usuários (`portal_usuarios.administrador`) |
+| `0011` | Portal: notas recorrentes (`portal_recorrencias`) |
 
 - **Backup diário:** `deploy/backup_banco.sh`, no cron. Veja o manual de
   implantação, seção "Backup".
@@ -731,6 +734,19 @@ sessões abertas.
   troca a própria senha em "Minha senha". O primeiro usuário criado no painel
   para uma empresa sem administrador ativo vira administrador sozinho; no
   painel também há o botão "Tornar administrador" (script `0010`).
+- **Recorrências** (script `0011`): a mensalidade de um cliente cadastrada
+  uma vez (tomador, serviço, valor, dia do mês até 28, mês de competência
+  atual ou anterior, último mês opcional). `{mes}` na descrição vira o mês
+  da nota. Cada uma escolhe o modo:
+  - **Me avisar para confirmar** (padrão): no dia, aparece "Esperando você"
+    no menu e na tela inicial; a nota só sai no clique "Emitir agora" (ou
+    "Pular mês").
+  - **Emitir sozinha:** o worker emite no dia. Se der erro (empresa
+    bloqueada, limite do plano), tenta uma vez por dia e o motivo aparece
+    no cartão, que fica esperando o cliente.
+  Cada mês tem a referência `PORTAL-rec-<id>-<AAAAMM>`, então a mesma nota
+  nunca sai duas vezes. Pausar e retomar não gera notas atrasadas: segue do
+  próximo dia marcado. Apagar não mexe nas notas já emitidas.
 
 **Configuração** (`portal` no `config/nfse.php`, troque no
 `config/nfse.local.php`):

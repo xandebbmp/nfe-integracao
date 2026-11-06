@@ -157,7 +157,7 @@
             <a class="menu__item" href="#inicio"><i class="icone">space_dashboard</i><span>Início</span></a>
             <a class="menu__item" href="#emitir"><i class="icone">post_add</i><span>Emitir nota</span></a>
             <a class="menu__item" href="#notas"><i class="icone">receipt_long</i><span>Minhas notas</span><span id="menu-rejeitadas" class="menu__marca menu__marca--qtd" title="Notas não autorizadas" hidden></span></a>
-            <a class="menu__item" href="#recorrencias"><i class="icone">event_repeat</i><span>Recorrências</span><span class="menu__marca menu__marca--breve">em breve</span></a>
+            <a class="menu__item" href="#recorrencias"><i class="icone">event_repeat</i><span>Recorrências</span><span class="menu__marca menu__marca--qtd" id="menu-recorrencias" hidden>0</span></a>
           </nav>
 
           <nav class="menu__grupo" aria-label="Cadastros">
@@ -442,7 +442,16 @@
             </div>
           </section>
           <section data-pagina="recorrencias" data-titulo="Recorrências" hidden>
-            <div class="cartao vazio"><i class="icone">event_repeat</i><h2>Recorrências</h2><p class="secundario">Notas mensais automáticas (fase 3).</p></div>
+            <div class="pagina-lista">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Recorrências</h1>
+                  <p class="secundario">Notas que se repetem todo mês, como uma mensalidade. Cada uma sai sozinha ou espera a sua confirmação.</p>
+                </div>
+                <button type="button" class="btn btn--primario" id="botao-nova-recorrencia"><i class="icone icone--p">add</i> Nova recorrência</button>
+              </div>
+              <div class="cartoes-servico" id="recorrencias-lista"></div>
+            </div>
           </section>
           <!-- ===== Tomadores ===== -->
           <section data-pagina="tomadores" data-titulo="Tomadores" hidden>
@@ -667,6 +676,58 @@
       <button type="button" class="btn btn--secundario" data-fechar>Fechar</button>
       <button type="button" class="btn btn--primario" id="botao-copiar-provisoria"><i class="icone icone--p">content_copy</i> Copiar mensagem</button>
     </div>
+  </dialog>
+
+  <dialog id="janela-recorrencia" class="janela janela--larga" aria-labelledby="recorrencia-titulo">
+    <form id="form-recorrencia" class="emitir" novalidate>
+      <div class="janela__cabeca">
+        <h2 id="recorrencia-titulo">Nova recorrência</h2>
+        <button type="button" class="btn btn--icone" data-fechar aria-label="Fechar"><i class="icone">close</i></button>
+      </div>
+      <div class="janela__corpo">
+        <input type="hidden" id="recf-id">
+        <div class="linha-campos">
+          <div class="campo campo--largo"><label for="recf-nome">Nome para achar na lista</label><input id="recf-nome" maxlength="120" placeholder="Ex.: Mensalidade Clínica Vida"></div>
+        </div>
+        <div class="linha-campos">
+          <div class="campo campo--meio"><label for="recf-tomador">Tomador</label><select id="recf-tomador"></select>
+            <small class="dica">Não está na lista? Cadastre em <a href="#tomadores">Tomadores</a>.</small></div>
+          <div class="campo campo--meio"><label for="recf-servico">Serviço</label><select id="recf-servico"></select>
+            <small class="dica">Os códigos fiscais vêm do serviço salvo.</small></div>
+        </div>
+        <div class="campo"><label for="recf-descricao">Descrição que vai na nota</label>
+          <textarea id="recf-descricao" maxlength="2000"></textarea>
+          <small class="dica">Escreva <b>{mes}</b> e ele vira o mês de cada nota (ex.: novembro/2026).</small></div>
+        <div class="linha-campos">
+          <div class="campo campo--terco"><label for="recf-valor">Valor do serviço</label>
+            <div class="campo__moeda"><span>R$</span><input id="recf-valor" inputmode="decimal" placeholder="0,00"></div></div>
+          <div class="campo campo--terco"><label for="recf-primeira">Próxima nota em</label><input id="recf-primeira" type="date">
+            <small class="dica" id="recf-primeira-dica">Repete todo mês neste dia (até o dia 28).</small></div>
+          <div class="campo campo--terco"><label for="recf-fim">Última nota em</label><input id="recf-fim" type="month">
+            <small class="dica">Vazio = sem data para acabar.</small></div>
+        </div>
+        <div class="linha-campos">
+          <div class="campo campo--meio"><label for="recf-competencia">Mês de competência</label>
+            <select id="recf-competencia"><option value="ATUAL">O mês em que a nota sai</option><option value="ANTERIOR">O mês anterior (serviço já prestado)</option></select></div>
+        </div>
+        <label class="interruptor">
+          <input type="checkbox" id="recf-iss-retido">
+          <span>ISS retido pelo tomador <small class="apagado">o tomador recolhe o ISS e paga o valor líquido</small></span>
+        </label>
+        <fieldset class="modos" id="recf-modo">
+          <legend>Quando chegar o dia</legend>
+          <label class="modo"><input type="radio" name="recf-modo" value="CONFIRMAR" checked>
+            <span><b>Me avisar para confirmar</b><small>A nota fica pronta e só sai quando você clicar em "Emitir". Recomendado se o valor pode mudar.</small></span></label>
+          <label class="modo"><input type="radio" name="recf-modo" value="AUTOMATICA">
+            <span><b>Emitir sozinha</b><small>No dia, a nota vai para a prefeitura sem ninguém clicar. Se der problema, você é avisado.</small></span></label>
+        </fieldset>
+        <p id="recorrencia-erro" class="erro" role="alert" hidden></p>
+      </div>
+      <div class="janela__rodape">
+        <button type="button" class="btn btn--secundario" data-fechar>Cancelar</button>
+        <button type="submit" class="btn btn--primario" id="botao-salvar-recorrencia"><i class="icone icone--p">save</i> Salvar recorrência</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="portal.js"></script>

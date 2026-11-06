@@ -17,6 +17,7 @@ use Xande\NfeIntegracao\Nfse\Servico\PortalAcesso;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmissao;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmpresa;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
+use Xande\NfeIntegracao\Nfse\Servico\PortalRecorrencias;
 use Xande\NfeIntegracao\Nfse\Servico\PortalServicos;
 use Xande\NfeIntegracao\Nfse\Servico\PortalTomadores;
 use Xande\NfeIntegracao\Nfse\Servico\PortalUsuarios;
@@ -255,4 +256,63 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     Apoio::igual('DESATIVADO', $linhaCarlos['situacao'] ?? null, 'usuarios: desativado aparece na lista');
     $outra = ['id' => $usuarioId, 'cnpj' => '41986662000160', 'administrador' => true];
     Apoio::igual('USUARIO_NAO_ENCONTRADO', $usuariosPortal->executar($outra, ['acao' => 'ativar', 'id' => $carlosId], 'ip')['codigo'] ?? null, 'usuarios: administrador de outra empresa nao mexe');
+
+    // ---- Tela "Recorrencias" (datas fixas no passado: a competencia nunca fica no futuro) ----
+    Apoio::igual(['2026-02-28', '2026-12-05'], [PortalRecorrencias::mesSeguinte('2026-01-28', 28), PortalRecorrencias::proximoDia('2026-11-06', 5)],
+        'recorrencia: proxima data no mes seguinte e a partir de hoje');
+    $rec = static fn(string $hoje) => new PortalRecorrencias($pdo, $cfgGeral, $hoje);
+    $eu = ['id' => $usuarioId, 'cnpj' => $cnpj, 'administrador' => true];
+    $base = [
+        'acao' => 'salvar', 'nome' => 'Mensalidade Cliente Exemplo',
+        'tomador' => ['cpf_cnpj' => '11.222.333/0001-81', 'nome' => 'Cliente Exemplo Ltda', 'email' => 'fin@cliente.com'],
+        'servico_id' => $servicoId, 'descricao' => 'Consultoria mensal referente a {mes}',
+        'valores' => ['valor_servicos' => 800], 'primeira_em' => '2026-01-15', 'competencia' => 'ATUAL', 'modo' => 'AUTOMATICA',
+    ];
+    $r = $rec('2026-01-10')->salvar($eu, ['nome' => 'X', 'primeira_em' => '2026-01-30', 'servico_id' => 999999, 'modo' => 'TALVEZ'] + $base);
+    Apoio::igual(['nome', 'servico_id', 'modo', 'primeira_em'], array_column($r['erros'] ?? [], 'campo'), 'recorrencia: nome, servico, modo e dia acima de 28 explicados');
+    $r = $rec('2026-01-10')->salvar($eu, ['primeira_em' => '2026-01-05'] + $base);
+    Apoio::igual('primeira_em', $r['erros'][0]['campo'] ?? null, 'recorrencia: data no passado recusada');
+    $r = $rec('2026-01-10')->salvar($eu, ['valores' => ['valor_servicos' => 0]] + $base);
+    Apoio::igual('valores.valor_servicos', $r['erros'][0]['campo'] ?? null, 'recorrencia: valor zero recusado na hora (mesmas regras do Emitir)');
+    $r = $rec('2026-01-10')->salvar($eu, $base);
+    Apoio::verificar($r['ok'], 'recorrencia: automatica criada');
+    $autoId = $r['id'];
+    Apoio::igual('AGENDADA', $rec('2026-01-10')->listar($cnpj)[0]['situacao'] ?? null, 'recorrencia: antes do dia fica agendada');
+    Apoio::igual([], $rec('2026-01-10')->listar('99999999000191'), 'recorrencia: outra empresa nao ve');
+
+    // Empresa ainda bloqueada no painel: a tentativa falha, guarda o motivo e so tenta de novo amanha.
+    Apoio::igual(['emitidas' => 0, 'falhas' => 1], $rec('2026-01-15')->executarAutomaticas(), 'recorrencia: no dia tenta emitir sozinha');
+    $linha = $rec('2026-01-15')->listar($cnpj)[0];
+    Apoio::verificar($linha['situacao'] === 'PENDENTE' && str_contains((string)$linha['ultima_mensagem'], 'bloqueada'), 'recorrencia: erro fica pendente com o motivo para o cliente');
+    Apoio::igual(['emitidas' => 0, 'falhas' => 0], $rec('2026-01-15')->executarAutomaticas(), 'recorrencia: so uma tentativa por dia');
+    Apoio::igual(1, $rec('2026-01-15')->pendentes($cnpj), 'recorrencia: conta como pendente (aviso na tela inicial)');
+
+    (new AdministracaoClientes($pdo, $cfgGeral))->salvar(['cnpj' => $cnpj, 'emissao_liberada' => true], 'ip');
+    Apoio::igual(['emitidas' => 1, 'falhas' => 0], $rec('2026-01-16')->executarAutomaticas(), 'recorrencia: empresa liberada, sai no dia seguinte');
+    $linha = $rec('2026-01-16')->listar($cnpj)[0];
+    Apoio::igual(['2026-02-15', 1, null, 'AGENDADA'], [$linha['proxima_em'], $linha['emitidas'], $linha['ultima_mensagem'], $linha['situacao']], 'recorrencia: segue para o mes seguinte');
+    $doc = (new DocumentoRepositorio($pdo))->buscar((string)$linha['ultimo_documento_id']);
+    Apoio::igual(["PORTAL-rec-{$autoId}-202601", '11222333000181'], [$doc['referencia'], $doc['payload']['tomador']['cpf_cnpj']], 'recorrencia: nota com referencia do mes (nunca sai duas vezes)');
+    Apoio::verificar(str_contains($doc['payload']['servico']['descricao'], 'janeiro/2026'), 'recorrencia: {mes} vira o mes da competencia');
+
+    // Confirmar: espera o clique, pular e fim.
+    $r = $rec('2026-01-10')->salvar($eu, ['nome' => 'Suporte trimestral', 'modo' => 'CONFIRMAR', 'competencia' => 'ANTERIOR', 'primeira_em' => '2026-02-10', 'fim' => '2026-03'] + $base);
+    $confId = $r['id'];
+    Apoio::igual(0, $rec('2026-02-10')->executarAutomaticas()['emitidas'], 'recorrencia: "confirmar" nao sai sozinha');
+    Apoio::igual('NAO_PENDENTE', $rec('2026-02-09')->emitirMes($eu, $confId)['codigo'] ?? null, 'recorrencia: emitir antes do dia recusado');
+    $r = $rec('2026-02-10')->emitirMes($eu, $confId);
+    Apoio::verificar($r['ok'] && str_contains($r['mensagem'], 'janeiro/2026'), 'recorrencia: clique emite com a competencia do mes anterior');
+    Apoio::igual('NAO_PENDENTE', $rec('2026-02-10')->emitirMes($eu, $confId)['codigo'] ?? null, 'recorrencia: segundo clique nao emite de novo');
+    Apoio::verificar($rec('2026-03-10')->pular($eu, $confId)['ok'], 'recorrencia: pula o mes');
+    $linha = array_values(array_filter($rec('2026-03-11')->listar($cnpj), static fn($x) => $x['id'] === $confId))[0];
+    Apoio::igual(['ENCERRADA', 1], [$linha['situacao'], $linha['emitidas']], 'recorrencia: passou do ultimo mes, encerra sozinha');
+    Apoio::igual('RECORRENCIA_ENCERRADA', $rec('2026-03-11')->retomar($eu, $confId)['codigo'] ?? null, 'recorrencia: encerrada nao retoma');
+
+    Apoio::verificar($rec('2026-01-20')->pausar($eu, $autoId)['ok'], 'recorrencia: pausa');
+    Apoio::igual(['emitidas' => 0, 'falhas' => 0], $rec('2026-02-15')->executarAutomaticas(), 'recorrencia: pausada nao emite');
+    Apoio::verificar(str_contains($rec('2026-04-20')->retomar($eu, $autoId)['mensagem'], '15/05/2026'), 'recorrencia: retoma no proximo dia marcado (meses pausados nao viram nota atrasada)');
+    $rec('2026-04-21')->pausar($eu, $autoId);
+    Apoio::verificar(str_contains($rec('2026-04-10')->retomar($eu, $autoId)['mensagem'], '15/05/2026'), 'recorrencia: retomar mantem a data marcada que ainda esta a frente');
+    Apoio::igual('RECORRENCIA_NAO_ENCONTRADA', $rec('2026-04-20')->remover(['cnpj' => '99999999000191'], $autoId)['codigo'] ?? null, 'recorrencia: outra empresa nao apaga');
+    Apoio::verificar($rec('2026-04-20')->remover($eu, $autoId)['ok'], 'recorrencia: apagada');
 }
