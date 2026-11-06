@@ -102,7 +102,7 @@
     });
     if (!achou) { window.location.hash = PAGINA_INICIAL; return; }
 
-    document.querySelectorAll('.menu__item, .menu__cta').forEach(function (link) {
+    document.querySelectorAll('.menu__item').forEach(function (link) {
       if (link.getAttribute('href') === '#' + nome) { link.setAttribute('aria-current', 'page'); }
       else { link.removeAttribute('aria-current'); }
     });
