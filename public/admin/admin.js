@@ -315,7 +315,7 @@ function recolhivel(titulo, resumo, aberto, ...conteudo) {
 }
 
 function formularioEmpresa(c, novo) {
-  const simples = selecao('Simples Nacional', 'opcao_simples_nacional', c.opcao_simples_nacional, [[1, 'Não optante'], [2, 'MEI'], [3, 'ME/EPP (Simples)']]);
+  const simples = selecao('Simples Nacional', 'opcao_simples_nacional', c.opcao_simples_nacional, [[1, '1 - Não optante'], [2, '2 - MEI'], [3, '3 - ME/EPP (Simples)']]);
   const regimeApuracao = selecao('Regime de apuração (ME/EPP)', 'regime_apuracao_simples', c.regime_apuracao_simples, [['', 'Escolha'],
     [1, '1 - Tudo pelo Simples (DAS), inclusive o ISS'],
     [2, '2 - Federais pelo Simples, ISS pela prefeitura'],
@@ -323,10 +323,12 @@ function formularioEmpresa(c, novo) {
   regimeApuracao.dataset.mostrarSe = 'mepp';
   regimeApuracao.append(el('span', { class: 'campo-ajuda' }, 'Como os impostos são pagos. O mais comum é o 1. Confirme com o contador.'));
   const regimeNacional = selecao('Regime especial (NFS-e Nacional)', 'regime_especial_tributacao', c.regime_especial_tributacao,
-    [0, 1, 2, 3, 4, 5, 6].map((v) => [v, v === 0 ? 'Nenhum' : String(v)]));
+    [[0, '0 - Nenhum'], [1, '1 - Ato cooperado (cooperativa)'], [2, '2 - Estimativa'], [3, '3 - Microempresa municipal'],
+      [4, '4 - Notário ou registrador'], [5, '5 - Profissional autônomo'], [6, '6 - Sociedade de profissionais']]);
   regimeNacional.dataset.tipos = 'NACIONAL';
   const regimeSalvador = selecao('Regime especial (Salvador)', 'regime_especial_abrasf', c.regime_especial_abrasf,
-    [['', 'Nenhum'], 1, 2, 3, 4, 5, 6].map((v) => (Array.isArray(v) ? v : [v, String(v)])));
+    [['', 'Nenhum'], [1, '1 - Microempresa municipal'], [2, '2 - Estimativa'], [3, '3 - Sociedade de profissionais'],
+      [4, '4 - Cooperativa'], [5, '5 - MEI do Simples'], [6, '6 - ME/EPP do Simples']]);
   regimeSalvador.dataset.tipos = 'SALVADOR';
 
   const form = el('form', { class: 'form-empresa', novalidate: false },
