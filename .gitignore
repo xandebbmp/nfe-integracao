@@ -34,3 +34,6 @@ storage/certs/*
 
 # Configuração local de banco fiscal
 config/database.local.php
+
+# Pasta local de certificados na raiz (NUNCA versionar)
+certificados/

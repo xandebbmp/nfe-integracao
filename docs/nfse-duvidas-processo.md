@@ -166,9 +166,9 @@ O `EventSource` do navegador não envia cabeçalhos, então o token do monitor v
 - **Adotado:** espelho simples gerado pela API, com aviso de "documento auxiliar".
 - **Decidir:** o espelho atende os clientes, ou preferem **link** para a nota no portal da prefeitura? Para o link, informe o formato em `salvador.url_visualizacao` (não encontrei documentação oficial atual do endereço).
 
-### C5 🟡 DANFSe (Nacional)
-- **Adotado:** baixamos o PDF do ADN (`/danfse/{chave}`). Se o ADN estiver fora, a rota de PDF responde 502.
-- **Decidir:** gerar um DANFSe próprio (layout oficial) como contingência?
+### C5 ✅ DANFSe (Nacional)
+- **Adotado (06/11/2026):** a API do ADN que gerava o PDF foi desligada em 03/08/2026 (NT 008/2026). A API gera o DANFSe v2.0 a partir do XML autorizado (`src/Nfse/Pdf/DanfsePdf.php`), com QR Code de consulta, "SEM VALIDADE JURÍDICA" em homologação e marca d'água de cancelada/substituída.
+- **Limitação:** o XML só traz o nome dos municípios de emissão, prestação e incidência; para os outros (ex.: do tomador) o PDF mostra o código IBGE. A fonte é Arial (a NT pede Microsoft Sans Serif nos conteúdos).
 
 ### C6 🟡 Armazenamento e retenção de XML
 - **Adotado:** XML enviado e autorizado ficam no **PostgreSQL** (sem disco compartilhado entre API e worker).

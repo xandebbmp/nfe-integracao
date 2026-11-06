@@ -231,7 +231,7 @@ assim o consumidor tem um contrato só. O que cada padrão aceita está em
 | 101103 Solicitação de análise fiscal p/ cancelamento (fora do prazo) | ✅ | ❌ |
 | 105102 Cancelamento por substituição | ✅ automático ao emitir com `substituicao` | ❌ |
 | Consulta de situação | ✅ (NFS-e + eventos) | ✅ (lote / RPS) |
-| PDF | DANFSe oficial (ADN) | Espelho gerado pela API + link do portal |
+| PDF | DANFSe v2.0 gerado pela API (NT 008/2026) | Espelho gerado pela API + link do portal |
 | Confirmação/rejeição (202201, 202205...) | previsto, não implementado | ❌ |
 | Eventos do fisco (105104, 305101...) | detectados na consulta | — |
 

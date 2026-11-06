@@ -5,7 +5,6 @@ namespace Xande\NfeIntegracao\Nfse\Nacional;
 
 use DateTimeImmutable;
 use DOMDocument;
-use RuntimeException;
 use Xande\NfeIntegracao\Nfse\Contrato\ProvedorNfse;
 use Xande\NfeIntegracao\Nfse\Contrato\RetornoProvedor;
 use Xande\NfeIntegracao\Nfse\Dominio\Padrao;
@@ -15,6 +14,7 @@ use Xande\NfeIntegracao\Nfse\Infra\AssinadorXml;
 use Xande\NfeIntegracao\Nfse\Infra\RespostaHttp;
 use Xande\NfeIntegracao\Nfse\Infra\ValidadorXsd;
 use Xande\NfeIntegracao\Nfse\Infra\Xml;
+use Xande\NfeIntegracao\Nfse\Pdf\DanfsePdf;
 
 /**
  * NFS-e Padrao Nacional (Sefin Nacional).
@@ -193,19 +193,13 @@ final class ProvedorNacional implements ProvedorNfse
     // PDF
     // =================================================================
 
+    /**
+     * DANFSe v2.0 gerado a partir do XML autorizado (NT 008/2026).
+     * A API do ADN que entregava o PDF foi desligada em 03/08/2026.
+     */
     public function gerarPdf(array $documento): string
     {
-        $chave = (string)($documento['chave_acesso'] ?? '');
-        if ($chave === '') {
-            throw new RuntimeException('Documento sem chave de acesso: PDF disponivel apenas para NFS-e autorizada.');
-        }
-
-        $resposta = $this->cliente->baixarDanfse($chave);
-        if (!$resposta->sucesso() || !str_starts_with($resposta->corpo, '%PDF')) {
-            throw new RuntimeException('Nao foi possivel obter o DANFSe no ADN: ' . self::descreverFalha($resposta));
-        }
-
-        return $resposta->corpo;
+        return (new DanfsePdf())->gerar((string)($documento['xml_autorizado'] ?? ''), (string)($documento['status'] ?? ''));
     }
 
     // =================================================================

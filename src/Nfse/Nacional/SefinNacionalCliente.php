@@ -17,17 +17,21 @@ use Xande\NfeIntegracao\Nfse\Infra\TransporteHttp;
  *   GET  {base}/nfse/{chave}                  consultar NFS-e pela chave
  *   GET  {base}/dps/{idDps}                   descobrir a chave a partir da DPS
  *   POST {base}/nfse/{chave}/eventos          registrar evento
- *   GET  {base}/nfse/{chave}/eventos          listar eventos da NFS-e
- *   GET  {url_danfse}/danfse/{chave}          PDF oficial (DANFSe)
+ *   GET  {base}/nfse/{chave}/eventos/{tipo}/{seq}  consultar um evento da NFS-e
+ *
+ * O PDF (DANFSe) nao vem mais do fisco: a API do ADN foi desligada em
+ * 03/08/2026 (NT 008/2026). Ele e gerado por Pdf\DanfsePdf.
  */
 final class SefinNacionalCliente
 {
     private const JSON = ['Content-Type' => 'application/json', 'Accept' => 'application/json'];
 
+    /** 101101 cancelamento, 105102 cancelamento por substituicao, 105104 cancelamento deferido, 305101 cancelamento de oficio. */
+    private const EVENTOS_QUE_MUDAM_STATUS = ['101101', '105102', '105104', '305101'];
+
     public function __construct(
         private TransporteHttp $http,
-        private string $urlSefin,
-        private string $urlDanfse
+        private string $urlSefin
     ) {
     }
 
@@ -58,19 +62,31 @@ final class SefinNacionalCliente
         );
     }
 
+    /**
+     * O Sefin nao lista todos os eventos de uma vez: a consulta e por tipo e
+     * sequencia (GET /nfse/{chave}/eventos/{tipo}/{seq}). Consultamos os tipos
+     * que mudam o status da nota e juntamos tudo em uma resposta so,
+     * no formato {"eventos": [...]}. HTTP 404 = nao ha evento daquele tipo.
+     */
     public function listarEventos(string $chave): RespostaHttp
     {
-        return $this->http->enviar('GET', $this->urlSefin . '/nfse/' . rawurlencode($chave) . '/eventos', self::JSON);
+        $eventos = [];
+        foreach (self::EVENTOS_QUE_MUDAM_STATUS as $tipo) {
+            $url = $this->urlSefin . '/nfse/' . rawurlencode($chave) . '/eventos/' . $tipo . '/1';
+            $resposta = $this->http->enviar('GET', $url, self::JSON);
+            if ($resposta->status === 404) {
+                continue;
+            }
+            if (!$resposta->sucesso()) {
+                return $resposta; // falha: quem chamou decide (tenta de novo depois)
+            }
+            foreach ((array)(($resposta->json() ?? [])['eventos'] ?? []) as $evento) {
+                $eventos[] = $evento;
+            }
+        }
+        return new RespostaHttp(200, (string)json_encode(['eventos' => $eventos]), null, 'application/json');
     }
 
-    public function baixarDanfse(string $chave): RespostaHttp
-    {
-        return $this->http->enviar(
-            'GET',
-            $this->urlDanfse . '/danfse/' . rawurlencode($chave),
-            ['Accept' => 'application/pdf']
-        );
-    }
 
     // ---------------------------------------------------------------
     // Compactacao exigida pela API: XML -> gzip -> base64 (e o inverso)

@@ -279,7 +279,6 @@ final class Diagnostico
         $tpAmb = (int)$this->cfg['tpAmb'];
         $destinos = array_filter([
             'NFS-e Nacional (Sefin)' => $this->cfg['nacional']['url_sefin'][$tpAmb] ?? '',
-            'NFS-e Nacional (DANFSe)' => $this->cfg['nacional']['url_danfse'][$tpAmb] ?? '',
             'NFS-e Salvador' => $this->cfg['salvador']['url_base'][$tpAmb] ?? '',
         ]);
         // NF-e: SEFAZ de cada UF das empresas, pela lista oficial da sped-nfe.
