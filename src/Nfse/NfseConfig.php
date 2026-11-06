@@ -84,6 +84,8 @@ final class NfseConfig
         $cfg['admin_token'] = (string)($nfse['admin_token'] ?? '');
         $cfg['chave_certificados'] = (string)($nfse['chave_certificados'] ?? '') ?: (string)getenv('NFSE_CHAVE_CERTIFICADOS');
 
+        $cfg['email'] = self::montarEmail((array)($nfse['email'] ?? []));
+
         // NF-e (modelo 55): parametros tecnicos vem do config/nfe.php.
         $cfg['nfe'] = array_replace([
             'serie' => 1,
@@ -103,6 +105,37 @@ final class NfseConfig
         $cfg['consumidores'] = $consumidores;
 
         return $cfg;
+    }
+
+    /**
+     * Bloco 'email' (SMTP). Campo vazio no arquivo usa a variavel de ambiente
+     * (SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, SMTP_FROM,
+     * PORTAL_URL), para quem prefere configurar pelo ambiente do servidor.
+     */
+    private static function montarEmail(array $email): array
+    {
+        $ambiente = [
+            'host' => 'SMTP_HOST', 'porta' => 'SMTP_PORT', 'seguranca' => 'SMTP_SECURE', 'usuario' => 'SMTP_USER',
+            'senha' => 'SMTP_PASSWORD', 'remetente' => 'SMTP_FROM', 'url_portal' => 'PORTAL_URL',
+        ];
+        foreach ($ambiente as $chave => $variavel) {
+            $valor = getenv($variavel);
+            if (trim((string)($email[$chave] ?? '')) === '' && $valor !== false && $valor !== '') {
+                $email[$chave] = $chave === 'porta' ? (int)$valor : $valor;
+            }
+        }
+        $email += [
+            'host' => '', 'porta' => 465, 'seguranca' => 'ssl', 'usuario' => '', 'senha' => '',
+            'remetente' => '', 'nome_remetente' => 'Gestão Fiscal', 'url_portal' => '', 'timeout_segundos' => 20,
+        ];
+        // SMTP_SECURE costuma vir como true/false: true = ssl.
+        $email['seguranca'] = match (strtolower((string)$email['seguranca'])) {
+            'true', '1', 'ssl', 'smtps' => 'ssl',
+            'tls', 'starttls' => 'tls',
+            'false', '0', '', 'nenhuma' => (int)$email['porta'] === 587 ? 'tls' : '',
+            default => 'ssl',
+        };
+        return $email;
     }
 
     /**

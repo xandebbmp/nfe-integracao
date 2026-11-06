@@ -12,6 +12,7 @@
      sistema.php      tela Sistema: worker ligado? fila; pausar/retomar/reiniciar
      banco.php        tela Sistema: scripts do banco pendentes; botao Atualizar banco
      diagnostico.php  tela Sistema: botao Diagnostico (confere tudo, nao altera nada)
+     email.php        tela Sistema: bloco E-mail (situacao e e-mail de teste)
      configuracoes.php tela Sistema: configuracoes editaveis (portal, envio, API)
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
@@ -723,6 +724,7 @@ function abrirSistema() {
     'Confere servidor, configuração, banco, worker, certificados das empresas e acesso à internet da prefeitura. Não altera nada e não envia nota.'));
   const diagBotao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Rodar diagnóstico');
   const configArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const emailArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   const acoesArea = el('div', { class: 'acoes' });
   const retorno = el('div', {});
 
@@ -860,6 +862,8 @@ function abrirSistema() {
           entrada = el('select', { id }, ...Object.entries(c.opcoes).map(([v, nome]) => el('option', { value: v, selected: String(c.valor) === v }, nome)));
         } else if (c.tipo === 'inteiro') {
           entrada = el('input', { id, type: 'number', min: c.min, max: c.max, step: 1, value: c.valor });
+        } else if (c.tipo === 'texto' || c.tipo === 'email') {
+          entrada = el('input', { id, type: c.tipo === 'email' ? 'email' : 'text', value: c.valor ?? '', maxlength: 200 });
         } else {
           entrada = el('input', { id, type: 'url', value: c.valor ?? '', placeholder: 'https://...' });
         }
@@ -885,6 +889,7 @@ function abrirSistema() {
         const r = await api('configuracoes.php', { metodo: 'POST', corpo: { valores } });
         desenharConfiguracoes(r.configuracoes, r.mensagem);
         recarregar();
+        carregarEmail();
       } catch (e) {
         for (const d of e.detalhes || []) if (erros[d.campo]) erros[d.campo].textContent = d.mensagem;
         retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
@@ -950,11 +955,61 @@ function abrirSistema() {
       bancoRetorno.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
       desenharBanco(r.banco);
       carregarConfiguracoes();
+      carregarEmail();
     } catch (e) {
       bancoRetorno.replaceChildren(el('p', { class: 'erro' }, e.message));
       carregarBanco();
     }
     recarregar();
+  }
+
+  // ---- E-mail (Esqueci a senha do portal) ----
+  const NOMES_EMAIL = { PENDENTE: 'na fila', ENVIADO: 'enviado', ERRO: 'falhou' };
+  function desenharEmail(m) {
+    if (!m.instalado) {
+      emailArea.replaceChildren(el('p', { class: 'aviso' }, 'Falta atualizar o banco (script 0012) para ligar o "Esqueci a senha".'));
+      return;
+    }
+    const para = el('input', { type: 'email', value: m.remetente, placeholder: 'voce@empresa.com.br', 'aria-label': 'E-mail para receber o teste' });
+    const resultado = el('div', {});
+    const testar = el('button', { class: 'botao', type: 'button', disabled: !m.configurado }, 'Enviar e-mail de teste');
+    testar.addEventListener('click', async () => {
+      testar.disabled = true;
+      resultado.replaceChildren(el('p', { class: 'suave' }, 'Enviando... (até 20 s)'));
+      try {
+        const r = await api('email.php', { metodo: 'POST', corpo: { para: para.value } });
+        resultado.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      } catch (e) {
+        resultado.replaceChildren(el('p', { class: 'erro' }, e.message));
+      }
+      testar.disabled = false;
+    });
+    const situacao = !m.configurado
+      ? ['PAUSADO', 'E-mail não configurado', `Falta: ${m.faltam.join(', ')}. Preencha em Configurações abaixo; a senha vai no arquivo config/nfse.local.php.`]
+      : (!m.esqueci_ligado
+        ? ['PAUSADO', 'E-mail pronto, mas o "Esqueci a senha" está desligado', 'Preencha o "Endereço do portal" em Configurações (vai no link do e-mail).']
+        : ['LIGADO', '"Esqueci a senha" ligado', `Os e-mails saem por ${m.remetente}. Quem envia é o worker: ele precisa estar ligado.`]);
+    emailArea.replaceChildren(...[
+      el('div', { class: 'sistema-estado' },
+        el('span', { class: `ponto-sistema ponto-sistema--${situacao[0]}` }), el('strong', {}, situacao[1]), el('span', { class: 'suave' }, situacao[2])),
+      el('div', { class: 'acoes' }, para, testar),
+      resultado,
+      m.ultimos.length ? el('details', {}, el('summary', { class: 'suave' }, 'Últimos e-mails'),
+        el('table', { class: 'mini' }, el('tbody', {}, ...m.ultimos.map((x) => el('tr', {},
+          el('td', {}, x.para),
+          el('td', { class: 'suave' }, x.assunto),
+          el('td', {}, x.status === 'ENVIADO' ? el('span', { class: 'ok-texto' }, NOMES_EMAIL[x.status])
+            : el('span', { class: x.status === 'ERRO' ? 'erro' : 'aviso', title: x.ultimo_erro || '' }, NOMES_EMAIL[x.status] + (x.ultimo_erro ? `: ${x.ultimo_erro}` : ''))),
+          el('td', { class: 'suave' }, dataHora(x.enviado_em || x.criado_em))))))) : null,
+    ].filter(Boolean));
+  }
+
+  async function carregarEmail() {
+    try {
+      desenharEmail(await api('email.php'));
+    } catch (e) {
+      emailArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
   }
 
   abrirModal('Sistema', 'Worker (o programa que envia as notas), banco de dados, diagnóstico e configurações', [
@@ -963,12 +1018,14 @@ function abrirSistema() {
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
+    el('section', { class: 'secao' }, el('h3', {}, 'E-mail'), emailArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
   ]);
   recarregar();
   carregarBanco();
   carregarConfiguracoes();
+  carregarEmail();
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }

@@ -22,6 +22,10 @@ declare(strict_types=1);
  *
  * Notas recorrentes do portal (script 0011): a cada 5 minutos o worker emite
  * as AUTOMATICAS que chegaram no dia. Pausado pelo painel, nao emite.
+ *
+ * E-mails (script 0012, "Esqueci a senha" do portal): a cada volta o worker
+ * envia os e-mails da fila. Continua enviando mesmo com "Pausar envios"
+ * (a pausa e para as notas, nao para o login dos clientes).
  */
 
 use Xande\NfeIntegracao\Database\ConnectionFactory;
@@ -30,6 +34,8 @@ use Xande\NfeIntegracao\Nfse\ProvedorFactory;
 use Xande\NfeIntegracao\Nfse\Repositorio\FilaRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\EntregadorWebhook;
+use Xande\NfeIntegracao\Nfse\Servico\EnvioEmail;
+use Xande\NfeIntegracao\Nfse\Servico\FilaEmails;
 use Xande\NfeIntegracao\Nfse\Servico\PortalRecorrencias;
 use Xande\NfeIntegracao\Nfse\Servico\ProcessadorJobs;
 
@@ -140,6 +146,17 @@ while ($continuar) {
         registrar('Reinicio pedido pelo painel: saindo (o systemd/pm2 liga de novo).');
         break;
     }
+    // E-mails da fila (link de "Esqueci a senha"). A config vem de $cfg, que
+    // e relida a cada minuto: mudou no painel, vale sem reiniciar.
+    try {
+        $r = (new FilaEmails($pdo, new EnvioEmail($cfg)))->processar();
+        if ($r['enviados'] + $r['falhas'] > 0) {
+            registrar("E-mails: {$r['enviados']} enviado(s), {$r['falhas']} com falha (tenta de novo).");
+        }
+    } catch (Throwable $erro) {
+        registrar('E-mails: ' . $erro->getMessage());
+    }
+
     if ($ordens['pausado']) {
         $sinalDeVida('PAUSADO');
         if ($umaVez) {

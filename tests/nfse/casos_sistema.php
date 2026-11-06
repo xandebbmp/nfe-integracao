@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
+use Xande\NfeIntegracao\Nfse\Servico\EnvioEmail;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\AtualizacaoBanco;
 use Xande\NfeIntegracao\Nfse\Servico\ConfiguracoesPainel;
@@ -37,6 +38,26 @@ function testesSistemaUnidade(array $cfg): void
     Apoio::igual(9, $aplicado['portal']['tentativas_login'], 'ajuste valido aplicado na config');
     Apoio::igual($cfg['tpAmb'], $aplicado['tpAmb'], 'ambiente nunca muda pelo painel');
     Apoio::igual($cfg['fila']['max_tentativas'], $aplicado['fila']['max_tentativas'], 'valor invalido salvo no banco e ignorado');
+
+    echo "\n[12c] E-mail (SMTP) do Esqueci a senha\n";
+    Apoio::verificar(AjustesPainel::validar('email.remetente', 'Nome <a@b.com>')[1] !== null, 'remetente com nome e <> recusado');
+    Apoio::igual(['a@b.com.br', null], AjustesPainel::validar('email.remetente', ' a@b.com.br '), 'remetente valido aceito');
+    Apoio::verificar(AjustesPainel::validar('email.host', "mail\nx")[1] !== null, 'texto com quebra de linha recusado');
+    Apoio::verificar(AjustesPainel::validar('email.senha', 'x')[1] !== null, 'senha do e-mail nao muda pelo painel');
+    putenv('SMTP_HOST=mail.exemplo.com.br');
+    putenv('SMTP_PORT=587');
+    putenv('SMTP_SECURE=false');
+    putenv('SMTP_PASSWORD=segredo');
+    $comAmbiente = NfseConfig::montar(['tpAmb' => 2, 'cnpj' => '41986662000160', 'razao' => 'EMPRESA TESTE LTDA', 'siglaUF' => 'BA', 'ie' => '31638351'], ['email' => ['usuario' => 'contato@exemplo.com.br', 'remetente' => 'contato@exemplo.com.br']]);
+    putenv('SMTP_HOST');
+    putenv('SMTP_PORT');
+    putenv('SMTP_SECURE');
+    putenv('SMTP_PASSWORD');
+    Apoio::igual(['mail.exemplo.com.br', 587, 'tls', 'segredo'], [$comAmbiente['email']['host'], $comAmbiente['email']['porta'], $comAmbiente['email']['seguranca'], $comAmbiente['email']['senha']],
+        'variaveis SMTP_* do servidor preenchem o que falta (587 sem SSL = STARTTLS)');
+    $envio = new EnvioEmail($cfg);
+    Apoio::igual(['servidor (host)', 'usuário', 'senha', 'remetente'], $envio->pendencias(), 'sem config, diz o que falta');
+    Apoio::verificar((new EnvioEmail($comAmbiente))->configurado(), 'com tudo preenchido, pronto para enviar');
 }
 
 function testesSistemaIntegracao(PDO $pdo, array $cfg): void

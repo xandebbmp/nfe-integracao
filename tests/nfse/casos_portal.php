@@ -17,6 +17,9 @@ use Xande\NfeIntegracao\Nfse\Servico\PortalAcesso;
 use Xande\NfeIntegracao\Nfse\Servico\PortalCancelamento;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmissao;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmpresa;
+use Xande\NfeIntegracao\Nfse\Servico\PortalEsqueciSenha;
+use Xande\NfeIntegracao\Nfse\Servico\EnvioEmail;
+use Xande\NfeIntegracao\Nfse\Servico\FilaEmails;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
 use Xande\NfeIntegracao\Nfse\Servico\PortalRecorrencias;
 use Xande\NfeIntegracao\Nfse\Servico\PortalServicos;
@@ -351,4 +354,51 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     $sit = $cancelamento->situacao($documentos->buscar($idSsa));
     Apoio::igual([true, 'CANCELADO', 'REGISTRADO', '2026/123', false], [$r['ok'], $documentos->buscar($idSsa)['status'], $sit['evento']['status'], $sit['evento']['numero_processo'], $sit['pode']],
         'cancelar: protocolo registrado, nota cancelada na hora');
+
+    // ---- Esqueci a senha (nenhum e-mail sai: o envio e trocado por uma funcao) ----
+    $semUrl = new PortalEsqueciSenha($pdo, $cfgGeral);
+    Apoio::igual(false, $semUrl->disponivel(), 'esqueci: sem endereco do portal fica desligado');
+    Apoio::igual('ESQUECI_INDISPONIVEL', $semUrl->pedir('mariana@exemplo.com.br', 'ip')['codigo'] ?? null, 'esqueci: desligado avisa para pedir ao administrador');
+    $cfgEmail = $cfgGeral;
+    $cfgEmail['email']['url_portal'] = 'https://fiscal.exemplo.com.br/portal/';
+    Apoio::igual(false, (new PortalEsqueciSenha($pdo, $cfgEmail))->disponivel(), 'esqueci: sem SMTP completo fica desligado (nao promete e-mail que nao sai)');
+    $cfgEmail['email'] = ['host' => 'smtp.teste', 'usuario' => 'u@teste.com', 'senha' => 'x', 'remetente' => 'u@teste.com'] + $cfgEmail['email'];
+    $esqueci = new PortalEsqueciSenha($pdo, $cfgEmail);
+    $emailUsuario = (string)$pdo->query("SELECT email FROM portal_usuarios WHERE id = {$usuarioId}")->fetchColumn();
+    $r1 = $esqueci->pedir(strtoupper($emailUsuario), '10.0.0.1');
+    $r2 = $esqueci->pedir('ninguem@exemplo.com.br', '10.0.0.1');
+    Apoio::igual([true, $r1['mensagem']], [$r2['ok'], $r2['mensagem']], 'esqueci: mesma resposta para quem existe ou nao');
+    Apoio::igual('EMAIL_INVALIDO', $esqueci->pedir('nao-e-email', 'ip')['codigo'] ?? null, 'esqueci: e-mail invalido explicado');
+    $enviados = [];
+    $falso = new EnvioEmail($cfgEmail, static function (array $m) use (&$enviados): void { $enviados[] = $m; });
+    Apoio::igual(['enviados' => 1, 'falhas' => 0], (new FilaEmails($pdo, $falso))->processar(), 'esqueci: worker envia so o e-mail de quem existe');
+    preg_match('/#redefinir=([a-f0-9]{64})/', $enviados[0]['texto'] ?? '', $achado);
+    $codigo = $achado[1] ?? '';
+    Apoio::verificar($enviados[0]['para'] === $emailUsuario && str_starts_with($achado[0] ?? '', '#redefinir=') && str_contains($enviados[0]['texto'], 'https://fiscal.exemplo.com.br/portal/#redefinir='),
+        'esqueci: link com o endereco da configuracao');
+    Apoio::igual(0, (int)$pdo->query("SELECT COUNT(*) FROM portal_redefinicoes WHERE token_hash = '{$codigo}'")->fetchColumn(), 'esqueci: banco guarda so o sha256 do codigo');
+    Apoio::igual(true, $esqueci->conferir($codigo)['ok'], 'esqueci: link abre');
+    Apoio::igual('LINK_INVALIDO', $esqueci->conferir(str_repeat('a', 64))['codigo'] ?? null, 'esqueci: codigo inventado recusado');
+    Apoio::igual('senha', $esqueci->redefinir($codigo, '123')['erros'][0]['campo'] ?? null, 'esqueci: senha fraca recusada');
+    $acesso = new PortalAcesso($pdo, $cfgGeral);
+    $sessaoAntiga = $acesso->entrar($emailUsuario, 'nova-senha-2026', false, 'ip', 'teste');
+    Apoio::verificar($esqueci->redefinir($codigo, 'senhanova2026')['ok'], 'esqueci: senha nova gravada');
+    Apoio::igual([true, null], [$acesso->entrar($emailUsuario, 'senhanova2026', false, 'ip', 'teste')['ok'], $acesso->sessao($sessaoAntiga['token'] ?? '')],
+        'esqueci: entra com a senha nova e as sessoes antigas saem');
+    Apoio::igual('LINK_INVALIDO', $esqueci->redefinir($codigo, 'outrasenha2026')['codigo'] ?? null, 'esqueci: link so vale uma vez');
+    for ($i = 0; $i < 4; $i++) {
+        $esqueci->pedir($emailUsuario, 'ip');
+    }
+    Apoio::igual(3, (int)$pdo->query("SELECT COUNT(*) FROM portal_redefinicoes WHERE criado_em > now() - interval '1 hour' AND usuario_id = {$usuarioId}")->fetchColumn(),
+        'esqueci: no maximo 3 pedidos por hora');
+    $pdo->exec("UPDATE portal_redefinicoes SET expira_em = now() - interval '1 minute'");
+    $ultimo = (string)$pdo->query("SELECT id FROM sistema_emails ORDER BY id DESC LIMIT 1")->fetchColumn();
+    $falha = new EnvioEmail($cfgEmail, static function (): void { throw new RuntimeException('535 senha incorreta'); });
+    Apoio::igual(['enviados' => 0, 'falhas' => 2], (new FilaEmails($pdo, $falha))->processar(), 'esqueci: SMTP recusou, conta a falha');
+    $linhaEmail = $pdo->query("SELECT status, tentativas, ultimo_erro, enviar_apos > now() AS depois FROM sistema_emails WHERE id = {$ultimo}")->fetch(PDO::FETCH_ASSOC);
+    Apoio::igual(['PENDENTE', 1, '535 senha incorreta', true], [$linhaEmail['status'], (int)$linhaEmail['tentativas'], $linhaEmail['ultimo_erro'], (bool)$linhaEmail['depois']],
+        'esqueci: guarda o erro e tenta de novo mais tarde');
+    $pdo->exec("UPDATE sistema_emails SET tentativas = 4, enviar_apos = now() WHERE id = {$ultimo}");
+    (new FilaEmails($pdo, $falha))->processar();
+    Apoio::igual('ERRO', $pdo->query("SELECT status FROM sistema_emails WHERE id = {$ultimo}")->fetchColumn(), 'esqueci: desiste depois de 5 tentativas');
 }

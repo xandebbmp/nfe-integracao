@@ -175,6 +175,63 @@ final class PortalRepositorio
     }
 
     // =====================================================================
+    // "Esqueci a senha" (script 0012)
+    // =====================================================================
+
+    public function temRedefinicoes(): bool
+    {
+        return (bool)$this->pdo->query("SELECT to_regclass('public.portal_redefinicoes') IS NOT NULL")->fetchColumn();
+    }
+
+    /** Quantos links esta pessoa pediu nos ultimos minutos (limite contra abuso). */
+    public function redefinicoesRecentes(int $usuarioId, int $minutos): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM portal_redefinicoes
+              WHERE usuario_id = :id AND criado_em > CURRENT_TIMESTAMP - make_interval(mins => :minutos)'
+        );
+        $stmt->bindValue(':id', $usuarioId, PDO::PARAM_INT);
+        $stmt->bindValue(':minutos', $minutos, PDO::PARAM_INT);
+        $stmt->execute();
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function criarRedefinicao(int $usuarioId, string $tokenHash, int $minutos, string $ip): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO portal_redefinicoes (usuario_id, token_hash, expira_em, ip)
+             VALUES (:id, :hash, CURRENT_TIMESTAMP + make_interval(mins => :minutos), :ip)'
+        );
+        $stmt->bindValue(':id', $usuarioId, PDO::PARAM_INT);
+        $stmt->bindValue(':hash', $tokenHash);
+        $stmt->bindValue(':minutos', $minutos, PDO::PARAM_INT);
+        $stmt->bindValue(':ip', mb_substr($ip, 0, 45));
+        $stmt->execute();
+    }
+
+    /** Link ainda valido (nao usado, nao vencido, usuario ativo) com os dados da pessoa. */
+    public function redefinicaoValida(string $tokenHash): ?array
+    {
+        return $this->uma(
+            'SELECT r.id AS redefinicao_id, u.id, u.nome, u.email
+               FROM portal_redefinicoes r
+               JOIN portal_usuarios u ON u.id = r.usuario_id
+              WHERE r.token_hash = :hash AND r.usado_em IS NULL
+                AND r.expira_em > CURRENT_TIMESTAMP AND u.ativo',
+            [':hash' => $tokenHash]
+        );
+    }
+
+    /** Senha trocada: este link e todos os outros da pessoa param de valer. */
+    public function encerrarRedefinicoes(int $usuarioId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE portal_redefinicoes SET usado_em = CURRENT_TIMESTAMP WHERE usuario_id = :id AND usado_em IS NULL'
+        );
+        $stmt->execute([':id' => $usuarioId]);
+    }
+
+    // =====================================================================
     // Servicos salvos
     // =====================================================================
 

@@ -180,6 +180,12 @@
         return ok({ ok: true, forma: 'ENVIAR', mensagem: 'Pedido de cancelamento enviado. A nota muda para "Cancelada" quando a prefeitura confirmar.' }, 600);
       }
       if (rota === 'senha.php') { return ok({ mensagem: 'Senha alterada.' }); }
+      if (rota === 'esqueci.php') {
+        if (metodo === 'GET') { return ok({ disponivel: true }); }
+        if (corpo.acao === 'pedir') { return ok({ ok: true, mensagem: 'Se este e-mail tiver acesso ao portal, enviamos um link para criar uma senha nova. Confira a caixa de entrada e o spam. O link vale 1 hora.' }, 500); }
+        if (corpo.acao === 'conferir') { return ok({ ok: true, nome: 'Mariana', email: 'mariana@exemplo.com.br' }); }
+        return ok({ ok: true, email: 'mariana@exemplo.com.br', mensagem: 'Senha criada. Entre com o seu e-mail e a senha nova.' });
+      }
       if (rota === 'empresa.php') {
         return ok({
           cadastro: { cnpj: '41986662000160', razao_social: 'Studio Bela Forma Ltda', nome_fantasia: 'Studio Bela Forma', inscricao_municipal: '123456', inscricao_estadual: null, codigo_municipio: '2927408', municipio: 'Salvador / BA', email: 'contato@belaforma.com.br', telefone: '71999990000' },

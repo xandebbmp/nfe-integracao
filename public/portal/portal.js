@@ -178,12 +178,16 @@
     el(id).hidden = !texto;
   }
 
+  /** Mostra so um dos quadros da tela de login (entrar, trocar senha, esqueci...). */
+  function mostrarQuadroLogin(id) {
+    ['form-login', 'form-senha', 'form-esqueci', 'esqueci-enviado', 'form-redefinir'].forEach(function (q) { el(q).hidden = q !== id; });
+  }
+
   function mostrarLogin(mensagem) {
     pararAtualizacao();
     telaSistema.hidden = true;
     telaLogin.hidden = false;
-    formSenha.hidden = true;
-    formLogin.hidden = false;
+    mostrarQuadroLogin('form-login');
     mostrarErro('login-erro', mensagem || '');
     el('login-senha').value = '';
     el('login-email').focus();
@@ -192,8 +196,7 @@
   function mostrarTrocaSenha(senhaDigitada) {
     telaSistema.hidden = true;
     telaLogin.hidden = false;
-    formLogin.hidden = true;
-    formSenha.hidden = false;
+    mostrarQuadroLogin('form-senha');
     el('senha-atual').value = senhaDigitada || '';
     mostrarErro('senha-erro', '');
     el(senhaDigitada ? 'senha-nova' : 'senha-atual').focus();
@@ -218,9 +221,96 @@
       .then(function () { botao.disabled = false; });
   });
 
+  // ---- Esqueci a senha ----
+  // 1) pede o link; 2) "confira o seu e-mail"; 3) o link do e-mail abre
+  // #redefinir=<codigo> e a pessoa cria a senha nova.
+  var formEsqueci = el('form-esqueci');
+  var formRedefinir = el('form-redefinir');
+  var codigoRedefinir = '';
+
   el('link-esqueci').addEventListener('click', function (evento) {
     evento.preventDefault();
-    mostrarErro('login-erro', 'Peça ao suporte para redefinir sua senha. Você recebe uma senha provisória e cria a nova no primeiro acesso.');
+    mostrarErro('login-erro', '');
+    api('GET', 'esqueci.php').then(function (r) {
+      if (!r.disponivel) {
+        mostrarErro('login-erro', 'Peça ao administrador da sua empresa para gerar uma senha nova (tela Usuários). Você cria a sua no primeiro acesso.');
+        return;
+      }
+      el('esqueci-email').value = el('login-email').value.trim();
+      mostrarErro('esqueci-erro', '');
+      mostrarQuadroLogin('form-esqueci');
+      el('esqueci-email').focus();
+    }).catch(function (erro) { mostrarErro('login-erro', erro.message); });
+  });
+
+  document.querySelectorAll('[data-voltar-login]').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+      if (window.location.hash.indexOf('#redefinir=') === 0) { history.replaceState(null, '', window.location.pathname); }
+      mostrarLogin('');
+    });
+  });
+
+  formEsqueci.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var email = el('esqueci-email').value.trim();
+    if (email.indexOf('@') < 1) { mostrarErro('esqueci-erro', 'Digite um e-mail válido.'); return; }
+    var botao = formEsqueci.querySelector('button[type=submit]');
+    botao.disabled = true;
+    api('POST', 'esqueci.php', { acao: 'pedir', email: email }).then(function (r) {
+      el('esqueci-enviado-texto').textContent = r.mensagem;
+      mostrarQuadroLogin('esqueci-enviado');
+    }).catch(function (erro) { mostrarErro('esqueci-erro', erro.message); })
+      .then(function () { botao.disabled = false; });
+  });
+
+  /** Abriu o link do e-mail: confere o codigo e mostra o formulario. */
+  function abrirRedefinicao(codigo) {
+    codigoRedefinir = codigo;
+    telaSistema.hidden = true;
+    telaLogin.hidden = false;
+    formRedefinir.reset();
+    mostrarErro('redefinir-erro', '');
+    el('redefinir-para').textContent = 'Conferindo o link…';
+    el('redefinir-voltar').hidden = true;
+    formRedefinir.querySelector('button[type=submit]').disabled = true;
+    mostrarQuadroLogin('form-redefinir');
+    api('POST', 'esqueci.php', { acao: 'conferir', codigo: codigo }).then(function (r) {
+      el('redefinir-para').textContent = 'Olá, ' + r.nome + '. Escolha a senha nova de ' + r.email + '.';
+      formRedefinir.querySelector('button[type=submit]').disabled = false;
+      el('redefinir-senha').focus();
+    }).catch(function (erro) {
+      el('redefinir-para').textContent = '';
+      mostrarErro('redefinir-erro', erro.message);
+      el('redefinir-voltar').hidden = false;
+    });
+  }
+
+  el('redefinir-voltar').addEventListener('click', function () {
+    history.replaceState(null, '', window.location.pathname);
+    mostrarLogin('');
+    el('link-esqueci').click();
+  });
+
+  formRedefinir.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var nova = el('redefinir-senha').value;
+    if (nova.length < 8 || !/[A-Za-z]/.test(nova) || !/\d/.test(nova)) {
+      mostrarErro('redefinir-erro', 'A senha precisa ter pelo menos 8 caracteres, com letras e números.');
+      return;
+    }
+    if (nova !== el('redefinir-confirma').value) { mostrarErro('redefinir-erro', 'As duas senhas não são iguais.'); return; }
+    var botao = formRedefinir.querySelector('button[type=submit]');
+    botao.disabled = true;
+    api('POST', 'esqueci.php', { acao: 'redefinir', codigo: codigoRedefinir, senha: nova }).then(function (r) {
+      history.replaceState(null, '', window.location.pathname);
+      mostrarLogin('');
+      el('login-email').value = r.email;
+      el('login-senha').focus();
+      avisar(escapar(r.mensagem));
+    }).catch(function (erro) {
+      mostrarErro('redefinir-erro', erro.message);
+      if (erro.codigo === 'LINK_INVALIDO') { el('redefinir-voltar').hidden = false; } else { botao.disabled = false; }
+    });
   });
 
   formSenha.addEventListener('submit', function (evento) {
@@ -302,6 +392,7 @@
   function mostrarPagina() {
     var nome = window.location.hash.replace('#', '') || PAGINA_INICIAL;
     if (nome === 'sair') { sair(); return; }
+    if (nome.indexOf('redefinir=') === 0) { abrirRedefinicao(nome.slice('redefinir='.length)); return; }
     if (telaSistema.hidden) { return; }
 
     var achou = false;
@@ -1914,5 +2005,10 @@
   // 7. INICIO DO PORTAL
   // ==================================================================
   aplicarTema(lerPreferencia('portal_tema'));
-  carregarSessao();
+  // Link do "Esqueci a senha" (#redefinir=codigo) abre direto o formulario.
+  if (window.location.hash.indexOf('#redefinir=') === 0) {
+    abrirRedefinicao(window.location.hash.slice('#redefinir='.length));
+  } else {
+    carregarSessao();
+  }
 })();

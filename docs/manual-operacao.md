@@ -187,6 +187,8 @@ php bin/nfse_verificar.php
    meio e relê o cadastro de empresas do painel admin.
 5. A cada 5 minutos, emite as **notas recorrentes automáticas** do dia
    (seção 13, "Recorrências"). Pausado no painel, não emite.
+   A cada volta também envia os **e-mails da fila** ("Esqueci a senha"),
+   mesmo pausado: a pausa vale para as notas, não para o login.
 6. Sem trabalho, **dorme** até o banco avisar (`LISTEN/NOTIFY`) ou 5 s
    passarem. Nota nova é atendida na hora, sem ficar consultando o banco.
 
@@ -369,6 +371,7 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 | `0009` | Configurações alteradas pelo painel (`sistema_ajustes`) |
 | `0010` | Portal: papel de administrador dos usuários (`portal_usuarios.administrador`) |
 | `0011` | Portal: notas recorrentes (`portal_recorrencias`) |
+| `0012` | Portal: "Esqueci a senha" e fila de e-mails (`portal_redefinicoes`, `sistema_emails`) |
 
 - **Backup diário:** `deploy/backup_banco.sh`, no cron. Veja o manual de
   implantação, seção "Backup".
@@ -758,6 +761,24 @@ sessões abertas.
   - **Salvador:** não cancela por webservice. A tela explica como pedir no
     site da prefeitura; depois de aceito, o cliente informa o protocolo e a
     nota vira "Cancelada" na hora (nada é enviado).
+- **Esqueci a senha** (script `0012`): no login, a pessoa digita o e-mail e
+  recebe um link (vale 1 hora, uma vez; no máximo 3 pedidos por hora). A
+  resposta é sempre a mesma, exista ou não o e-mail. Criada a senha nova,
+  as sessões abertas em outros navegadores saem. Quem envia o e-mail é o
+  **worker**. Para ligar:
+  1. No painel, **Sistema > Configurações > E-mail**: servidor, porta,
+     criptografia, usuário, remetente e o **endereço do portal** (vai no
+     link do e-mail).
+  2. A **senha** do e-mail vai só no `config/nfse.local.php`
+     (`'email' => ['senha' => '...']`) ou na variável `SMTP_PASSWORD`.
+     Também valem `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+     `SMTP_FROM` e `PORTAL_URL` quando o campo estiver vazio.
+  3. No bloco **Sistema > E-mail**, use "Enviar e-mail de teste". Ali
+     também aparecem os últimos e-mails e o erro do servidor, se falhar
+     (tenta de novo em 1, 2, 4 e 8 minutos e desiste na 5ª vez).
+  Enquanto faltar algo, o link "Esqueci minha senha" mostra "peça ao
+  administrador da sua empresa" (o administrador gera senha provisória em
+  Usuários).
 
 **Configuração** (`portal` no `config/nfse.php`, troque no
 `config/nfse.local.php`):

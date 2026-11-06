@@ -181,6 +181,25 @@ $cfg = [
         'url_cnpj' => 'https://brasilapi.com.br/api/cnpj/v1/{cnpj}',
         'url_cep' => 'https://viacep.com.br/ws/{cep}/json/',
     ],
+
+    // E-mail (SMTP) para o "Esqueci a senha" do portal. Quem envia e o worker.
+    // A SENHA fica so no config/nfse.local.php (ou na variavel SMTP_PASSWORD).
+    // O resto tambem pode ser mudado no painel: Sistema > Configuracoes.
+    // Variaveis de ambiente aceitas quando o campo estiver vazio: SMTP_HOST,
+    // SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, PORTAL_URL.
+    'email' => [
+        'host' => '',                 // ex.: mail.suaempresa.com.br
+        'porta' => 465,               // 465 = TLS direto; 587 = STARTTLS
+        'seguranca' => 'ssl',         // ssl (465) | tls (587) | '' (sem criptografia)
+        'usuario' => '',              // geralmente o proprio e-mail da conta
+        'senha' => '',                // so no nfse.local.php!
+        'remetente' => '',            // so o endereco, ex.: contato@suaempresa.com.br
+        'nome_remetente' => 'Gestão Fiscal',
+        // Endereco publico do portal (vai no link do e-mail), ex.:
+        // https://fiscal.suaempresa.com.br/portal/
+        'url_portal' => '',
+        'timeout_segundos' => 20,
+    ],
 ];
 
 $localConfigFile = __DIR__ . '/nfse.local.php';
