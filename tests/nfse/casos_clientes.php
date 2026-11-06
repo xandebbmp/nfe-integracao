@@ -11,12 +11,99 @@ use Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\Servico\AdministracaoClientes;
 use Xande\NfeIntegracao\Nfse\Servico\ControleEmissao;
+use Xande\NfeIntegracao\Nfse\Servico\ProntidaoEmissao;
 use Xande\NfeIntegracao\Nfse\Servico\RecebimentoLote;
 
 /** situacao_recebimento e codigo do 1o erro de cada documento do lote. */
 function resumoLote(array $r): array
 {
     return array_map(static fn(array $d): array => [$d['situacao_recebimento'], $d['erros'][0]['codigo'] ?? null], $r['documentos'] ?? []);
+}
+
+/** Niveis da lista "Pronta para emitir", por grupo: ['Geral' => ['OK', 'FALTA', ...], ...]. */
+function niveisProntidao(array $p): array
+{
+    $saida = [];
+    foreach ($p['grupos'] as $g) {
+        $saida[$g['titulo']] = array_column($g['itens'], 'nivel');
+    }
+    return $saida;
+}
+
+/** Textos de um nivel, de todos os grupos. */
+function textosProntidao(array $p, string $nivel): array
+{
+    $saida = [];
+    foreach ($p['grupos'] as $g) {
+        foreach ($g['itens'] as $i) {
+            if ($i['nivel'] === $nivel) {
+                $saida[] = $i['texto'];
+            }
+        }
+    }
+    return $saida;
+}
+
+function testesClientesUnidade(): void
+{
+    echo "\n[10a] Ficha da empresa: lista \"Pronta para emitir\"\n";
+
+    $hoje = '2026-11-06';
+    $completa = [
+        'cnpj' => '41986662000160', 'razao_social' => 'Serralheria Teste', 'email' => 'contato@teste.com.br',
+        'situacao' => 'LIBERADA', 'situacao_mensagem' => 'Emissao liberada.', 'liberado_ate' => null,
+        'padroes_permitidos' => ['NACIONAL'], 'tem_certificado' => true,
+        'certificado_validade' => '2027-06-30 12:00:00', 'certificado_dias_restantes' => 236, 'tem_token' => false,
+        'codigo_municipio' => '2927408', 'inscricao_municipal' => '123456', 'uf' => 'BA', 'ie' => '31638351',
+        'opcao_simples_nacional' => 3, 'regime_apuracao_simples' => 1, 'percentual_tributos_simples' => 2.0,
+        'series_padrao' => ['NFE' => '1', 'NACIONAL' => '1', 'SALVADOR' => '1'],
+        'numeracao' => [['padrao' => 'NACIONAL', 'serie' => '1', 'ultimo_numero' => 41]],
+    ];
+    $ctx = ['tp_amb' => 2, 'usuarios_portal' => 1, 'certificado_no_arquivo' => false, 'hoje' => $hoje];
+
+    $p = ProntidaoEmissao::avaliar($completa, $ctx);
+    Apoio::igual([true, 0, 0], [$p['pronta'], $p['faltam'], $p['atencao']], 'prontidao: cadastro completo (Simples ME/EPP, Nacional) fica pronto sem avisos');
+    Apoio::igual(['Geral', 'NFS-e Nacional'], array_column($p['grupos'], 'titulo'), 'prontidao: so aparece o grupo do tipo contratado');
+    Apoio::verificar(in_array('Série 1: a próxima nota sai com o nº 42.', textosProntidao($p, 'OK'), true), 'prontidao: mostra o proximo numero da serie');
+    Apoio::verificar(in_array('Simples ME/EPP: regime de apuração 1 e 2% de tributos.', textosProntidao($p, 'OK'), true), 'prontidao: mostra regime e % do Simples');
+    Apoio::verificar(str_contains($p['ambiente'], 'Homologação'), 'prontidao: avisa que esta em homologacao');
+
+    // ME/EPP sem regime e sem % (o Sefin recusa a nota)
+    $p = ProntidaoEmissao::avaliar(['regime_apuracao_simples' => null, 'percentual_tributos_simples' => null] + $completa, $ctx);
+    Apoio::igual(['OK', 'FALTA', 'FALTA', 'OK'], niveisProntidao($p)['NFS-e Nacional'], 'prontidao: ME/EPP sem regime e sem % aparecem como falta');
+    Apoio::igual(false, $p['pronta'], 'prontidao: com falta, a empresa nao esta pronta');
+    $p = ProntidaoEmissao::avaliar(['opcao_simples_nacional' => 1, 'regime_apuracao_simples' => null, 'percentual_tributos_simples' => null] + $completa, $ctx);
+    Apoio::igual(true, $p['pronta'], 'prontidao: nao optante nao precisa de regime nem %');
+
+    // Certificado: sem, vencido, perto de vencer, no arquivo do servidor
+    $sem = ['tem_certificado' => false, 'certificado_validade' => null, 'certificado_dias_restantes' => null] + $completa;
+    Apoio::igual('FALTA', niveisProntidao(ProntidaoEmissao::avaliar($sem, $ctx))['Geral'][1], 'prontidao: sem certificado e falta');
+    Apoio::igual('OK', niveisProntidao(ProntidaoEmissao::avaliar($sem, ['certificado_no_arquivo' => true] + $ctx))['Geral'][1],
+        'prontidao: certificado no arquivo do servidor conta como ok');
+    $vencido = ProntidaoEmissao::avaliar(['certificado_validade' => '2026-10-01', 'certificado_dias_restantes' => -36] + $completa, $ctx);
+    Apoio::igual(['Certificado venceu em 01/10/2026.'], textosProntidao($vencido, 'FALTA'), 'prontidao: certificado vencido e falta, com a data');
+    $perto = ProntidaoEmissao::avaliar(['certificado_validade' => '2026-11-20', 'certificado_dias_restantes' => 14] + $completa, $ctx);
+    Apoio::igual([true, 1], [$perto['pronta'], $perto['atencao']], 'prontidao: certificado perto de vencer e so aviso');
+
+    // Ninguem consegue emitir / bloqueio / vencimento
+    $p = ProntidaoEmissao::avaliar($completa, ['usuarios_portal' => 0] + $ctx);
+    Apoio::igual(['Ninguém consegue emitir ainda.'], textosProntidao($p, 'FALTA'), 'prontidao: sem token e sem pessoa no portal e falta');
+    $p = ProntidaoEmissao::avaliar(['tem_token' => true] + $completa, ['usuarios_portal' => null] + $ctx);
+    Apoio::igual(true, $p['pronta'], 'prontidao: token da API basta (portal nao instalado)');
+    $p = ProntidaoEmissao::avaliar(['situacao' => 'BLOQUEADA', 'situacao_mensagem' => 'Emissao bloqueada: falta pagamento.'] + $completa, $ctx);
+    Apoio::igual(['Emissao bloqueada: falta pagamento.'], textosProntidao($p, 'FALTA'), 'prontidao: bloqueio aparece com o motivo');
+    $p = ProntidaoEmissao::avaliar(['liberado_ate' => '2026-11-09'] + $completa, $ctx);
+    Apoio::verificar(str_contains(textosProntidao($p, 'ATENCAO')[0] ?? '', 'daqui a 3 dias'), 'prontidao: liberacao vencendo vira aviso');
+
+    // Salvador e NF-e
+    $p = ProntidaoEmissao::avaliar(['padroes_permitidos' => ['SALVADOR', 'NFE'], 'inscricao_municipal' => '', 'ie' => '', 'numeracao' => []] + $completa, $ctx);
+    $n = niveisProntidao($p);
+    Apoio::igual(['OK', 'FALTA', 'ATENCAO'], $n['NFS-e Salvador'], 'prontidao: Salvador sem inscricao municipal e falta; serie nova e aviso');
+    Apoio::igual(['OK', 'FALTA', 'ATENCAO'], $n['NF-e (produtos)'], 'prontidao: NF-e sem inscricao estadual e falta');
+    $p = ProntidaoEmissao::avaliar(['padroes_permitidos' => ['SALVADOR'], 'codigo_municipio' => '3550308'] + $completa, $ctx);
+    Apoio::verificar(in_array('O município do cadastro não é Salvador.', textosProntidao($p, 'ATENCAO'), true), 'prontidao: Salvador com municipio de outra cidade avisa');
+    $p = ProntidaoEmissao::avaliar(['padroes_permitidos' => [], 'codigo_municipio' => '29'] + $completa, $ctx);
+    Apoio::igual(['Nenhum tipo de nota contratado.'], textosProntidao($p, 'FALTA'), 'prontidao: sem tipo contratado e falta');
 }
 
 function testesClientesIntegracao(PDO $pdo, array $cfgGeral): void
@@ -56,6 +143,10 @@ function testesClientesIntegracao(PDO $pdo, array $cfgGeral): void
         'certificado: e-CNPJ de outra empresa e recusado');
     $r = $admin->enviarCertificado($cnpj, $pfx, 'senha-pfx', 'ip');
     Apoio::verificar($r['ok'] && $r['cliente']['tem_certificado'], 'certificado: aceito e guardado criptografado');
+    $prontidao = $r['cliente']['prontidao'] ?? [];
+    Apoio::verificar(in_array('NFS-e Nacional', array_column($prontidao['grupos'] ?? [], 'titulo'), true)
+        && !in_array('Sem certificado digital.', textosProntidao($prontidao, 'FALTA'), true),
+        'prontidao: a ficha da empresa traz a lista, ja com o certificado enviado');
     $bruto = $pdo->query("SELECT encode(certificado_cifrado, 'hex') FROM fiscal_clientes WHERE cnpj = '{$cnpj}'")->fetchColumn();
     Apoio::verificar(!str_contains((string)$bruto, bin2hex(substr($pfx, 0, 32))), 'certificado: banco nao guarda o .pfx em claro');
 

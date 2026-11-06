@@ -504,6 +504,7 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   - vencimento e validade do certificado;
   - final do token.
 - **Ao clicar numa empresa:**
+  - **Pronta para emitir?** (primeiro bloco da ficha, veja abaixo);
   - controle de emissão;
   - dados cadastrais e webhook;
   - certificado;
@@ -541,6 +542,45 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
    atual do servidor (homologação e produção têm numeração separada).
    Empresa nova, que nunca emitiu? Não precisa fazer nada: começa do 1.
 6. (Opcional) **Webhook:** a URL e o segredo do sistema do cliente.
+7. **Confira o bloco "Pronta para emitir?"** no alto da ficha (próximo item).
+
+### "Pronta para emitir?": o que falta para a empresa emitir
+
+No alto da ficha da empresa, uma lista confere o cadastro e diz o que falta,
+com "Como resolver" em cada item. Ela **não emite nada, não abre o
+certificado e não chama a prefeitura**: só olha o que já está gravado.
+
+- 🔴 **Falta:** a nota vai ser recusada enquanto não resolver.
+- 🟠 **Atenção:** emite, mas merece cuidado.
+- 🟢 **OK:** ficam recolhidos em "Ver os itens ok".
+
+O que é conferido:
+
+| Grupo | Item | Nível quando há problema |
+|---|---|---|
+| Geral | Emissão liberada (bloqueio, vencimento, limite do mês) | Falta |
+| Geral | "Liberado até" vence em 7 dias ou menos | Atenção |
+| Geral | Pelo menos um tipo de nota contratado | Falta |
+| Geral | Certificado enviado e dentro da validade | Falta (sem ou vencido) / Atenção (30 dias ou menos) |
+| Geral | Alguém consegue emitir: token da API ou pessoa ativa no portal | Falta |
+| Geral | E-mail da empresa | Atenção |
+| NFS-e Nacional | Código IBGE do município com 7 números | Falta |
+| NFS-e Nacional | Simples ME/EPP: regime de apuração e % de tributos | Falta |
+| NFS-e Salvador | Código do município; inscrição municipal | Falta |
+| NFS-e Salvador | Município do cadastro diferente de Salvador (2927408) | Atenção |
+| NF-e | UF e inscrição estadual | Falta |
+| Todos | Série ainda não usada (a primeira nota sai com o nº 1) | Atenção |
+
+Só aparecem os grupos dos tipos de nota contratados. O topo do bloco diz o
+ambiente (homologação ou produção). Corrigiu os dados? Clique em **Salvar
+alterações** e a lista é conferida de novo. Ao gerar o token ou dar acesso ao
+portal, ela se atualiza sozinha.
+
+O certificado que está no `config/nfse.local.php` (e não no painel) conta como
+OK, mas a validade dele não aparece na lista.
+
+Para incluir uma conferência nova: `src/Nfse/Servico/ProntidaoEmissao.php`
+(um item no grupo certo) e um teste em `tests/nfse/casos_clientes.php`.
 
 ### As quatro formas de bloqueio
 

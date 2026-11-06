@@ -277,6 +277,7 @@ function desenharCliente(c) {
 
   if (!novo) {
     partes.push(el('div', { class: 'acoes' }, seloSituacao(c.situacao), el('span', {}, c.situacao_mensagem)));
+    if (c.prontidao) partes.push(secaoProntidao(c.prontidao));
   }
 
   // ---- 1. Controle de emissao (cobranca) ----
@@ -348,6 +349,66 @@ function desenharCliente(c) {
   }
 
   abrirModal(novo ? 'Nova empresa' : (c.nome_fantasia || c.razao_social), novo ? '' : cnpj(c.cnpj), partes);
+}
+
+// ---- Pronta para emitir ----
+// Lista que o servidor monta (Servico/ProntidaoEmissao.php): o que falta para
+// a empresa emitir cada tipo de nota contratado. Primeiro o que falta, depois
+// os avisos; os itens ok ficam recolhidos.
+const NIVEIS_PRONTIDAO = {
+  FALTA: { nome: 'Falta', ponto: 'PARADO' },
+  ATENCAO: { nome: 'Atenção', ponto: 'PAUSADO' },
+  OK: { nome: 'OK', ponto: 'LIGADO' },
+};
+
+function itemProntidao(i, grupo) {
+  const n = NIVEIS_PRONTIDAO[i.nivel] || NIVEIS_PRONTIDAO.ATENCAO;
+  return el('li', { class: 'diag-item' },
+    el('span', { class: `ponto-sistema ponto-sistema--${n.ponto}`, title: n.nome }),
+    el('div', {},
+      el('div', {}, el('span', { class: 'suave' }, `${grupo} · `), i.texto),
+      i.resolver ? el('div', { class: 'diag-resolver' }, el('strong', {}, i.nivel === 'OK' ? 'Dica: ' : 'Como resolver: '), i.resolver) : null));
+}
+
+function secaoProntidao(p) {
+  const itens = p.grupos.flatMap((g) => g.itens.map((i) => [i, g.titulo]));
+  const de = (nivel) => itens.filter(([i]) => i.nivel === nivel);
+  const problemas = [...de('FALTA'), ...de('ATENCAO')];
+  const certos = de('OK');
+
+  let titulo;
+  let ponto;
+  if (!p.pronta) {
+    titulo = p.faltam === 1 ? 'Falta 1 item para emitir' : `Faltam ${p.faltam} itens para emitir`;
+    ponto = 'PARADO';
+  } else if (p.atencao > 0) {
+    titulo = `Pronta para emitir, com ${p.atencao === 1 ? '1 aviso' : `${p.atencao} avisos`}`;
+    ponto = 'PAUSADO';
+  } else {
+    titulo = 'Pronta para emitir';
+    ponto = 'LIGADO';
+  }
+
+  return el('section', { class: 'secao prontidao', 'data-pronta': String(p.pronta) },
+    el('h3', {}, 'Pronta para emitir?'),
+    el('div', { class: 'sistema-estado' },
+      el('span', { class: `ponto-sistema ponto-sistema--${ponto}` }),
+      el('strong', {}, titulo),
+      el('span', { class: 'suave' }, p.ambiente)),
+    problemas.length ? el('ul', { class: 'diag-lista' }, ...problemas.map(([i, g]) => itemProntidao(i, g))) : null,
+    certos.length ? el('details', {}, el('summary', { class: 'suave' }, `Ver os ${certos.length} itens ok`),
+      el('ul', { class: 'diag-lista' }, ...certos.map(([i, g]) => itemProntidao(i, g)))) : null,
+    el('p', { class: 'suave' }, 'Corrigiu um item nos dados da empresa? Clique em "Salvar alterações" e a lista é conferida de novo.'));
+}
+
+/** Confere de novo so a lista (depois de gerar token ou mexer no portal), sem redesenhar a ficha. */
+async function atualizarProntidao(numeroCnpj) {
+  const atual = $('modal-corpo').querySelector('.prontidao');
+  if (!atual) return;
+  try {
+    const { cliente } = await api(`cliente.php?cnpj=${encodeURIComponent(numeroCnpj)}`);
+    if (cliente.prontidao) atual.replaceWith(secaoProntidao(cliente.prontidao));
+  } catch { /* a lista antiga continua; ao reabrir a ficha ela e conferida de novo */ }
 }
 
 function lerFormulario(formDados, formControle) {
@@ -427,6 +488,7 @@ function secaoToken(c) {
         el('strong', {}, 'Token novo — copie agora, ele não será mostrado de novo:'), el('br'),
         el('code', { class: 'mono' }, r.token), el('div', { class: 'acoes' }, copiar)));
       await carregar();
+      atualizarProntidao(c.cnpj);
     } catch (e) {
       area.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
@@ -477,6 +539,7 @@ function secaoPortal(c) {
       const r = await api('portal_usuarios.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, ...corpo } });
       if (r.senha_provisoria) mostrarSenha(r); else area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
       await recarregar();
+      atualizarProntidao(c.cnpj);
     } catch (e) {
       area.replaceChildren(el('p', { class: 'erro' }, e.message));
     }

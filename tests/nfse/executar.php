@@ -361,6 +361,7 @@ testesNfeUnidade($cfgGeral, $raiz);
 echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
 // ===========================================================================
 
+testesClientesUnidade();
 testesPortalUnidade();
 testesSistemaUnidade($cfgGeral);
 

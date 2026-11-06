@@ -31,6 +31,9 @@ a.botao { text-decoration: none; color: inherit; display: inline-flex; align-ite
 .modal--largo { width: min(980px, 96vw); }
 .secao { border: 1px solid var(--borda); border-radius: var(--raio); padding: 14px 16px; margin-top: 14px; }
 .secao h3 { margin-top: 0; }
+.prontidao { border-left: 4px solid var(--st-autorizado); }
+.prontidao[data-pronta=false] { border-left-color: var(--st-rejeitado); }
+.prontidao .sistema-estado strong { font-size: 16px; }
 .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 16px; }
 .campos label { display: grid; gap: 4px; font-size: 12px; color: var(--suave); }
 .campos label.linha-check { display: flex; color: var(--texto); font-size: 14px; }
