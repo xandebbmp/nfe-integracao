@@ -69,6 +69,12 @@ final class PortalInicio
                 ];
             }
         }
+        $pendentes = (new PortalRecorrencias($this->pdo, $this->cfg))->pendentes($cnpj);
+        if ($pendentes > 0) {
+            $avisos[] = ['tipo' => 'RECORRENCIA_PENDENTE',
+                'titulo' => $pendentes === 1 ? '1 nota recorrente esperando você' : "{$pendentes} notas recorrentes esperando você",
+                'texto' => 'Abra Recorrências para emitir ou pular o mês.'];
+        }
         $dias = $empresa['certificado']['dias_restantes'] ?? null;
         if ($dias === null) {
             $avisos[] = ['tipo' => 'SEM_CERTIFICADO', 'titulo' => 'Certificado digital não enviado', 'texto' => 'Sem ele as notas não são assinadas. Fale com o suporte.'];

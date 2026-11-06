@@ -65,29 +65,16 @@ final class PortalEmissao
     public function emitir(array $usuario, array $entrada): array
     {
         $cnpj = (string)$usuario['cnpj'];
-        $cliente = (new ClienteRepositorio($this->pdo))->buscar($cnpj);
-        if ($cliente === null) {
-            return self::falha(404, 'EMPRESA_NAO_ENCONTRADA', 'Empresa não encontrada. Fale com o suporte.');
-        }
-
         $chave = (string)($entrada['chave_envio'] ?? '');
         if (!preg_match('/^[A-Za-z0-9-]{8,50}$/', $chave)) {
             return self::falha(400, 'CHAVE_ENVIO_INVALIDA', 'Recarregue a página e tente de novo.');
         }
 
-        $padrao = $this->padraoDaEmpresa($cliente);
-        $montado = $this->montarDocumento($cnpj, $padrao, $entrada);
-        if (!$montado['ok']) {
-            return $montado;
+        $preparado = $this->preparar($cnpj, $entrada, self::PREFIXO_REFERENCIA . $chave);
+        if (!$preparado['ok']) {
+            return $preparado;
         }
-        $documento = $montado['documento'];
-        $documento['referencia'] = self::PREFIXO_REFERENCIA . $chave;
-
-        // Mesmos erros que a API daria, mas sem gravar nada.
-        $erros = ValidadorPayload::validar($documento, $padrao);
-        if ($erros !== []) {
-            return self::falha(422, 'DADOS_INVALIDOS', 'Confira os campos destacados.', ['erros' => $erros]);
-        }
+        ['cliente' => $cliente, 'padrao' => $padrao, 'documento' => $documento, 'montado' => $montado] = $preparado;
 
         $resultado = (new RecebimentoLote($this->pdo, $this->comConsumidor($cnpj, $cliente)))
             ->receber($cnpj, ['padrao' => $padrao, 'emitente_cnpj' => $cnpj, 'documentos' => [$documento]]);
@@ -110,6 +97,43 @@ final class PortalEmissao
         }
 
         return ['ok' => true, 'id' => $item['id'], 'situacao_recebimento' => $item['situacao_recebimento'], 'padrao' => $padrao];
+    }
+
+    /**
+     * Confere os dados como o "Emitir" faria, sem gravar nada.
+     * Usado ao salvar uma nota recorrente: o erro aparece na hora, e nao
+     * so no dia da emissao.
+     *
+     * @return array ok=true, ou ok=false com http/codigo/mensagem/erros
+     */
+    public function conferir(string $cnpj, array $entrada): array
+    {
+        $preparado = $this->preparar($cnpj, $entrada, self::PREFIXO_REFERENCIA . 'conferencia');
+        return $preparado['ok'] ? ['ok' => true] : $preparado;
+    }
+
+    /** Empresa, padrao e documento ja validado (mesmas regras da API). */
+    private function preparar(string $cnpj, array $entrada, string $referencia): array
+    {
+        $cliente = (new ClienteRepositorio($this->pdo))->buscar($cnpj);
+        if ($cliente === null) {
+            return self::falha(404, 'EMPRESA_NAO_ENCONTRADA', 'Empresa não encontrada. Fale com o suporte.');
+        }
+
+        $padrao = $this->padraoDaEmpresa($cliente);
+        $montado = $this->montarDocumento($cnpj, $padrao, $entrada);
+        if (!$montado['ok']) {
+            return $montado;
+        }
+        $documento = $montado['documento'];
+        $documento['referencia'] = $referencia;
+
+        // Mesmos erros que a API daria, mas sem gravar nada.
+        $erros = ValidadorPayload::validar($documento, $padrao);
+        if ($erros !== []) {
+            return self::falha(422, 'DADOS_INVALIDOS', 'Confira os campos destacados.', ['erros' => $erros]);
+        }
+        return ['ok' => true, 'cliente' => $cliente, 'padrao' => $padrao, 'documento' => $documento, 'montado' => $montado];
     }
 
     // =====================================================================

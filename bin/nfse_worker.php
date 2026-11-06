@@ -19,6 +19,9 @@ declare(strict_types=1);
  *   - "Pausar envios": o worker para de pegar trabalhos (a fila espera);
  *   - "Reiniciar": o worker termina o trabalho atual e sai. O systemd
  *     (Restart=always) ou o pm2 liga de novo, ja com o codigo novo.
+ *
+ * Notas recorrentes do portal (script 0011): a cada 5 minutos o worker emite
+ * as AUTOMATICAS que chegaram no dia. Pausado pelo painel, nao emite.
  */
 
 use Xande\NfeIntegracao\Database\ConnectionFactory;
@@ -27,6 +30,7 @@ use Xande\NfeIntegracao\Nfse\ProvedorFactory;
 use Xande\NfeIntegracao\Nfse\Repositorio\FilaRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\EntregadorWebhook;
+use Xande\NfeIntegracao\Nfse\Servico\PortalRecorrencias;
 use Xande\NfeIntegracao\Nfse\Servico\ProcessadorJobs;
 
 if (PHP_SAPI !== 'cli') {
@@ -116,6 +120,7 @@ if ($sistema !== null) {
 
 registrar("Worker {$workerId} iniciado (tpAmb={$cfg['tpAmb']}).");
 $ultimaLimpeza = 0;
+$ultimasRecorrencias = 0;
 
 while ($continuar) {
     // A cada minuto: devolve para a fila jobs de workers que morreram.
@@ -142,6 +147,19 @@ while ($continuar) {
         }
         $pdo->pgsqlGetNotify(PDO::FETCH_ASSOC, 5000);
         continue;
+    }
+
+    // A cada 5 minutos: notas recorrentes automaticas do dia (entram na fila).
+    if (time() - $ultimasRecorrencias >= 300) {
+        try {
+            $r = (new PortalRecorrencias($pdo, $cfg))->executarAutomaticas();
+            if ($r['emitidas'] + $r['falhas'] > 0) {
+                registrar("Recorrencias: {$r['emitidas']} nota(s) na fila, {$r['falhas']} com problema (aparecem para o cliente).");
+            }
+        } catch (Throwable $erro) {
+            registrar('Recorrencias: ' . $erro->getMessage());
+        }
+        $ultimasRecorrencias = time();
     }
 
     $processouAlgo = false;

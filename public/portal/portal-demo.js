@@ -53,6 +53,27 @@
     { id: 3, nome: 'Júlia Andrade', email: 'julia@exemplo.com.br', administrador: false, situacao: 'PRIMEIRO_ACESSO', ultimo_acesso: null, eu: false }
   ];
   var numero = 125;
+  var recorrencias = [
+    { id: 1, nome: 'Mensalidade Clínica Vida', tomador: { cpf_cnpj: '00394460005887', nome: 'Clínica Vida Plena Ltda' }, servico_id: 1, servico_nome: 'Consultoria em gestão',
+      descricao: 'Consultoria em gestão financeira referente a {mes}.', valores: { valor_servicos: 1500, iss_retido: false }, dia: 5, competencia: 'ATUAL', modo: 'CONFIRMAR',
+      proxima_em: '2026-11-05', fim: null, situacao: 'PENDENTE', competencia_proxima: 'novembro/2026', emitidas: 6, ultima_mensagem: null },
+    { id: 2, nome: 'Suporte mensal — Escola', tomador: { cpf_cnpj: '04252011000110', nome: 'Escola Pequeno Saber' }, servico_id: 2, servico_nome: 'Desenvolvimento de software',
+      descricao: 'Suporte e manutenção do sistema referente a {mes}.', valores: { valor_servicos: 2150, iss_retido: false }, dia: 10, competencia: 'ANTERIOR', modo: 'AUTOMATICA',
+      proxima_em: '2026-11-10', fim: '2027-06', situacao: 'AGENDADA', competencia_proxima: 'outubro/2026', emitidas: 3, ultima_mensagem: null },
+    { id: 3, nome: 'Aulas particulares — Ana', tomador: { cpf_cnpj: '52998224725', nome: 'Ana Paula Souza' }, servico_id: 1, servico_nome: 'Consultoria em gestão',
+      descricao: 'Consultoria individual referente a {mes}.', valores: { valor_servicos: 320, iss_retido: false }, dia: 15, competencia: 'ATUAL', modo: 'CONFIRMAR',
+      proxima_em: '2026-11-15', fim: null, situacao: 'PAUSADA', competencia_proxima: 'novembro/2026', emitidas: 2, ultima_mensagem: null }
+  ];
+  var MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  function proximoMes(iso) {
+    var p = iso.split('-').map(Number); var m = p[1] === 12 ? 1 : p[1] + 1; var a = p[1] === 12 ? p[0] + 1 : p[0];
+    return a + '-' + String(m).padStart(2, '0') + '-' + String(p[2]).padStart(2, '0');
+  }
+  function competenciaTexto(r) {
+    var p = r.proxima_em.split('-').map(Number); var m = p[1] - (r.competencia === 'ANTERIOR' ? 1 : 0); var a = p[0];
+    if (m === 0) { m = 12; a--; }
+    return MESES[m - 1] + '/' + a;
+  }
 
   function ok(dados, atraso) {
     return new Promise(function (resolve) { setTimeout(function () { resolve(dados); }, atraso || 150); });
@@ -88,7 +109,7 @@
       if (rota === 'inicio.php') {
         return ok({
           resumo: { mes: '2026-11', notas_no_mes: 37, por_status: { AUTORIZADO: 35, REJEITADO: 1, CANCELADO: 1 }, em_andamento: 1, faturado_no_mes: 48320, franquia: { usado: 37, limite: 100 },
-            avisos: [{ tipo: 'NOTA_REJEITADA', titulo: 'Nota para Construtora Atlântico não foi autorizada', texto: 'CEP do tomador não encontrado. Corrija e emita de novo.' }] },
+            avisos: [{ tipo: 'RECORRENCIA_PENDENTE', titulo: '1 nota recorrente esperando você', texto: 'Abra Recorrências para emitir ou pular o mês.' }, { tipo: 'NOTA_REJEITADA', titulo: 'Nota para Construtora Atlântico não foi autorizada', texto: 'CEP do tomador não encontrado. Corrija e emita de novo.' }] },
           notas: notas.slice(0, 5)
         });
       }
@@ -107,6 +128,40 @@
           return ok({ ok: true, mensagem: 'Feito.' });
         }
         return ok({ usuarios: usuarios, pode_gerenciar: true });
+      }
+      if (rota === 'recorrencias.php') {
+        if (metodo === 'POST') {
+          var rec = recorrencias.filter(function (r) { return r.id === corpo.id; })[0];
+          if (corpo.acao === 'salvar') {
+            var erros = [];
+            if (!corpo.nome) { erros.push({ campo: 'nome', mensagem: 'Dê um nome para achar na lista (ex.: Mensalidade Clínica Vida).' }); }
+            if (!corpo.tomador.cpf_cnpj) { erros.push({ campo: 'tomador.cpf_cnpj', mensagem: 'Escolha um tomador com CPF ou CNPJ válido.' }); }
+            if (!corpo.servico_id) { erros.push({ campo: 'servico_id', mensagem: 'Escolha um dos seus serviços salvos.' }); }
+            if (!(corpo.valores.valor_servicos > 0)) { erros.push({ campo: 'valores.valor_servicos', mensagem: 'Informe o valor do serviço (maior que zero).' }); }
+            if (!rec && !corpo.primeira_em) { erros.push({ campo: 'primeira_em', mensagem: 'Escolha a data da próxima nota.' }); }
+            if (erros.length) { return falhaCampos(erros); }
+            var srvRec = servicos.filter(function (x) { return x.id === corpo.servico_id; })[0] || {};
+            var novo = Object.assign(rec || { id: Date.now(), emitidas: 0, ultima_mensagem: null }, {
+              nome: corpo.nome, tomador: corpo.tomador, servico_id: corpo.servico_id, servico_nome: srvRec.nome, descricao: corpo.descricao,
+              valores: corpo.valores, competencia: corpo.competencia, modo: corpo.modo, fim: corpo.fim || null
+            });
+            if (corpo.primeira_em) { novo.proxima_em = corpo.primeira_em; novo.dia = Number(corpo.primeira_em.slice(8)); }
+            novo.situacao = novo.proxima_em <= '2026-11-06' ? 'PENDENTE' : 'AGENDADA';
+            novo.competencia_proxima = competenciaTexto(novo);
+            if (!rec) { recorrencias.push(novo); }
+            return ok({ ok: true, id: novo.id, mensagem: rec ? 'Nota recorrente atualizada.' : 'Nota recorrente criada.' });
+          }
+          if (corpo.acao === 'remover') { recorrencias = recorrencias.filter(function (r) { return r.id !== corpo.id; }); return ok({ ok: true, mensagem: 'Nota recorrente apagada. As notas já emitidas continuam guardadas.' }); }
+          if (corpo.acao === 'pausar') { rec.situacao = 'PAUSADA'; return ok({ ok: true, mensagem: 'Pausada. Nenhuma nota sai até você retomar.' }); }
+          var msg = '';
+          if (corpo.acao === 'emitir') { msg = 'Nota de ' + rec.competencia_proxima + ' enviada para a prefeitura.'; rec.emitidas++; }
+          if (corpo.acao === 'emitir' || corpo.acao === 'pular') { rec.proxima_em = proximoMes(rec.proxima_em); if (!msg) { msg = 'Mês pulado.'; } }
+          if (corpo.acao === 'retomar') { msg = 'Retomada.'; }
+          rec.situacao = rec.proxima_em <= '2026-11-06' ? 'PENDENTE' : 'AGENDADA';
+          rec.competencia_proxima = competenciaTexto(rec);
+          return ok({ ok: true, mensagem: msg }, corpo.acao === 'emitir' ? 900 : 150);
+        }
+        return ok({ recorrencias: recorrencias });
       }
       if (rota === 'senha.php') { return ok({ mensagem: 'Senha alterada.' }); }
       if (rota === 'empresa.php') {
