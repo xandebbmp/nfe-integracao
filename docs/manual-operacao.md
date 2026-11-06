@@ -97,7 +97,7 @@ comentários estão em `config/nfse.php`):
 
 | Chave | O que faz | Exemplo |
 |---|---|---|
-| `tpAmb` | `2` = homologação (testes, sem valor fiscal); `1` = produção | `2` |
+| `tpAmb` | `2` = homologação (testes, sem valor fiscal); `1` = produção. Valor inicial: quem troca no dia a dia é o painel (Sistema > **Ambiente de emissão**), que vale por cima deste | `2` |
 | `admin_token` | Senha do painel admin (`/admin/`). Vazio = painel desligado | `openssl rand -hex 32` |
 | `chave_certificados` | Chave que criptografa os certificados enviados pelo painel. **Guarde cópia.** | `php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'` |
 | `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas. Opcional: quem entra no painel admin já abre o monitor sem ele | `openssl rand -hex 32` |
@@ -206,9 +206,11 @@ reiniciando, vermelha = parado.
 
 | Botão | O que acontece |
 |---|---|
+| **Ligar worker** | Aparece quando o worker está parado. Liga o worker pelo próprio painel, sem terminal (saída em `storage/logs/worker.log`). Se houver notas de **produção** na fila, o painel avisa quantas são e só liga depois de você confirmar, porque elas valem de verdade. |
+| **Desligar worker** | O worker termina a nota atual e para. As notas novas ficam na fila até ligar de novo. |
 | **Pausar envios** | Os workers param de enviar. Notas novas continuam entrando na fila e esperam. Use quando a prefeitura estiver fora do ar ou antes de uma manutenção. |
 | **Retomar envios** | Voltam a enviar, começando pelas que esperaram. |
-| **Reiniciar worker** | Cada worker termina a nota atual e sai; o systemd (ou o pm2) liga de novo em segundos, já com o código e a configuração novos. Use depois de atualizar o sistema. |
+| **Reiniciar worker** | Cada worker termina a nota atual e sai; o que foi ligado pelo painel liga um novo sozinho, e no servidor o systemd (ou o pm2) liga de novo em segundos, já com o código e a configuração novos. Use depois de atualizar o sistema. |
 
 A tela também mostra quantas notas esperam na fila, quantas falharam nas
 últimas 24 h, cada worker ligado (último sinal de vida) e quem deu cada
@@ -491,7 +493,45 @@ if (!crypto.timingSafeEqual(Buffer.from(esperado), Buffer.from(req.headers['x-nf
 
 ## 12. Painel admin
 
-Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
+Endereço: `https://SEU_DOMINIO/admin/`. Cada pessoa entra com o **próprio
+e-mail e senha** (script `0014`).
+
+### Quem entra no painel
+
+- **Pessoas do painel** (tela **Sistema**): cadastre nome e e-mail. O sistema
+  gera uma senha provisória e (com a caixa marcada) manda por e-mail; no
+  primeiro login a pessoa cria a própria senha. Na lista: **✉ Enviar acesso
+  por e-mail** (senha nova + e-mail num clique), **Desativar**/**Reativar**.
+  Ninguém desativa a si mesmo.
+- **5 senhas erradas** bloqueiam a pessoa por 15 minutos. Para destravar na
+  hora, outra pessoa usa **✉ Enviar acesso por e-mail**.
+- Login de 12 horas, ou 30 dias com **Manter conectado**. Trocar a senha (botão
+  com o nome, no topo) encerra os logins em outros computadores.
+- **Chave de emergência:** o `admin_token` de `config/nfse.local.php` ainda
+  entra (link "Entrar com a chave de emergência"). Use para cadastrar a
+  primeira pessoa ou se ninguém conseguir entrar; o painel mostra um aviso.
+- O **histórico** (da empresa e da tela Sistema) mostra **quem** fez cada
+  mudança: o nome da pessoa ou "Chave de emergência".
+- O banco guarda só o hash das senhas e o sha256 dos logins.
+
+### Ambiente de emissão (homologação ou produção)
+
+Fica em **Sistema > Ambiente de emissão**. Só quem entra no painel admin vê e
+usa esta chave; usuários do portal (nem o responsável da empresa) não podem.
+
+- **Homologação** = testes, sem valor fiscal. **Produção** = notas valem de
+  verdade.
+- Para ligar produção, digite `PRODUÇÃO` na caixa e clique em **Ligar
+  produção**. O painel avisa se há empresas liberadas sem certificado.
+- Em produção aparece uma **faixa vermelha** no topo do painel.
+- **Voltar para homologação** pede só uma confirmação.
+- O que está no painel vale por cima do `tpAmb` do arquivo; o worker passa a
+  usar o novo ambiente em até 1 minuto.
+- A troca fica no **histórico** com o nome de quem fez.
+
+**Primeira vez:** entre com a chave de emergência, clique em **Atualizar
+banco** (Sistema), cadastre você em **Pessoas do painel**, saia e entre com
+o seu e-mail.
 
 ### O que a tela mostra
 
@@ -507,7 +547,10 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   blocos que abrem com um clique; o botão **Salvar** fica fixo embaixo):
   - **Pronta para emitir?** (primeiro bloco da ficha, veja abaixo);
   - botão **Ver notas desta empresa**: abre o monitor já filtrado nela,
-    com XML, PDF (DANFSe) e o motivo de cada rejeição;
+    com XML, PDF (DANFSe) e o motivo de cada rejeição. Nota **rejeitada** ou
+    **com erro** tem o botão **↻ Reenviar** (na linha e no detalhe; também em
+    "Minhas notas" do portal): manda de novo os mesmos dados, com o mesmo
+    número, e fica no histórico com o nome de quem reenviou;
   - controle de emissão;
   - dados cadastrais e webhook;
   - certificado;
@@ -515,7 +558,7 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   - numeração de cada série (último usado e próxima nota);
   - uso dos últimos 12 meses;
   - documentos do mês por status;
-  - histórico de alterações, com data e IP.
+  - histórico de alterações, com data, IP e quem fez.
 
 ### Colocar uma empresa nova para emitir
 

@@ -233,7 +233,7 @@
     mostrarErro('login-erro', '');
     api('GET', 'esqueci.php').then(function (r) {
       if (!r.disponivel) {
-        mostrarErro('login-erro', 'Peça ao administrador da sua empresa para gerar uma senha nova (tela Usuários). Você cria a sua no primeiro acesso.');
+        mostrarErro('login-erro', 'Peça ao responsável da sua empresa para gerar uma senha nova (tela Usuários). Você cria a sua no primeiro acesso.');
         return;
       }
       el('esqueci-email').value = el('login-email').value.trim();
@@ -366,6 +366,7 @@
     el('empresa-nome').textContent = e.nome_fantasia || e.razao_social || '';
     el('empresa-cnpj').textContent = formatarDoc(e.cnpj || '');
     el('selo-ambiente').hidden = e.ambiente !== 'HOMOLOGACAO';
+    ambienteProducao = e.ambiente === 'PRODUCAO';
     el('emitir-padrao').textContent = e.padrao === 'SALVADOR' ? 'Prefeitura de Salvador (RPS)' : 'Padrão Nacional (DPS)';
 
     // Certificado no rodape do menu
@@ -729,6 +730,21 @@
   }
   el('srv-salvo').addEventListener('change', function () { aplicarServico(true); });
   el('srv-salvar').addEventListener('change', function () { el('srv-nome-campo').hidden = !this.checked; });
+  // Item da LC 116 = comeco do codigo nacional (141302 -> 14.13). Preenche sozinho,
+  // a menos que a pessoa tenha digitado outro item a mao.
+  function itemPeloNacional(idNacional, idItem) {
+    var item = el(idItem);
+    el(idNacional).addEventListener('input', function () {
+      var d = soNumeros(this.value);
+      if (d.length < 4 || (item.value && item.dataset.auto !== item.value)) { return; }
+      item.value = d.slice(0, 2) + '.' + d.slice(2, 4);
+      item.dataset.auto = item.value;
+      item.dispatchEvent(new Event('input'));
+    });
+  }
+  itemPeloNacional('srv-in-nacional', 'srv-in-item');
+  itemPeloNacional('srvf-nacional', 'srvf-item');
+
   ['srv-descricao', 'srv-in-nacional', 'srv-in-item', 'srv-in-aliquota', 'tom-nome'].forEach(function (id) {
     el(id).addEventListener('input', atualizar);
   });
@@ -1079,7 +1095,7 @@
           + '<td class="num">' + escapar(dataCurta(n.criado_em)) + '</td>'
           + '<td class="direita num">' + reais(n.valor) + '</td>'
           + '<td' + (n.motivo ? ' title="' + escapar(n.motivo) + '"' : '') + '>' + pilulaStatus(n.status) + '</td>'
-          + '<td class="acoes">' + arquivos + '</td>'
+          + '<td class="acoes">' + arquivos + (PODE_REENVIAR.indexOf(n.status) >= 0 ? botaoReenviar() : '') + '</td>'
           + '</tr>';
       }).join('');
     }
@@ -1087,6 +1103,29 @@
     el('notas-contagem').textContent = r.total + (r.total === 1 ? ' nota' : ' notas') + (r.paginas > 1 ? ' · página ' + r.pagina + ' de ' + r.paginas : '');
     el('notas-anterior').disabled = r.pagina <= 1;
     el('notas-proxima').disabled = r.pagina >= r.paginas;
+  }
+
+  // ---- Reenviar nota rejeitada (linha e detalhe) ----
+  var ambienteProducao = false;
+  var PODE_REENVIAR = ['REJEITADO', 'ERRO'];
+
+  function botaoReenviar() {
+    return '<button type="button" class="btn btn--secundario" data-reenviar><i class="icone icone--p">replay</i> Reenviar</button>';
+  }
+
+  // Pergunta no proprio lugar do botao; em producao avisa que a nota vale.
+  function reenviarNota(id, lugar, depois) {
+    var pergunta = ambienteProducao ? 'Reenviar? Em produção a nota vale de verdade.' : 'Reenviar com os mesmos dados?';
+    confirmarRemocao(lugar, pergunta, function () {
+      lugar.innerHTML = '<span class="apagado">Reenviando…</span>';
+      api('POST', 'reenviar.php', { id: id }).then(function (r) {
+        avisar(escapar(r.mensagem));
+        if (depois) { depois(); }
+      }).catch(function (erro) {
+        avisar(escapar(erro.message), 'error_outline');
+        if (depois) { depois(); }
+      });
+    }, 'Reenviar');
   }
 
   function limparFiltrosNotas() {
@@ -1127,6 +1166,11 @@
   // Clique (ou Enter) na linha abre o detalhe. Os links de PDF/XML seguem normais.
   function aoEscolherLinha(evento) {
     if (evento.type === 'keydown' && evento.key !== 'Enter') { return; }
+    var reenviar = evento.type === 'click' && evento.target.closest('[data-reenviar]');
+    if (reenviar) {
+      reenviarNota(reenviar.closest('tr[data-id]').getAttribute('data-id'), reenviar.closest('td'), carregarNotas);
+      return;
+    }
     if (evento.target.closest('a, button')) { return; }
     var linha = evento.target.closest('tr[data-id]');
     if (linha) { abrirNota(linha.getAttribute('data-id')); }
@@ -1188,6 +1232,9 @@
     if (t.cpf_cnpj) {
       acoes += '<button type="button" class="btn btn--secundario" data-emitir-para="' + escapar(t.cpf_cnpj) + '"><i class="icone icone--p">add</i> Nova nota para este tomador</button>';
     }
+    if (PODE_REENVIAR.indexOf(n.status) >= 0) {
+      acoes += '<span data-reenviar-lugar>' + botaoReenviar() + '</span>';
+    }
     var canc = n.cancelamento || {};
     if (canc.pode) {
       acoes += '<button type="button" class="btn btn--secundario btn--perigo-leve" data-cancelar><i class="icone icone--p">block</i> Cancelar nota</button>';
@@ -1221,6 +1268,13 @@
     }
     html += '</div>';
     el('nota-corpo').innerHTML = html;
+
+    var lugarReenviar = el('nota-corpo').querySelector('[data-reenviar-lugar]');
+    if (lugarReenviar) {
+      lugarReenviar.querySelector('[data-reenviar]').addEventListener('click', function () {
+        reenviarNota(n.id, lugarReenviar, function () { fecharJanela('janela-nota'); carregarNotas(); });
+      });
+    }
 
     var botaoCancelar = el('nota-corpo').querySelector('[data-cancelar]');
     if (botaoCancelar) { botaoCancelar.addEventListener('click', function () { abrirCancelamento(n); }); }
@@ -1689,8 +1743,8 @@
       listaUsuarios = r.usuarios || [];
       el('botao-convidar').hidden = !r.pode_gerenciar;
       el('usuarios-subtitulo').textContent = r.pode_gerenciar
-        ? 'Quem da sua empresa entra no portal. Você é administrador: pode convidar, desativar e redefinir senhas.'
-        : 'Quem da sua empresa entra no portal. Para convidar ou tirar alguém, fale com um administrador.';
+        ? 'Quem da sua empresa entra no portal. Você é responsável da empresa: pode convidar, desativar e redefinir senhas.'
+        : 'Quem da sua empresa entra no portal. Para convidar ou tirar alguém, fale com o responsável da empresa.';
       desenharUsuarios(r.pode_gerenciar);
     }).catch(function (erro) {
       if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
@@ -1703,14 +1757,14 @@
       var acoes = '';
       if (podeGerenciar && !u.eu) {
         acoes = '<button type="button" class="btn btn--secundario" data-acao="redefinir_senha"><i class="icone icone--p">key</i> Nova senha</button> '
-          + '<button type="button" class="btn btn--icone" data-acao="' + (u.administrador ? 'remover_admin' : 'tornar_admin') + '" title="' + (u.administrador ? 'Tirar administrador' : 'Tornar administrador') + '" aria-label="' + (u.administrador ? 'Tirar administrador de ' : 'Tornar administrador ') + escapar(u.nome) + '"><i class="icone">' + (u.administrador ? 'remove_moderator' : 'add_moderator') + '</i></button>'
+          + '<button type="button" class="btn btn--icone" data-acao="' + (u.administrador ? 'remover_admin' : 'tornar_admin') + '" title="' + (u.administrador ? 'Tirar responsável' : 'Tornar responsável') + '" aria-label="' + (u.administrador ? 'Tirar responsável: ' : 'Tornar responsável: ') + escapar(u.nome) + '"><i class="icone">' + (u.administrador ? 'remove_moderator' : 'add_moderator') + '</i></button>'
           + (u.situacao === 'DESATIVADO'
             ? '<button type="button" class="btn btn--icone" data-acao="ativar" title="Devolver o acesso" aria-label="Devolver o acesso de ' + escapar(u.nome) + '"><i class="icone">person_add_alt</i></button>'
             : '<button type="button" class="btn btn--icone" data-acao="desativar" title="Desativar" aria-label="Desativar ' + escapar(u.nome) + '"><i class="icone">person_off</i></button>');
       }
       return '<tr data-id="' + u.id + '">'
         + '<td><b>' + escapar(u.nome) + '</b>' + (u.eu ? '<span class="eu">você</span>' : '') + '<span class="sub">' + escapar(u.email) + '</span></td>'
-        + '<td>' + (u.administrador ? '<span class="pilula pilula--info">Administrador</span>' : '<span class="pilula pilula--neutro">Emissor</span>') + '</td>'
+        + '<td>' + (u.administrador ? '<span class="pilula pilula--info">Responsável</span>' : '<span class="pilula pilula--neutro">Emissor</span>') + '</td>'
         + '<td>' + '<span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span></td>'
         + '<td class="num">' + escapar(dataCurta(u.ultimo_acesso) || 'nunca entrou') + '</td>'
         + '<td class="acoes">' + acoes + '</td></tr>';

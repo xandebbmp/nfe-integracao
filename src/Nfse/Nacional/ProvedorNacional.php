@@ -36,8 +36,7 @@ final class ProvedorNacional implements ProvedorNfse
         private SefinNacionalCliente $cliente,
         private AssinadorXml $assinador
     ) {
-        $versao = (string)$cfg['nacional']['versao_leiaute'];
-        $this->dirXsd = dirname(__DIR__, 3) . "/schemas/nfse/nacional/{$versao}";
+        $this->dirXsd = dirname(__DIR__, 3) . '/schemas/nfse/nacional/' . DpsXmlBuilder::leiaute($cfg)['xsd'];
     }
 
     public function padrao(): string

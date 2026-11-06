@@ -82,17 +82,43 @@ final class DpsXmlBuilder
         Xml::filho($dom, $inf, 'nDPS', (string)$numero);
         Xml::filho($dom, $inf, 'dCompet', (string)($p['competencia'] ?? $agora->format('Y-m-d')));
         Xml::filho($dom, $inf, 'tpEmit', '1'); // 1 = prestador
-        // Finalidade da NFS-e: obrigatoria desde o XSD de 20/10/2026. Hoje so existe 0 = NFS-e regular.
-        Xml::filho($dom, $inf, 'finNFSe', '0');
+        // Finalidade da NFS-e: obrigatoria no XSD de 20/10/2026 (hoje so na
+        // Producao Restrita; a producao ainda recusa o campo). 0 = NFS-e regular.
+        if (self::leiaute($this->cfg)['finNFSe']) {
+            Xml::filho($dom, $inf, 'finNFSe', '0');
+        }
         Xml::filho($dom, $inf, 'cLocEmi', (string)$emitente['codigo_municipio']);
 
         $this->montarSubstituicao($dom, $inf, $p);
         $this->montarPrestador($dom, $inf, $emitente);
         $this->montarTomador($dom, $inf, $p['tomador'] ?? null);
         $this->montarServico($dom, $inf, $p['servico'], (string)$emitente['codigo_municipio']);
-        $this->montarValores($dom, $inf, self::valoresComPadraoDoEmitente($p['valores'], $emitente));
+        $this->montarValores($dom, $inf, self::valoresComPadraoDoEmitente($p['valores'], $emitente), $emitente);
 
         return ['xml' => $dom->saveXML($dom->documentElement), 'id_dps' => $idDps];
+    }
+
+    /**
+     * Leiaute do ambiente (config nacional.leiaute_por_ambiente):
+     * ['xsd' => pasta em schemas/nfse/nacional, 'finNFSe' => envia o campo?].
+     */
+    public static function leiaute(array $cfg): array
+    {
+        $tpAmb = (int)$cfg['tpAmb'];
+        $padrao = ['xsd' => (string)$cfg['nacional']['versao_leiaute'], 'finNFSe' => true];
+        return ($cfg['nacional']['leiaute_por_ambiente'][$tpAmb] ?? []) + $padrao;
+    }
+
+    /**
+     * ME/EPP (opSimpNac 3) com o ISS apurado no Simples (regApTribSN 1) e sem
+     * retencao: o Sefin recusa pAliq (o ISS vai no DAS). A aliquota fica so
+     * nos dados da nota, para mostrar na tela.
+     */
+    public static function issPeloSimplesSemRetencao(array $valores, array $emitente): bool
+    {
+        return (int)($emitente['opcao_simples_nacional'] ?? 1) === 3
+            && (int)($emitente['regime_apuracao_simples'] ?? 0) === 1
+            && empty($valores['iss_retido']);
     }
 
     /**
@@ -181,7 +207,7 @@ final class DpsXmlBuilder
         Xml::filhoOpcional($dom, $cServ, 'cNBS', $servico['codigo_nbs'] ?? null);
     }
 
-    private function montarValores(DOMDocument $dom, DOMElement $inf, array $valores): void
+    private function montarValores(DOMDocument $dom, DOMElement $inf, array $valores, array $emitente = []): void
     {
         $val = Xml::filho($dom, $inf, 'valores');
 
@@ -208,7 +234,8 @@ final class DpsXmlBuilder
         Xml::filho($dom, $tribMun, 'tribISSQN', (string)(int)($valores['tributacao_issqn'] ?? 1));
         // 1=Nao retido, 2=Retido pelo tomador, 3=Retido pelo intermediario
         Xml::filho($dom, $tribMun, 'tpRetISSQN', !empty($valores['iss_retido']) ? '2' : '1');
-        if (isset($valores['aliquota_iss']) && $valores['aliquota_iss'] !== null && $valores['aliquota_iss'] !== '') {
+        if (isset($valores['aliquota_iss']) && $valores['aliquota_iss'] !== null && $valores['aliquota_iss'] !== ''
+            && !self::issPeloSimplesSemRetencao($valores, $emitente)) {
             Xml::filho($dom, $tribMun, 'pAliq', Xml::decimal($valores['aliquota_iss']));
         }
 

@@ -61,11 +61,12 @@ final class SistemaRepositorio
     /** Pausado e "reiniciar ate" numa consulta so (o worker le a cada volta). */
     public function ordensDoWorker(): array
     {
-        $linhas = $this->pdo->query("SELECT chave, valor FROM sistema_controle WHERE chave IN ('worker_pausado', 'worker_reiniciar')")
+        $linhas = $this->pdo->query("SELECT chave, valor FROM sistema_controle WHERE chave IN ('worker_pausado', 'worker_reiniciar', 'worker_desligar')")
             ->fetchAll(PDO::FETCH_KEY_PAIR);
         return [
             'pausado' => ($linhas['worker_pausado'] ?? '0') === '1',
             'reiniciar' => isset($linhas['worker_reiniciar']) ? (int)$linhas['worker_reiniciar'] : 0,
+            'desligar' => isset($linhas['worker_desligar']) ? (int)$linhas['worker_desligar'] : 0,
         ];
     }
 
@@ -129,12 +130,14 @@ final class SistemaRepositorio
     {
         $r = $this->pdo->query(
             "SELECT
-                count(*) FILTER (WHERE status = 'PENDENTE' AND executar_apos <= CURRENT_TIMESTAMP) AS esperando,
-                count(*) FILTER (WHERE status = 'PENDENTE' AND executar_apos > CURRENT_TIMESTAMP) AS agendados,
-                count(*) FILTER (WHERE status = 'EXECUTANDO') AS executando,
-                count(*) FILTER (WHERE status = 'FALHOU' AND atualizado_em >= CURRENT_TIMESTAMP - INTERVAL '24 hours') AS falhas_24h,
-                min(criado_em) FILTER (WHERE status = 'PENDENTE' AND executar_apos <= CURRENT_TIMESTAMP) AS mais_antigo
-               FROM nfse_jobs"
+                count(*) FILTER (WHERE j.status = 'PENDENTE' AND j.executar_apos <= CURRENT_TIMESTAMP) AS esperando,
+                count(*) FILTER (WHERE j.status = 'PENDENTE' AND j.executar_apos > CURRENT_TIMESTAMP) AS agendados,
+                count(*) FILTER (WHERE j.status = 'EXECUTANDO') AS executando,
+                count(*) FILTER (WHERE j.status = 'FALHOU' AND j.atualizado_em >= CURRENT_TIMESTAMP - INTERVAL '24 hours') AS falhas_24h,
+                min(j.criado_em) FILTER (WHERE j.status = 'PENDENTE' AND j.executar_apos <= CURRENT_TIMESTAMP) AS mais_antigo,
+                count(*) FILTER (WHERE j.status IN ('PENDENTE', 'EXECUTANDO') AND d.tp_amb = 1) AS producao
+               FROM nfse_jobs j
+               LEFT JOIN nfse_documentos d ON d.id = j.documento_id"
         )->fetch(PDO::FETCH_ASSOC);
         return [
             'esperando' => (int)$r['esperando'],
@@ -142,6 +145,7 @@ final class SistemaRepositorio
             'executando' => (int)$r['executando'],
             'falhas_24h' => (int)$r['falhas_24h'],
             'mais_antigo' => $r['mais_antigo'],
+            'producao' => (int)$r['producao'],   // notas de PRODUCAO esperando (valem de verdade)
         ];
     }
 
@@ -149,12 +153,12 @@ final class SistemaRepositorio
     // Historico (o registro em si e gravado por ClienteRepositorio::registrarLog)
     // ------------------------------------------------------------------
 
-    /** Ultimas ordens dadas na tela Sistema (worker e banco). */
+    /** Ultimas ordens dadas na tela Sistema (worker, banco, configuracoes e pessoas do painel). */
     public function acoesRecentes(int $limite = 10): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT acao, ip, criado_em FROM fiscal_admin_log
-              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%' OR acao LIKE 'CONFIG\\_%')
+            "SELECT acao, ip, criado_em, to_jsonb(l)->>'autor' AS autor FROM fiscal_admin_log l
+              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%' OR acao LIKE 'CONFIG\\_%' OR acao LIKE 'PAINEL\\_%' OR acao LIKE 'AMBIENTE\\_%')
               ORDER BY id DESC LIMIT :limite"
         );
         $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);

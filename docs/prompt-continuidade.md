@@ -204,7 +204,7 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 430/430 com banco e 130/130 sem.
+  - Situação atual: 499/499 com banco e 135/135 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
   `node --check public/admin/admin.js public/monitor/monitor.js public/portal/portal.js` e
   `shellcheck -S warning deploy/*.sh`.

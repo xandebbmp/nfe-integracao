@@ -122,6 +122,36 @@ function testesSistemaIntegracao(PDO $pdo, array $cfg): void
     $acoes = array_column($controle->status()['acoes_recentes'], 'acao');
     Apoio::igual(['WORKER_REINICIADO', 'WORKER_RETOMADO', 'WORKER_PAUSADO'], array_slice($acoes, 0, 3), 'ordens ficam no historico (mais nova primeiro)');
 
+    // Ligar e desligar pelo painel (o processo e trocado por um falso no teste).
+    $ligou = 0;
+    $falso = new ControleSistema($pdo, function () use (&$ligou): ?string { $ligou++; return null; });
+    Apoio::igual('WORKER_JA_LIGADO', $falso->executar('ligar', null)['codigo'] ?? null, 'ligar: recusa se ja tem worker dando sinal');
+    $repo->removerWorker('srv:200');
+    $r = $falso->executar('ligar', '10.0.0.1');
+    Apoio::verificar($r['ok'] && $ligou === 1, 'ligar: chama o iniciador do worker');
+    $quebrado = new ControleSistema($pdo, fn (): ?string => 'sem exec');
+    $r = $quebrado->executar('ligar', null);
+    Apoio::verificar(!$r['ok'] && $r['codigo'] === 'WORKER_NAO_LIGOU' && $r['mensagem'] === 'sem exec', 'ligar: mostra por que nao ligou');
+    // Nota de PRODUCAO na fila: so liga com confirmacao (tudo desfeito no fim).
+    $pdo->beginTransaction();
+    $lote = $pdo->query("INSERT INTO nfse_lotes (consumidor, quantidade_documentos) VALUES ('teste', 1) RETURNING id")->fetchColumn();
+    $doc = $pdo->query("INSERT INTO nfse_documentos (lote_id, consumidor, padrao, tp_amb, emitente_cnpj, referencia, payload, serie, numero)
+        VALUES ('{$lote}', 'teste', 'NACIONAL', 1, '00000000000191', 'prod-1', '{}', '900', 1) RETURNING id")->fetchColumn();
+    $pdo->exec("INSERT INTO nfse_jobs (tipo, documento_id) VALUES ('EMITIR', '{$doc}')");
+    Apoio::igual(1, $controle->status()['fila']['producao'], 'fila: conta notas de producao esperando');
+    $ligou = 0;
+    $r = $falso->executar('ligar', null);
+    Apoio::verificar(!$r['ok'] && $r['codigo'] === 'CONFIRMAR_PRODUCAO' && $r['producao'] === 1 && $ligou === 0, 'ligar: com nota de producao na fila pede confirmacao e nao liga');
+    $r = $falso->executar('ligar', null, ['confirmar_producao' => true]);
+    Apoio::verificar($r['ok'] && $ligou === 1, 'ligar: confirmado, liga');
+    $pdo->rollBack();
+
+    $r = $controle->executar('desligar', '10.0.0.1');
+    Apoio::verificar($r['ok'] && $repo->ordensDoWorker()['desligar'] >= time() - 5, 'desligar: grava a ordem para o worker');
+    $falso->executar('ligar', null);
+    Apoio::igual(0, $repo->ordensDoWorker()['desligar'], 'ligar: apaga a ordem de desligar antiga');
+    $repo->batimento('srv:200', 'srv', 200, 'AGUARDANDO', 0);
+
     $r = $controle->executar('desligar_tudo', null);
     Apoio::verificar(!$r['ok'] && $r['http'] === 400, 'acao desconhecida recusada');
 
@@ -130,7 +160,7 @@ function testesSistemaIntegracao(PDO $pdo, array $cfg): void
     $pdo->exec("UPDATE sistema_workers SET batimento_em = CURRENT_TIMESTAMP - INTERVAL '2 minutes'");
     $s = $controle->status();
     Apoio::igual('PARADO', $s['situacao'], 'sem sinal ha 2 minutos: PARADO');
-    Apoio::verificar(str_contains($s['texto'], 'deixou de dar sinal'), 'explica que o worker parou de dar sinal');
+    Apoio::verificar(str_contains($s['texto'], 'está desligado'), 'explica que o worker parou de dar sinal');
     Apoio::igual(1, $repo->apagarWorkersMortos(60), 'limpeza apaga worker morto');
 
     // Resumo da fila (le nfse_jobs).

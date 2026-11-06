@@ -26,6 +26,7 @@ require __DIR__ . '/casos_nfe.php';
 require __DIR__ . '/casos_clientes.php';
 require __DIR__ . '/casos_portal.php';
 require __DIR__ . '/casos_sistema.php';
+require __DIR__ . '/casos_painel.php';
 
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoLocal;
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoS3;
@@ -49,6 +50,7 @@ use Xande\NfeIntegracao\Nfse\Salvador\ProvedorSalvador;
 use Xande\NfeIntegracao\Nfse\Salvador\SalvadorSoapCliente;
 use Xande\NfeIntegracao\Nfse\Servico\ProcessadorJobs;
 use Xande\NfeIntegracao\Nfse\Servico\RecebimentoLote;
+use Xande\NfeIntegracao\Nfse\Servico\ReenvioDocumento;
 use Xande\NfeIntegracao\Nfse\Servico\Solicitacoes;
 use Xande\NfeIntegracao\Nfse\Servico\ValidadorPayload;
 
@@ -206,7 +208,20 @@ $http->responder(201, respostaSefinAutorizada($chave));
 provedorNacional($cfgMeEpp, $http)->emitir(Apoio::documentoNacional());
 $dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
 Apoio::verificar(str_contains($dps, '<pTotTribSN>2.00</pTotTribSN>') && !str_contains($dps, '<indTotTrib>'), 'ME/EPP: DPS usa o percentual do cadastro (pTotTribSN 2.00)');
+Apoio::verificar(!str_contains($dps, '<pAliq>'), 'ME/EPP com ISS no Simples e sem retencao: DPS sem pAliq (o Sefin recusa)');
 Apoio::igual([], ValidadorXsd::validar($dps, "{$raiz}/schemas/nfse/nacional/1.01/DPS_v1.01.xsd"), 'ME/EPP: DPS com pTotTribSN passa no XSD');
+
+// Producao e Producao Restrita em leiautes diferentes (E1235 em producao com finNFSe).
+Apoio::verificar(str_contains($dps, '<finNFSe>0</finNFSe>'), 'homologacao: DPS envia finNFSe (XSD de 20/10/2026)');
+$cfgProducao = $cfgMeEpp;
+$cfgProducao['tpAmb'] = 1;
+$http = new TransporteFalso();
+$http->responder(201, respostaSefinAutorizada($chave));
+provedorNacional($cfgProducao, $http)->emitir(Apoio::documentoNacional());
+$dpsProducao = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
+Apoio::verificar(!str_contains($dpsProducao, 'finNFSe') && str_contains($dpsProducao, '<tpAmb>1</tpAmb>'), 'producao: DPS sem finNFSe (a producao ainda recusa o campo)');
+Apoio::igual([], ValidadorXsd::validar($dpsProducao, "{$raiz}/schemas/nfse/nacional/1.01-producao/DPS_v1.01.xsd"), 'producao: DPS passa no XSD da producao');
+Apoio::verificar(ValidadorXsd::validar($dps, "{$raiz}/schemas/nfse/nacional/1.01-producao/DPS_v1.01.xsd") !== [], 'XSD da producao recusa finNFSe (mesmo erro da Receita)');
 
 $docComPercentual = Apoio::documentoNacional();
 $docComPercentual['payload']['valores']['percentual_tributos_simples'] = 6.5;
@@ -372,7 +387,7 @@ if (!$dsn) {
     Apoio::verificar(!getenv('NFSE_TESTE_EXIGIR_PG'), 'NFSE_TESTE_EXIGIR_PG ativo, mas NFSE_TESTE_PG nao foi definido');
 } else {
     $pdo = new PDO($dsn, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-    $pdo->exec('DROP TABLE IF EXISTS sistema_emails, portal_redefinicoes, portal_recorrencias, sistema_ajustes, sistema_scripts, sistema_workers, sistema_controle, portal_consultas, portal_tomadores, portal_servicos, portal_sessoes, portal_usuarios, fiscal_uso, fiscal_admin_log, fiscal_clientes, nfse_webhooks_saida, nfse_monitor, nfse_jobs, nfse_eventos, nfse_numeracao, nfse_documentos, nfse_lotes CASCADE');
+    $pdo->exec('DROP TABLE IF EXISTS admin_sessoes, admin_usuarios, sistema_emails, portal_redefinicoes, portal_recorrencias, sistema_ajustes, sistema_scripts, sistema_workers, sistema_controle, portal_consultas, portal_tomadores, portal_servicos, portal_sessoes, portal_usuarios, fiscal_uso, fiscal_admin_log, fiscal_clientes, nfse_webhooks_saida, nfse_monitor, nfse_jobs, nfse_eventos, nfse_numeracao, nfse_documentos, nfse_lotes CASCADE');
     // Aplica TODOS os scripts do banco, na ordem (0001, 0002, 0003...),
     // igual ao deploy/aplicar_banco.sh.
     $scripts = glob("{$raiz}/database/scripts/*.sql");
@@ -440,8 +455,17 @@ if (!$dsn) {
     Apoio::igual('JA_EXISTENTE', $repetido['documentos'][0]['situacao_recebimento'], 'mesma referencia autorizada nao gera nova nota');
     Apoio::igual(0, (int)$pdo->query("SELECT count(*) FROM nfse_jobs WHERE status = 'PENDENTE'")->fetchColumn(), 'nenhum job novo para documento ja autorizado');
 
-    $reenvio = $recebimento->receber('TESTE', ['padrao' => 'NACIONAL', 'documentos' => [array_replace($payload, ['referencia' => 'PEDIDO-2'])]]);
-    Apoio::igual('REENVIADO', $reenvio['documentos'][0]['situacao_recebimento'], 'referencia rejeitada pode ser reenviada');
+    // Botao "Reenviar" (portal/monitor): mesmos dados guardados, mesma nota.
+    $reenvioBotao = new ReenvioDocumento($pdo, $cfgGeral);
+    Apoio::igual('NAO_PODE_REENVIAR', $reenvioBotao->reenviar($doc1['id'], null, 'ip')['codigo'] ?? null, 'reenviar: nota autorizada nao reenvia');
+    Apoio::igual('NOTA_NAO_ENCONTRADA', $reenvioBotao->reenviar($doc2['id'], '99999999000191', 'ip')['codigo'] ?? null, 'reenviar: portal so reenvia nota da propria empresa');
+    $outroAmbiente = $cfgGeral;
+    $outroAmbiente['tpAmb'] = 1;
+    Apoio::igual('AMBIENTE_DIFERENTE', (new ReenvioDocumento($pdo, $outroAmbiente))->reenviar($doc2['id'], null, 'ip')['codigo'] ?? null, 'reenviar: nota de homologacao nao vai para producao');
+    $reenvio = $reenvioBotao->reenviar($doc2['id'], null, 'ip');
+    Apoio::verificar($reenvio['ok'] && !$reenvio['producao'], 'reenviar: rejeitada volta para a fila');
+    Apoio::igual(1, (int)$pdo->query("SELECT count(*) FROM nfse_jobs WHERE status = 'PENDENTE' AND documento_id = '{$doc2['id']}'")->fetchColumn(), 'reenviar: um job novo para a mesma nota');
+    Apoio::igual('NAO_PODE_REENVIAR', $reenvioBotao->reenviar($doc2['id'], null, 'ip')['codigo'] ?? null, 'reenviar: clique duplo nao cria outro job');
     $http->responder(201, respostaSefinAutorizada(str_repeat('2', 50)));
     while ($worker->processarProximo()) {
     }
@@ -538,6 +562,7 @@ if (!$dsn) {
     testesClientesIntegracao($pdo, $cfgGeral);
     testesPortalIntegracao($pdo, $cfgGeral);
     testesSistemaIntegracao($pdo, $cfgGeral);
+    testesPainelIntegracao($pdo, $cfgGeral);
 }
 
 // ===========================================================================

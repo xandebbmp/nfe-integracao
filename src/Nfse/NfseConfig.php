@@ -165,6 +165,7 @@ final class NfseConfig
         $ajustes = (new SistemaRepositorio($pdo))->ajustes();
         $cfg = AjustesPainel::aplicar($cfg, $ajustes);
         $cfg = ConfiguracoesPainel::aplicarSenhaEmail($cfg, $ajustes);
+        $cfg = ConfiguracoesPainel::aplicarAmbiente($cfg, $ajustes);
 
         $repositorio = new ClienteRepositorio($pdo);
         if (!$repositorio->existe()) {

@@ -8,7 +8,7 @@
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261106a">
+  <link rel="stylesheet" href="portal.css?v=20261106b">
 </head>
 <body>
 
@@ -381,7 +381,7 @@
                         <div class="campo campo--terco"><label for="srv-in-item">Item LC 116</label><input id="srv-in-item" maxlength="5" placeholder="01.01"></div>
                         <div class="campo campo--terco"><label for="srv-in-aliquota">Alíquota ISS (%)</label><input id="srv-in-aliquota" inputmode="decimal" placeholder="5"></div>
                       </div>
-                      <small class="dica">Não sabe os códigos? Eles estão em uma nota antiga da empresa ou com o seu contador.</small>
+                      <small class="dica"><b>Item LC 116</b> é o número do serviço na lista da lei do ISS (ex.: 14.13 = serralheria). Ele se preenche sozinho com o começo do código nacional. Não sabe os códigos? Eles estão em uma nota antiga da empresa ou com o seu contador.</small>
                       <label class="interruptor">
                         <input id="srv-salvar" type="checkbox" checked>
                         <span>Salvar este serviço <small class="apagado">na próxima nota é só escolher na lista</small></span>
@@ -642,6 +642,7 @@
           <div class="campo campo--terco"><label for="srvf-item">Item da LC 116</label><input id="srvf-item" maxlength="5" placeholder="01.01"></div>
           <div class="campo campo--terco"><label for="srvf-aliquota">Alíquota do ISS (%)</label><input id="srvf-aliquota" inputmode="decimal" placeholder="2,00"></div>
         </div>
+        <small class="dica"><b>Item da LC 116</b> é o número do serviço na lista da lei do ISS (ex.: 14.13 = serralheria). Ele se preenche sozinho com o começo do código nacional (141302 → 14.13). Na dúvida, veja numa nota antiga ou pergunte ao contador.</small>
         <details class="mais">
           <summary>Mais códigos <span class="apagado">só se a prefeitura pedir</span></summary>
           <div class="linha-campos">
@@ -701,7 +702,7 @@
           <div class="campo campo--meio"><label for="conv-email">E-mail</label><input id="conv-email" type="email" maxlength="160" autocomplete="off"></div>
         </div>
         <label class="interruptor"><input type="checkbox" id="conv-admin">
-          <span>Também é administrador<small class="secundario">Pode convidar e desativar pessoas. Deixe desmarcado para quem só emite notas.</small></span></label>
+          <span>Também é responsável da empresa<small class="secundario">Pode convidar e desativar pessoas. Deixe desmarcado para quem só emite notas.</small></span></label>
         <p id="convite-erro" class="erro" role="alert" hidden></p>
       </div>
       <div class="janela__rodape">
@@ -816,6 +817,6 @@
     </form>
   </dialog>
 
-  <script src="portal.js?v=20261106a"></script>
+  <script src="portal.js?v=20261106d"></script>
 </body>
 </html>

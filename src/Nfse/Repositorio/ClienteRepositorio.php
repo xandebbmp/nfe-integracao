@@ -276,16 +276,35 @@ final class ClienteRepositorio
 
     // ---------------------------------------------------------------- historico
 
+    /**
+     * Quem esta usando o painel nesta requisicao ("Nome <email>" ou "Chave de
+     * emergência"). Preenchido por Api::exigirAdmin(); vai no historico.
+     */
+    public static ?string $autor = null;
+
+    /** @var array<int, bool> a coluna "autor" (script 0014) existe? por conexao */
+    private static array $temColunaAutor = [];
+
     public function registrarLog(?string $cnpj, string $acao, array $detalhes, ?string $ip): void
     {
+        $chave = spl_object_id($this->pdo);
+        self::$temColunaAutor[$chave] ??= (bool)$this->pdo->query(
+            "SELECT 1 FROM information_schema.columns WHERE table_name = 'fiscal_admin_log' AND column_name = 'autor'"
+        )->fetchColumn();
+        $parametros = [':cnpj' => $cnpj, ':acao' => $acao, ':detalhes' => json_encode($detalhes, JSON_UNESCAPED_UNICODE), ':ip' => $ip];
+        if (self::$temColunaAutor[$chave]) {
+            $this->pdo->prepare('INSERT INTO fiscal_admin_log (cnpj, acao, detalhes, ip, autor) VALUES (:cnpj, :acao, :detalhes, :ip, :autor)')
+                ->execute($parametros + [':autor' => self::$autor]);
+            return;
+        }
         $this->pdo->prepare('INSERT INTO fiscal_admin_log (cnpj, acao, detalhes, ip) VALUES (:cnpj, :acao, :detalhes, :ip)')
-            ->execute([':cnpj' => $cnpj, ':acao' => $acao, ':detalhes' => json_encode($detalhes, JSON_UNESCAPED_UNICODE), ':ip' => $ip]);
+            ->execute($parametros);
     }
 
     /** @return list<array> */
     public function historico(string $cnpj, int $limite = 30): array
     {
-        $stmt = $this->pdo->prepare('SELECT acao, detalhes, ip, criado_em FROM fiscal_admin_log WHERE cnpj = :cnpj ORDER BY id DESC LIMIT :limite');
+        $stmt = $this->pdo->prepare("SELECT acao, detalhes, ip, criado_em, to_jsonb(l)->>'autor' AS autor FROM fiscal_admin_log l WHERE cnpj = :cnpj ORDER BY id DESC LIMIT :limite");
         $stmt->bindValue(':cnpj', $cnpj);
         $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
         $stmt->execute();

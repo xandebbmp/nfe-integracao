@@ -146,6 +146,41 @@ async function api(caminho, formato = 'json') {
   return corpo;
 }
 
+// Botao "Reenviar" (nota rejeitada ou com erro). So para quem entrou no
+// painel admin: o token do monitor sozinho e so leitura.
+const API_ADMIN = new URL('../v1/admin/', window.location.href).href;
+const PODE_REENVIAR = ['REJEITADO', 'ERRO'];
+
+async function reenviarDocumento(doc, botao) {
+  const pergunta = doc.ambiente === 'PRODUCAO'
+    ? `Reenviar a nota ${doc.referencia}? Ela é de PRODUÇÃO: se for autorizada, vale de verdade.`
+    : `Reenviar a nota ${doc.referencia} com os mesmos dados?`;
+  if (!confirm(pergunta)) return;
+  botao.disabled = true;
+  botao.textContent = 'Reenviando…';
+  try {
+    const resposta = await fetch(API_ADMIN + 'reenviar.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-ADMIN-TOKEN': estado.token },
+      body: JSON.stringify({ id: doc.id }),
+    });
+    const corpo = await resposta.json().catch(() => ({}));
+    if (resposta.status === 401) throw new Error('Só quem entra no painel admin com e-mail e senha pode reenviar.');
+    if (!resposta.ok) throw new Error(corpo.erro?.mensagem || `HTTP ${resposta.status}`);
+    botao.textContent = 'Na fila ✓';
+  } catch (e) {
+    alert(e.message);
+    botao.disabled = false;
+    botao.textContent = '↻ Reenviar';
+  }
+}
+
+function botaoReenviar(doc) {
+  if (!PODE_REENVIAR.includes(doc.status)) return null;
+  return el('button', { class: 'botao-reenviar', type: 'button', title: 'Mandar de novo os mesmos dados (mesmo número)',
+    onclick: (e) => { e.stopPropagation(); reenviarDocumento(doc, e.currentTarget); } }, '↻ Reenviar');
+}
+
 async function carregarDocumentos() {
   const { documentos } = await api(`documentos.php?limite=${LIMITE_NOTAS}`);
   estado.documentos.clear();
@@ -261,7 +296,7 @@ function linhaDocumento(doc) {
     el('td', { class: 'mono' }, doc.dps_rps ? `${doc.dps_rps.serie}/${doc.dps_rps.numero}` : '—'),
     el('td', { class: 'mono' }, doc.nfse?.numero || '—'),
     el('td', {}, seloStatus(doc.status), problema ? el('span', { class: 'alerta', title: 'Passe o mouse para ver o motivo' }, '⚠') : null),
-    el('td', { class: 'acao' }, textoUltimaAcao(doc, ultima)),
+    el('td', { class: 'acao' }, textoUltimaAcao(doc, ultima), botaoReenviar(doc)),
   );
 }
 
@@ -367,8 +402,10 @@ function conteudoModal(doc) {
       ));
     }
     if (doc.pode_reenviar) {
+      const reenviar = botaoReenviar(doc);
+      if (reenviar) partes.push(el('p', {}, reenviar, el('span', { class: 'suave' }, ' manda de novo os mesmos dados, com o mesmo número.')));
       partes.push(el('p', { class: 'suave' },
-        `Depois de corrigir no sistema de origem, reenvie com a mesma referência (${doc.referencia}). `
+        `Se o erro for de cadastro, corrija no sistema de origem e reenvie com a mesma referência (${doc.referencia}). `
         + (doc.padrao === 'NFE'
           ? (doc.dps_rps ? 'O número da NF-e será reaproveitado.' : 'O número da NF-e será reservado no reenvio.')
           : (doc.dps_rps ? 'O número da DPS/RPS será reaproveitado.' : 'O número da DPS/RPS será reservado no reenvio.'))));
