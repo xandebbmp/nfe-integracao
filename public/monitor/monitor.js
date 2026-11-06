@@ -560,6 +560,14 @@ function configurarTela() {
   });
   $('botao-sair').addEventListener('click', () => sair());
   $('modal-fechar').addEventListener('click', () => $('modal').close());
+  // Clique no fundo escuro (fora da caixa) fecha; arrastar de dentro para fora nao.
+  let comecouFora = false;
+  const fora = (e) => {
+    const r = $('modal').getBoundingClientRect();
+    return e.target === $('modal') && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+  };
+  $('modal').addEventListener('mousedown', (e) => { comecouFora = fora(e); });
+  $('modal').addEventListener('click', (e) => { if (comecouFora && fora(e)) $('modal').close(); comecouFora = false; });
   $('modal').addEventListener('close', () => { estado.modalId = null; });
 }
 

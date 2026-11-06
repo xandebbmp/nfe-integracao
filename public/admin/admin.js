@@ -261,7 +261,30 @@ function abrirModal(titulo, subtitulo, conteudo, opcoes = {}) {
   else if (opcoes.rodape) conteudo = [...conteudo, el('div', { class: 'acoes' }, ...opcoes.rodape)];
   $('modal-corpo').replaceChildren(...conteudo);
   $('modal-corpo').scrollTop = 0;
+  delete $('modal').dataset.sujo;
   if (!$('modal').open) $('modal').showModal();
+}
+
+// Fecha a janela pelo X, pelo Esc ou clicando fora dela. Se houver alteracao
+// nao salva (ou uma senha provisoria na tela), pergunta antes.
+function podeFecharModal() {
+  const modal = $('modal');
+  if (modal.dataset.sujo === '1' && !confirm('Há alterações não salvas. Fechar mesmo assim?')) return false;
+  if (modal.querySelector('.acesso-box') && !confirm('A senha provisória na tela some ao fechar (para mandar depois, só gerando outra). Fechar mesmo assim?')) return false;
+  return true;
+}
+function fecharModal() { if (podeFecharModal()) $('modal').close(); }
+
+/** Clique no fundo escuro (fora da caixa) fecha a janela. */
+function fecharAoClicarFora(dialogo, fechar) {
+  let comecouFora = false;
+  const fora = (e) => {
+    const r = dialogo.getBoundingClientRect();
+    return e.target === dialogo && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+  };
+  // So fecha se apertou E soltou fora (arrastar uma selecao de dentro para fora nao fecha).
+  dialogo.addEventListener('mousedown', (e) => { comecouFora = fora(e); });
+  dialogo.addEventListener('click', (e) => { if (comecouFora && fora(e)) fechar(); comecouFora = false; });
 }
 
 async function abrirCliente(numeroCnpj) {
@@ -402,7 +425,7 @@ function desenharCliente(c) {
   // ---- Botao salvar (barra fixa embaixo da janela) ----
   const mensagemSalvar = el('span', { class: 'rodape__mensagem', role: 'status' });
   const botaoSalvar = el('button', { class: 'botao botao--forte', type: 'button' }, novo ? 'Cadastrar empresa' : 'Salvar alterações');
-  form.addEventListener('input', () => { mensagemSalvar.className = 'rodape__mensagem aviso'; mensagemSalvar.textContent = 'Alterações não salvas'; });
+  form.addEventListener('input', () => { $('modal').dataset.sujo = '1'; mensagemSalvar.className = 'rodape__mensagem aviso'; mensagemSalvar.textContent = 'Alterações não salvas'; });
   botaoSalvar.addEventListener('click', async () => {
     const corpo = lerFormulario(form);
     if (!corpo) return;
@@ -1444,7 +1467,9 @@ $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
 $('botao-sistema').addEventListener('click', () => abrirSistema());
-$('modal-fechar').addEventListener('click', () => $('modal').close());
+$('modal-fechar').addEventListener('click', fecharModal);
+$('modal').addEventListener('cancel', (e) => { if (!podeFecharModal()) e.preventDefault(); });
+fecharAoClicarFora($('modal'), fecharModal);
 $('filtro-busca').addEventListener('input', desenhar);
 $('filtro-situacao').addEventListener('change', (e) => { estado.filtroSituacao = e.target.value; desenhar(); });
 
