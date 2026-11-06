@@ -44,6 +44,13 @@
       valores: { valor_servicos: n.valor, aliquota_iss: 5, iss_retido: false },
       competencia: n.criado_em.slice(0, 10),
       nfse: n.numero ? { numero: n.numero, codigo_verificacao: 'AB12CD34', chave_acesso: null, data_autorizacao: n.criado_em } : null,
+      cancelamento: {
+        forma: 'ENVIAR',
+        pode: n.status === 'AUTORIZADO' && !n.pedidoCancelamento,
+        evento: n.pedidoCancelamento || (n.status === 'CANCELADO'
+          ? { status: 'REGISTRADO', motivo: 'Erro na emissão', texto: 'Valor errado, foi emitida outra nota.', por: 'mariana@exemplo.com.br', criado_em: '2026-10-29T10:00:00', mensagens: [] }
+          : null)
+      },
       mensagens: n.status === 'REJEITADO' ? [{ codigo: 'E0312', mensagem: 'CEP do tomador não encontrado.', correcao: 'Confira o CEP no cadastro do tomador e emita de novo.' }] : []
     });
   }
@@ -162,6 +169,15 @@
           return ok({ ok: true, mensagem: msg }, corpo.acao === 'emitir' ? 900 : 150);
         }
         return ok({ recorrencias: recorrencias });
+      }
+      if (rota === 'cancelar.php') {
+        var errosCanc = [];
+        if (!corpo.motivo_codigo) { errosCanc.push({ campo: 'motivo_codigo', mensagem: 'Escolha o motivo do cancelamento.' }); }
+        if ((corpo.motivo || '').length < 15) { errosCanc.push({ campo: 'motivo', mensagem: 'Explique em 15 a 255 letras (ex.: "Valor errado, será emitida outra nota").' }); }
+        if (errosCanc.length) { return falhaCampos(errosCanc); }
+        var cancelada = notas.filter(function (n) { return n.id === corpo.id; })[0];
+        cancelada.pedidoCancelamento = { status: 'RECEBIDO', motivo: { 1: 'Erro na emissão', 2: 'Serviço não prestado', 9: 'Outro motivo' }[corpo.motivo_codigo], texto: corpo.motivo, por: 'mariana@exemplo.com.br', criado_em: '2026-11-06T10:00:00', mensagens: [] };
+        return ok({ ok: true, forma: 'ENVIAR', mensagem: 'Pedido de cancelamento enviado. A nota muda para "Cancelada" quando a prefeitura confirmar.' }, 600);
       }
       if (rota === 'senha.php') { return ok({ mensagem: 'Senha alterada.' }); }
       if (rota === 'empresa.php') {

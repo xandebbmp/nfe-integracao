@@ -747,6 +747,17 @@ sessões abertas.
   Cada mês tem a referência `PORTAL-rec-<id>-<AAAAMM>`, então a mesma nota
   nunca sai duas vezes. Pausar e retomar não gera notas atrasadas: segue do
   próximo dia marcado. Apagar não mexe nas notas já emitidas.
+- **Cancelar nota** (botão no detalhe de uma nota autorizada, em "Minhas
+  notas"): qualquer usuário da empresa pode cancelar. Pede o motivo (erro na
+  emissão, serviço não prestado ou outro), uma explicação de 15 a 255 letras
+  e a marcação "Entendi que não pode ser desfeito". O pedido guarda quem fez.
+  - **Padrão Nacional:** o pedido vai para a fila e o worker envia ao fisco.
+    A nota continua "Autorizada" até a confirmação; se o fisco recusar (fora
+    do prazo, por exemplo), o motivo aparece no detalhe e dá para tentar de
+    novo.
+  - **Salvador:** não cancela por webservice. A tela explica como pedir no
+    site da prefeitura; depois de aceito, o cliente informa o protocolo e a
+    nota vira "Cancelada" na hora (nada é enviado).
 
 **Configuração** (`portal` no `config/nfse.php`, troque no
 `config/nfse.local.php`):

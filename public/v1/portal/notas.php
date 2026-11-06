@@ -7,13 +7,14 @@ declare(strict_types=1);
  * GET /v1/portal/notas.php?status=&busca=&mes=AAAA-MM&pagina=1
  *       status: AUTORIZADAS | EM_ANDAMENTO | COM_PROBLEMA | CANCELADAS (vazio = todas)
  *       busca:  nome ou CPF/CNPJ do tomador, ou numero da NFS-e/DPS
- * GET /v1/portal/notas.php?id=UUID     detalhe de uma nota
+ * GET /v1/portal/notas.php?id=UUID     detalhe de uma nota (com o bloco "cancelamento")
  *
  * So aparecem notas da empresa de quem esta logado, no ambiente atual.
  */
 
 use Xande\NfeIntegracao\Nfse\Api\Api;
 use Xande\NfeIntegracao\Nfse\Api\PortalSessao;
+use Xande\NfeIntegracao\Nfse\Servico\PortalCancelamento;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -27,6 +28,8 @@ if (isset($_GET['id'])) {
     if ($nota === null) {
         $api->erro(404, 'NOTA_NAO_ENCONTRADA', 'Nota não encontrada.');
     }
+    // O que da para fazer sobre cancelamento (botao, pedido em andamento ou recusado).
+    $nota['cancelamento'] = (new PortalCancelamento($api->pdo(), $api->cfg))->situacao($nota);
     $api->responder(200, ['nota' => $nota]);
 }
 
