@@ -46,3 +46,30 @@ pre.exemplo { background: var(--fundo); padding: 10px; border-radius: 8px; overf
 .mini th, .mini td { padding: 6px 8px; border-bottom: 1px solid var(--borda); text-align: left; }
 .mini th { color: var(--suave); font-weight: 600; font-size: 12px; }
 .mini td.num, .mini th.num { text-align: right; }
+
+/* Tela "Sistema" (worker e fila) */
+#botao-sistema { display: inline-flex; align-items: center; gap: 7px; }
+.ponto-sistema { width: 9px; height: 9px; border-radius: 50%; background: var(--cor, var(--st-recebido)); flex: none; }
+.ponto-sistema--LIGADO { --cor: var(--st-autorizado); }
+.ponto-sistema--PAUSADO, .ponto-sistema--REINICIANDO { --cor: var(--st-erro); }
+.ponto-sistema--PARADO { --cor: var(--st-rejeitado); }
+.sistema-estado { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; }
+.sistema-estado .ponto-sistema { width: 14px; height: 14px; grid-row: span 2; }
+.sistema-estado strong { font-size: 17px; }
+.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.numero { border: 1px solid var(--borda); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.numero b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.numero span { font-size: 12px; color: var(--suave); }
+.numero--alerta b { color: var(--st-rejeitado); }
+.confirmar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--fundo); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.diag-lista { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.diag-item { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+.diag-item .ponto-sistema { margin-top: 6px; }
+.diag-resolver { font-size: 13px; color: var(--suave); margin-top: 2px; }
+details summary { cursor: pointer; margin-top: 10px; }
+.config-grupo { border: 1px solid var(--borda); border-radius: 8px; padding: 10px 14px 14px; margin: 12px 0 0; }
+.config-grupo legend { font-weight: 600; padding: 0 6px; }
+.config-rotulo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--texto); font-weight: 600; }
+.config-alterado { font-size: 11px; font-weight: 600; color: var(--destaque); border: 1px solid var(--destaque); border-radius: 99px; padding: 0 7px; }
+.config-ajuda { font-size: 12px; color: var(--suave); }
+.link-botao { background: none; border: 0; padding: 0; color: var(--destaque); cursor: pointer; font: inherit; text-decoration: underline; }

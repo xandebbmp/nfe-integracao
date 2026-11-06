@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="claude:viewport-fit-sides" content="cover">
+  <title>Portal Gestão Fiscal NFS-e</title>
+  <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+
+  <!-- =====================================================================
+       TELA DE LOGIN
+       ===================================================================== -->
+  <section id="tela-login" class="login" hidden>
+
+    <!-- Lado esquerdo: apresentacao -->
+    <div class="login__marca">
+      <div class="logo">
+        <div class="logo__icone"><i class="icone">receipt_long</i></div>
+        <div>
+          <span class="logo__nome" style="color:#fff">Gestão Fiscal</span>
+          <span class="logo__sub">NFS-e Nacional · Salvador-BA</span>
+        </div>
+      </div>
+
+      <div>
+        <h1>Sua nota de serviço em <em>3 campos</em>.</h1>
+        <p class="login__texto">Os dados da sua empresa, endereço do cliente e impostos são preenchidos sozinhos. Você informa só o que muda.</p>
+      </div>
+
+      <!-- Ilustracao: o que o cliente digita x o que o sistema preenche -->
+      <div class="login__nota" aria-hidden="true">
+        <div class="login__nota-topo"><span>Nova NFS-e</span><span class="mono">DPS nº 000124</span></div>
+        <div class="login__nota-linha"><span class="login__nota-num">1</span><span>Tomador <b>12.345.678/0001-90</b></span><span class="login__nota-auto">endereço automático</span></div>
+        <div class="login__nota-linha"><span class="login__nota-num">2</span><span>Serviço <b>01.01 Desenvolvimento</b></span><span class="login__nota-auto">ISS 5%</span></div>
+        <div class="login__nota-linha"><span class="login__nota-num">3</span><span>Valor <b class="num">R$ 1.500,00</b></span><span class="login__nota-auto">líquido calculado</span></div>
+      </div>
+
+      <p class="login__rodape">Emissão pelo Padrão Nacional ou pela Prefeitura de Salvador</p>
+    </div>
+
+    <!-- Lado direito: formulario -->
+    <div class="login__form-area">
+      <form id="form-login" class="login__form" novalidate>
+        <div>
+          <h1>Entrar</h1>
+          <p class="secundario">Use o e-mail cadastrado pela sua empresa.</p>
+        </div>
+
+        <div class="campo">
+          <label for="login-email">E-mail</label>
+          <div class="campo__caixa">
+            <i class="icone">mail</i>
+            <input id="login-email" type="email" autocomplete="username" placeholder="voce@empresa.com.br" required>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="login-senha">Senha</label>
+          <div class="campo__caixa">
+            <i class="icone">lock</i>
+            <input id="login-senha" type="password" autocomplete="current-password" placeholder="Sua senha" required>
+          </div>
+        </div>
+
+        <div class="login__linha">
+          <label><input id="login-lembrar" type="checkbox"> Manter conectado</label>
+          <a href="#esqueci" id="link-esqueci">Esqueci minha senha</a>
+        </div>
+
+        <p id="login-erro" class="erro" hidden></p>
+
+        <button type="submit" class="btn btn--primario btn--largo">
+          Entrar <i class="icone icone--p">arrow_forward</i>
+        </button>
+
+        <p class="login__ajuda">Primeiro acesso? Use a senha provisória que você recebeu.</p>
+      </form>
+
+      <!-- Troca obrigatoria da senha provisoria (1o acesso) -->
+      <form id="form-senha" class="login__form" novalidate hidden>
+        <div>
+          <h1>Crie sua senha</h1>
+          <p class="secundario">A senha que você recebeu é provisória. Escolha uma nova para continuar.</p>
+        </div>
+        <div class="campo">
+          <label for="senha-atual">Senha provisória</label>
+          <div class="campo__caixa"><i class="icone">key</i><input id="senha-atual" type="password" autocomplete="current-password" required></div>
+        </div>
+        <div class="campo">
+          <label for="senha-nova">Nova senha</label>
+          <div class="campo__caixa"><i class="icone">lock</i><input id="senha-nova" type="password" autocomplete="new-password" minlength="8" required></div>
+          <small class="dica">Mínimo de 8 caracteres, com letras e números.</small>
+        </div>
+        <div class="campo">
+          <label for="senha-confirma">Repita a nova senha</label>
+          <div class="campo__caixa"><i class="icone">lock</i><input id="senha-confirma" type="password" autocomplete="new-password" required></div>
+        </div>
+        <p id="senha-erro" class="erro" hidden></p>
+        <button type="submit" class="btn btn--primario btn--largo">Salvar e entrar <i class="icone icone--p">arrow_forward</i></button>
+      </form>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       SISTEMA (depois do login)
+       ===================================================================== -->
+  <div id="tela-sistema" class="sistema" hidden>
+
+    <!-- Barra superior -->
+    <header class="topo">
+      <div class="topo__esquerda">
+        <button id="botao-menu" type="button" class="btn btn--icone topo__abrir-menu" aria-label="Mostrar ou recolher o menu" aria-controls="menu" aria-expanded="true">
+          <i class="icone">menu</i>
+        </button>
+        <div class="logo">
+          <div class="logo__icone"><i class="icone">receipt_long</i></div>
+          <div>
+            <span class="logo__nome">Gestão Fiscal</span>
+            <span class="logo__sub">NFS-e Nacional · Salvador-BA</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topo__direita">
+        <span id="selo-ambiente" class="pilula pilula--alerta" title="As notas emitidas aqui não têm valor fiscal" hidden>Homologação</span>
+
+        <div class="empresa-atual">
+          <i class="icone">storefront</i>
+          <div>
+            <b id="empresa-nome"></b>
+            <span id="empresa-cnpj" class="mono"></span>
+          </div>
+        </div>
+
+        <button id="botao-tema" type="button" class="btn btn--icone" aria-label="Trocar tema claro/escuro">
+          <i class="icone" id="icone-tema">dark_mode</i>
+        </button>
+
+        <button type="button" class="usuario" title="Minha conta">
+          <span class="avatar" id="usuario-iniciais"></span>
+          <span class="usuario__nome" id="usuario-nome"></span>
+        </button>
+      </div>
+    </header>
+
+    <div class="corpo">
+      <!-- Menu lateral. Para incluir uma tela: um <a> aqui + um <section data-pagina> no conteudo. -->
+      <aside id="menu" class="menu">
+        <div class="menu__topo">
+          <nav class="menu__grupo" aria-label="Notas">
+            <div class="menu__titulo">Notas fiscais</div>
+            <a class="menu__item" href="#inicio"><i class="icone">space_dashboard</i><span>Início</span></a>
+            <a class="menu__item" href="#emitir"><i class="icone">post_add</i><span>Emitir nota</span></a>
+            <a class="menu__item" href="#notas"><i class="icone">receipt_long</i><span>Minhas notas</span><span id="menu-rejeitadas" class="menu__marca menu__marca--qtd" title="Notas não autorizadas" hidden></span></a>
+            <a class="menu__item" href="#recorrencias"><i class="icone">event_repeat</i><span>Recorrências</span><span class="menu__marca menu__marca--breve">em breve</span></a>
+          </nav>
+
+          <nav class="menu__grupo" aria-label="Cadastros">
+            <div class="menu__titulo">Cadastros</div>
+            <a class="menu__item" href="#tomadores"><i class="icone">groups</i><span>Tomadores</span></a>
+            <a class="menu__item" href="#servicos"><i class="icone">design_services</i><span>Serviços</span></a>
+          </nav>
+
+          <nav class="menu__grupo" aria-label="Conta">
+            <div class="menu__titulo">Conta</div>
+            <a class="menu__item" href="#empresa"><i class="icone">business</i><span>Minha empresa</span></a>
+            <a class="menu__item" href="#usuarios"><i class="icone">manage_accounts</i><span>Usuários</span></a>
+            <a class="menu__item" href="#sair" id="link-sair"><i class="icone">logout</i><span>Sair</span></a>
+          </nav>
+        </div>
+
+        <div class="menu__rodape">
+          <div id="selo-certificado" class="selo-certificado">
+            <i class="icone">verified_user</i>
+            <div><b id="certificado-titulo">Certificado A1</b><span id="certificado-texto"></span></div>
+          </div>
+        </div>
+      </aside>
+      <div id="cortina" class="cortina"></div>
+
+      <!-- Conteudo: cada tela e um <section data-pagina="...">; o JS mostra so a do menu. -->
+      <main class="conteudo">
+        <div class="conteudo__largura">
+
+          <!-- ===== Inicio ===== -->
+          <section data-pagina="inicio" data-titulo="Início">
+            <div style="display:grid;gap:20px">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Olá, <span id="saudacao-nome"></span></h1>
+                  <p class="secundario" id="inicio-subtitulo">Resumo do mês da sua empresa.</p>
+                </div>
+                <a href="#emitir" class="btn btn--primario"><i class="icone icone--p">add</i> Nova NFS-e</a>
+              </div>
+
+              <div id="aviso-demo" class="aviso-exemplo" hidden><i class="icone icone--p">info</i> Demonstração com dados de exemplo: nada é enviado à prefeitura.</div>
+
+              <div class="kpis">
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Notas no mês <i class="icone">receipt</i></div>
+                  <div class="kpi__valor" id="kpi-notas">–</div>
+                  <div class="kpi__rodape" id="kpi-notas-detalhe"></div>
+                </div>
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Faturado no mês <i class="icone">payments</i></div>
+                  <div class="kpi__valor" id="kpi-faturado">–</div>
+                  <div class="kpi__rodape">notas autorizadas no mês</div>
+                </div>
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Aguardando prefeitura <i class="icone">hourglass_top</i></div>
+                  <div class="kpi__valor" id="kpi-andamento">–</div>
+                  <div class="kpi__rodape">atualiza a cada 20 segundos</div>
+                </div>
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Franquia do plano <i class="icone">data_usage</i></div>
+                  <div class="kpi__valor"><span id="kpi-franquia">–</span> <span class="apagado kpi__limite" id="kpi-franquia-limite"></span></div>
+                  <div class="barra" id="kpi-franquia-barra"><div class="barra__cheio" id="kpi-franquia-cheio" style="width:0%"></div></div>
+                </div>
+              </div>
+
+              <div class="duas-colunas">
+                <div class="cartao bloco">
+                  <div class="bloco__cabeca">
+                    <h2>Últimas notas</h2>
+                    <a href="#notas" class="btn btn--secundario">Ver todas</a>
+                  </div>
+                  <div class="tabela-rolagem">
+                    <table class="tabela">
+                      <thead>
+                        <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th>Status</th></tr>
+                      </thead>
+                      <tbody id="inicio-notas"></tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="cartao bloco">
+                  <div class="bloco__cabeca"><h2>Precisa da sua atenção</h2></div>
+                  <div class="bloco__corpo" id="inicio-avisos"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== Demais telas: por enquanto so o espaco reservado ===== -->
+          <!-- ===== Emitir nota ===== -->
+          <section data-pagina="emitir" data-titulo="Emitir nota" hidden>
+            <form id="form-emitir" class="emitir" novalidate>
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Emitir NFS-e</h1>
+                  <p class="secundario">Preencha o tomador, o serviço e o valor. O resto vem do cadastro da sua empresa.</p>
+                </div>
+                <span class="pilula pilula--neutro" id="emitir-padrao"></span>
+              </div>
+
+              <div class="emitir__grade">
+                <div class="emitir__blocos">
+
+                  <!-- Bloco 1: tomador -->
+                  <fieldset class="cartao etapa">
+                    <legend class="etapa__cabeca"><span class="etapa__num">1</span> Para quem é a nota</legend>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--meio">
+                        <label for="tom-doc">CPF ou CNPJ do tomador</label>
+                        <div class="campo__grupo">
+                          <input id="tom-doc" inputmode="numeric" autocomplete="off" placeholder="Digite e saia do campo" maxlength="18">
+                          <button type="button" id="botao-buscar-doc" class="btn btn--secundario"><i class="icone icone--p">search</i> Buscar</button>
+                        </div>
+                        <small id="tom-doc-info" class="dica">Com CNPJ, nome e endereço são preenchidos sozinhos.</small>
+                      </div>
+                      <div class="campo campo--meio">
+                        <label for="tom-salvo">Ou escolha um tomador salvo</label>
+                        <select id="tom-salvo">
+                          <option value="">Selecione…</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--meio"><label for="tom-nome">Nome / razão social</label><input id="tom-nome"></div>
+                      <div class="campo campo--meio"><label for="tom-email">E-mail (recebe PDF e XML)</label><input id="tom-email" type="email" placeholder="financeiro@cliente.com.br"></div>
+                    </div>
+
+                    <details class="mais" id="tom-endereco-box">
+                      <summary>Endereço <span id="tom-endereco-resumo" class="apagado">opcional no Padrão Nacional</span></summary>
+                      <div class="linha-campos">
+                        <div class="campo campo--terco"><label for="tom-cep">CEP</label><input id="tom-cep" inputmode="numeric" maxlength="9" placeholder="00000-000"></div>
+                        <div class="campo campo--largo"><label for="tom-logradouro">Logradouro</label><input id="tom-logradouro"></div>
+                        <div class="campo campo--terco"><label for="tom-numero">Número</label><input id="tom-numero"></div>
+                        <div class="campo campo--meio"><label for="tom-bairro">Bairro</label><input id="tom-bairro"></div>
+                        <div class="campo campo--meio"><label for="tom-cidade">Cidade / UF</label><input id="tom-cidade" readonly placeholder="pelo CEP"></div>
+                      </div>
+                    </details>
+                  </fieldset>
+
+                  <!-- Bloco 2: servico -->
+                  <fieldset class="cartao etapa">
+                    <legend class="etapa__cabeca"><span class="etapa__num">2</span> O que foi feito</legend>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--largo">
+                        <label for="srv-salvo">Serviço</label>
+                        <select id="srv-salvo"></select>
+                      </div>
+                    </div>
+
+                    <div class="campo">
+                      <label for="srv-descricao">Descrição que vai na nota</label>
+                      <textarea id="srv-descricao" rows="3" maxlength="2000" placeholder="O que foi feito. Use {mes} para o mês da competência."></textarea>
+                      <small class="dica"><span id="srv-contador">0</span>/2000 caracteres</small>
+                    </div>
+
+                    <div class="codigos" id="srv-codigos" hidden>
+                      <div><span class="apagado">Cód. tributação nacional</span><b class="mono" id="srv-cod-nacional"></b></div>
+                      <div><span class="apagado">Item LC 116</span><b class="mono" id="srv-item"></b></div>
+                      <div><span class="apagado">Alíquota ISS</span><b class="mono" id="srv-aliquota-txt"></b></div>
+                      <div><span class="apagado">Local da prestação</span><b id="srv-local">Município da empresa</b></div>
+                    </div>
+
+                    <!-- Servico novo: codigos digitados (aparece em "Outro servico") -->
+                    <div id="srv-manual" class="srv-manual" hidden>
+                      <div class="linha-campos">
+                        <div class="campo campo--terco"><label for="srv-in-nacional">Cód. tributação nacional</label><input id="srv-in-nacional" inputmode="numeric" maxlength="8" placeholder="010101"></div>
+                        <div class="campo campo--terco"><label for="srv-in-item">Item LC 116</label><input id="srv-in-item" maxlength="5" placeholder="01.01"></div>
+                        <div class="campo campo--terco"><label for="srv-in-aliquota">Alíquota ISS (%)</label><input id="srv-in-aliquota" inputmode="decimal" placeholder="5"></div>
+                      </div>
+                      <small class="dica">Não sabe os códigos? Eles estão em uma nota antiga da empresa ou com o seu contador.</small>
+                      <label class="interruptor">
+                        <input id="srv-salvar" type="checkbox" checked>
+                        <span>Salvar este serviço <small class="apagado">na próxima nota é só escolher na lista</small></span>
+                      </label>
+                      <div class="campo" id="srv-nome-campo"><label for="srv-in-nome">Nome na lista</label><input id="srv-in-nome" maxlength="120" placeholder="Ex.: Consultoria mensal"></div>
+                    </div>
+                  </fieldset>
+
+                  <!-- Bloco 3: valores -->
+                  <fieldset class="cartao etapa">
+                    <legend class="etapa__cabeca"><span class="etapa__num">3</span> Quanto custou</legend>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--meio">
+                        <label for="val-servico">Valor do serviço</label>
+                        <div class="campo__moeda"><span>R$</span><input id="val-servico" inputmode="decimal" placeholder="0,00"></div>
+                      </div>
+                      <div class="campo campo--meio">
+                        <label for="val-competencia">Competência</label>
+                        <input id="val-competencia" type="month">
+                      </div>
+                    </div>
+
+                    <label class="interruptor">
+                      <input id="val-iss-retido" type="checkbox">
+                      <span>ISS retido pelo tomador <small class="apagado">o tomador recolhe o ISS e paga o valor líquido</small></span>
+                    </label>
+
+                    <details class="mais">
+                      <summary>Mais opções <span class="apagado">desconto e retenções federais</span></summary>
+                      <div class="linha-campos">
+                        <div class="campo campo--terco"><label for="val-desconto">Desconto incondicionado</label><div class="campo__moeda"><span>R$</span><input id="val-desconto" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-ir">IR retido</label><div class="campo__moeda"><span>R$</span><input id="val-ir" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-inss">INSS retido</label><div class="campo__moeda"><span>R$</span><input id="val-inss" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-pis">PIS retido</label><div class="campo__moeda"><span>R$</span><input id="val-pis" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-cofins">COFINS retido</label><div class="campo__moeda"><span>R$</span><input id="val-cofins" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-csll">CSLL retido</label><div class="campo__moeda"><span>R$</span><input id="val-csll" inputmode="decimal" placeholder="0,00"></div></div>
+                      </div>
+                    </details>
+                  </fieldset>
+                </div>
+
+                <!-- Resumo fixo ao lado -->
+                <aside class="cartao resumo-nota">
+                  <h2>Resumo da nota</h2>
+                  <dl class="resumo-nota__linhas">
+                    <div><dt>Valor do serviço</dt><dd id="res-bruto" class="num">R$ 0,00</dd></div>
+                    <div><dt>Descontos</dt><dd id="res-desconto" class="num">R$ 0,00</dd></div>
+                    <div><dt>ISS <span id="res-aliquota">5%</span> <span id="res-iss-situacao" class="apagado">(a recolher)</span></dt><dd id="res-iss" class="num">R$ 0,00</dd></div>
+                    <div><dt>Retenções</dt><dd id="res-retencoes" class="num">R$ 0,00</dd></div>
+                  </dl>
+                  <div class="resumo-nota__liquido"><span>Você recebe</span><b id="res-liquido" class="num">R$ 0,00</b></div>
+
+                  <ul class="checagem" id="checagem"></ul>
+
+                  <button type="submit" class="btn btn--primario btn--largo" id="botao-emitir"><i class="icone icone--p">send</i> Emitir nota</button>
+                  <p id="emitir-retorno" class="erro" role="alert" hidden></p>
+                  <div id="emitir-resultado" class="resultado" role="status" hidden></div>
+                  <p class="dica">Ao emitir, a nota entra na fila e o status aparece em <a href="#notas">Minhas notas</a>.</p>
+                </aside>
+              </div>
+            </form>
+          </section>
+          <section data-pagina="notas" data-titulo="Minhas notas" hidden>
+            <div class="cartao vazio"><i class="icone">receipt_long</i><h2>Minhas notas</h2><p class="secundario">Lista com status em tempo real, PDF, XML e cancelamento (fase 1).</p></div>
+          </section>
+          <section data-pagina="recorrencias" data-titulo="Recorrências" hidden>
+            <div class="cartao vazio"><i class="icone">event_repeat</i><h2>Recorrências</h2><p class="secundario">Notas mensais automáticas (fase 3).</p></div>
+          </section>
+          <section data-pagina="tomadores" data-titulo="Tomadores" hidden>
+            <div class="cartao vazio"><i class="icone">groups</i><h2>Tomadores</h2><p class="secundario">Clientes salvos para não redigitar (fase 2).</p></div>
+          </section>
+          <section data-pagina="servicos" data-titulo="Serviços" hidden>
+            <div class="cartao vazio"><i class="icone">design_services</i><h2>Serviços</h2><p class="secundario">Serviços com código fiscal e alíquota salvos (fase 2).</p></div>
+          </section>
+          <section data-pagina="empresa" data-titulo="Minha empresa" hidden>
+            <div class="cartao vazio"><i class="icone">business</i><h2>Minha empresa</h2><p class="secundario">Dados fiscais, certificado e plano (somente leitura).</p></div>
+          </section>
+          <section data-pagina="usuarios" data-titulo="Usuários" hidden>
+            <div class="cartao vazio"><i class="icone">manage_accounts</i><h2>Usuários</h2><p class="secundario">Quem da empresa pode emitir.</p></div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="portal.js"></script>
+</body>
+</html>

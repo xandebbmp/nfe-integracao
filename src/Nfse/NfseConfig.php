@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Xande\NfeIntegracao\Nfse;
 
 use PDO;
+use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
+use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use RuntimeException;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 
@@ -104,11 +106,16 @@ final class NfseConfig
     }
 
     /**
-     * Acrescenta as empresas clientes do banco (painel admin).
-     * Sem o script 0005 aplicado, devolve a config como veio.
+     * Acrescenta o que foi cadastrado no painel admin:
+     *   - configuracoes alteradas na tela Sistema (sistema_ajustes, script 0009),
+     *     que substituem o valor do arquivo (lista em Dominio/AjustesPainel.php);
+     *   - empresas clientes (script 0005).
+     * Sem os scripts aplicados, devolve a config como veio.
      */
     public static function comClientes(array $cfg, PDO $pdo): array
     {
+        $cfg = AjustesPainel::aplicar($cfg, (new SistemaRepositorio($pdo))->ajustes());
+
         $repositorio = new ClienteRepositorio($pdo);
         if (!$repositorio->existe()) {
             return $cfg;
