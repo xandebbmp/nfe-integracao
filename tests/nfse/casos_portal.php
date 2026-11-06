@@ -15,6 +15,7 @@ use Xande\NfeIntegracao\Nfse\Servico\AdministracaoClientes;
 use Xande\NfeIntegracao\Nfse\Servico\ConsultaCadastro;
 use Xande\NfeIntegracao\Nfse\Servico\PortalAcesso;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmissao;
+use Xande\NfeIntegracao\Nfse\Servico\PortalEmpresa;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
 use Xande\NfeIntegracao\Nfse\Servico\PortalServicos;
 use Xande\NfeIntegracao\Nfse\Servico\PortalTomadores;
@@ -215,4 +216,18 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     Apoio::igual([], $tomadores->listar('41986662000160', ''), 'tomador: outra empresa nao ve');
     Apoio::verificar($tomadores->remover($cnpj, '529.982.247-25')['ok'], 'tomador: removido da lista');
     Apoio::igual('TOMADOR_NAO_ENCONTRADO', $tomadores->remover($cnpj, '52998224725')['codigo'] ?? null, 'tomador: remover de novo explica que nao existe');
+
+    // ---- Tela "Minha empresa" ----
+    $empresa = new PortalEmpresa($pdo, $cfgGeral);
+    $ficha = $empresa->ficha($cnpj);
+    Apoio::igual(['Portal Teste Ltda', '998877', 'Salvador / BA'], [$ficha['cadastro']['razao_social'], $ficha['cadastro']['inscricao_municipal'],
+        $ficha['cadastro']['municipio']], 'empresa: cadastro com razao social, inscricao municipal e cidade');
+    Apoio::igual(['NACIONAL', 'SALVADOR'], $ficha['fiscal']['padroes'], 'empresa: mostra so os tipos de NFS-e contratados');
+    Apoio::igual('Não optante', $ficha['fiscal']['simples_nacional'], 'empresa: codigo do Simples vira texto');
+    Apoio::igual(['BLOQUEADA', 'Fatura em aberto'], [$ficha['plano']['situacao'], $ficha['plano']['motivo_bloqueio']], 'empresa: mostra o bloqueio e o motivo');
+    Apoio::igual(false, $ficha['certificado']['enviado'], 'empresa: avisa que o certificado nao foi enviado');
+    $json = json_encode($ficha);
+    Apoio::verificar(!str_contains($json, 'token') && !str_contains($json, 'cifrado') && !str_contains($json, 'segredo') && !str_contains($json, 'observacao'),
+        'empresa: nao devolve token, certificado, segredo nem observacao interna');
+    Apoio::igual(null, $empresa->ficha('99999999000191'), 'empresa: CNPJ sem cadastro devolve vazio');
 }

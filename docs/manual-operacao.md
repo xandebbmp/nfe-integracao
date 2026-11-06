@@ -717,6 +717,11 @@ sessões abertas.
   cadastrar um novo (com CNPJ e CEP preenchidos sozinhos) e remover.
   "Emitir nota" abre a emissão com o tomador preenchido. Editar não muda a
   ordem da lista (os mais usados ficam em cima).
+- **Minha empresa:** só para ver. Mostra o cadastro, os dados fiscais (em
+  texto: Simples, regime especial, tipos de nota contratados), o certificado
+  (titular e validade) e o plano (limite do mês, uso e se a emissão está
+  liberada). Para mudar algo, o suporte altera no painel admin. Nunca mostra
+  token, certificado, segredo do webhook ou a observação interna.
 
 **Configuração** (`portal` no `config/nfse.php`, troque no
 `config/nfse.local.php`):
@@ -736,7 +741,7 @@ chamada que altera algo exige o cabeçalho `X-Portal: 1` (o próprio portal
 envia), o que impede outro site de emitir usando a sessão de alguém.
 
 **Rotas** (`public/v1/portal/`): `entrar`, `sair`, `sessao`, `senha`,
-`inicio`, `notas`, `servicos`, `tomadores`, `consulta`, `emitir` e `arquivo` (PDF/XML).
+`inicio`, `notas`, `servicos`, `tomadores`, `empresa`, `consulta`, `emitir` e `arquivo` (PDF/XML).
 No painel: `public/v1/admin/portal_usuarios.php`.
 
 ### Alterar o visual ou os textos

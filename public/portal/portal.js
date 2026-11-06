@@ -9,7 +9,7 @@
      3. Menu, telas e tema
      4. Tela inicial
      5. Tela "Emitir nota"
-     6. Minhas notas, Servicos e Tomadores
+     6. Minhas notas, Servicos, Tomadores e Minha empresa
      7. Inicio do portal
 
    Demonstracao sem servidor: portal-demo.js define window.PORTAL_DEMO e
@@ -325,6 +325,7 @@
     if (nome === 'notas') { carregarNotas(); }
     if (nome === 'servicos') { carregarListaServicos(); }
     if (nome === 'tomadores') { carregarListaTomadores(); }
+    if (nome === 'empresa') { carregarEmpresa(); }
 
     fecharMenuCelular();
     window.scrollTo(0, 0);
@@ -862,7 +863,7 @@
   });
 
   // ==================================================================
-  // 6. MINHAS NOTAS, SERVICOS E TOMADORES
+  // 6. MINHAS NOTAS, SERVICOS, TOMADORES E MINHA EMPRESA
   // ==================================================================
 
   // ---- Utilidades das telas de lista ----
@@ -1392,6 +1393,89 @@
       if (!erro.erros || !erro.erros.length) { mostrarErro('tomador-erro', erro.message); }
     }).then(function () { botao.disabled = false; });
   });
+
+  // ---- Minha empresa (so leitura) ----
+  var NOMES_PADRAO = { NACIONAL: 'NFS-e Padrão Nacional', SALVADOR: 'NFS-e Salvador' };
+
+  function carregarEmpresa() {
+    api('GET', 'empresa.php').then(desenharEmpresa).catch(function (erro) {
+      if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
+    });
+  }
+
+  function cartaoFicha(icone, titulo, linhas, extra) {
+    return '<section class="cartao bloco"><div class="bloco__cabeca"><h2><i class="icone">' + icone + '</i>' + escapar(titulo) + '</h2></div>'
+      + '<div class="bloco__corpo">' + (extra || '') + '<dl class="ficha">' + linhas.join('') + '</dl></div></section>';
+  }
+
+  function desenharEmpresa(e) {
+    var c = e.cadastro, f = e.fiscal, cert = e.certificado, p = e.plano;
+    var sim = function (v) { return v ? 'Sim' : 'Não'; };
+
+    // Avisos no topo: so o que impede (ou vai impedir) de emitir.
+    var avisos = [];
+    if (p.situacao !== 'LIBERADA') {
+      avisos.push(['erro', 'Emissão ' + p.situacao_texto.toLowerCase(), (p.motivo_bloqueio ? p.motivo_bloqueio + '. ' : '') + 'Fale com o suporte para liberar.']);
+    }
+    if (!cert.enviado) {
+      avisos.push(['erro', 'Certificado digital não enviado', 'Sem ele as notas não são assinadas. Envie o certificado A1 ao suporte.']);
+    } else if (cert.dias_restantes !== null && cert.dias_restantes < 0) {
+      avisos.push(['erro', 'Certificado vencido', 'Renove o certificado A1 e envie ao suporte para voltar a emitir.']);
+    } else if (cert.dias_restantes !== null && cert.dias_restantes <= 30) {
+      avisos.push(['alerta', 'Certificado vence em ' + cert.dias_restantes + ' dias', 'Renove antes do vencimento para não parar de emitir.']);
+    }
+    el('empresa-avisos').innerHTML = avisos.map(function (a) {
+      return '<div class="resultado resultado--' + a[0] + '"><b>' + escapar(a[1]) + '</b><span>' + escapar(a[2]) + '</span></div>';
+    }).join('');
+
+    var cadastro = cartaoFicha('business', 'Cadastro', [
+      linhaDetalhe('Razão social', c.razao_social),
+      linhaDetalhe('Nome fantasia', c.nome_fantasia),
+      linhaDetalhe('CNPJ', formatarDoc(c.cnpj)),
+      linhaDetalhe('Inscrição municipal', c.inscricao_municipal || 'não informada'),
+      linhaDetalhe('Inscrição estadual', c.inscricao_estadual),
+      linhaDetalhe('Município', c.municipio || 'IBGE ' + c.codigo_municipio),
+      linhaDetalhe('E-mail', c.email),
+      linhaDetalhe('Telefone', c.telefone)
+    ]);
+
+    var fiscal = cartaoFicha('account_balance', 'Dados fiscais', [
+      linhaDetalhe('Simples Nacional', f.simples_nacional),
+      linhaDetalhe('Apuração', f.apuracao),
+      linhaDetalhe('Regime especial', f.regime_especial),
+      linhaDetalhe('Incentivador cultural', sim(f.incentivador_cultural)),
+      linhaDetalhe('Notas contratadas', f.padroes.length ? f.padroes.map(function (x) { return NOMES_PADRAO[x] || x; }).join(', ') : 'nenhuma'),
+      linhaDetalhe('O portal emite', NOMES_PADRAO[f.padrao_portal] || f.padrao_portal),
+      linhaDetalhe('Ambiente', f.ambiente === 'PRODUCAO' ? 'Produção (notas valem)' : 'Homologação (testes, sem valor fiscal)')
+    ]);
+
+    var tomCert = !cert.enviado ? 'erro' : (cert.dias_restantes !== null && cert.dias_restantes <= 30 ? (cert.dias_restantes < 0 ? 'erro' : 'alerta') : 'ok');
+    var textoCert = !cert.enviado ? 'Não enviado' : (cert.dias_restantes < 0 ? 'Vencido' : (tomCert === 'alerta' ? 'Vencendo' : 'Em dia'));
+    var certificado = cartaoFicha('verified_user', 'Certificado digital', [
+      '<div><dt>Situação</dt><dd><span class="pilula pilula--' + tomCert + '">' + textoCert + '</span></dd></div>',
+      linhaDetalhe('Titular', cert.titular),
+      linhaDetalhe('Válido até', cert.validade ? dataCurta(cert.validade) + (cert.dias_restantes >= 0 ? ' (' + cert.dias_restantes + ' dias)' : '') : null),
+      linhaDetalhe('Enviado em', dataCurta(cert.atualizado_em))
+    ], '<p class="dica">O certificado A1 assina as suas notas. Ele fica guardado com segurança e só o suporte pode trocar.</p>');
+
+    var uso = '';
+    if (p.limite_mensal) {
+      var pct = Math.min(100, Math.round(p.usado_no_mes * 100 / p.limite_mensal));
+      uso = '<div class="uso"><div class="uso__numeros"><span><b>' + p.usado_no_mes + '</b> de ' + p.limite_mensal + ' notas</span><span class="secundario">' + pct + '% do mês</span></div>'
+        + '<div class="barra"><div class="barra__cheio' + (pct >= 100 ? ' barra__cheio--erro' : (pct >= 80 ? ' barra__cheio--alerta' : '')) + '" style="width:' + pct + '%"></div></div></div>';
+    } else {
+      uso = '<div class="uso"><div class="uso__numeros"><span><b>' + p.usado_no_mes + '</b> notas neste mês</span><span class="secundario">sem limite</span></div></div>';
+    }
+    var plano = cartaoFicha('workspace_premium', 'Plano e uso', [
+      '<div><dt>Emissão</dt><dd><span class="pilula pilula--' + (p.situacao === 'LIBERADA' ? 'ok' : 'erro') + '">' + escapar(p.situacao_texto) + '</span></dd></div>',
+      linhaDetalhe('Plano', p.nome || 'não informado'),
+      linhaDetalhe('Liberado até', p.liberado_ate ? dataCurta(p.liberado_ate) : 'sem data de término')
+    ], uso);
+
+    // Duas colunas: cadastro e dados fiscais à esquerda; plano e certificado à direita.
+    el('empresa-conteudo').innerHTML = '<div class="pagina-lista">' + cadastro + fiscal + '</div><div class="pagina-lista">' + plano + certificado + '</div>';
+  }
+
 
   // ==================================================================
   // 7. INICIO DO PORTAL

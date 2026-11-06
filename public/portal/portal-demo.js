@@ -88,6 +88,14 @@
         });
       }
       var q = parametros(busca);
+      if (rota === 'empresa.php') {
+        return ok({
+          cadastro: { cnpj: '41986662000160', razao_social: 'Studio Bela Forma Ltda', nome_fantasia: 'Studio Bela Forma', inscricao_municipal: '123456', inscricao_estadual: null, codigo_municipio: '2927408', municipio: 'Salvador / BA', email: 'contato@belaforma.com.br', telefone: '71999990000' },
+          fiscal: { simples_nacional: 'Microempresa ou EPP', apuracao: 'Tributos federais e ISS pelo Simples Nacional', regime_especial: 'Nenhum', incentivador_cultural: false, padroes: ['NACIONAL'], padrao_portal: 'NACIONAL', ambiente: 'HOMOLOGACAO' },
+          certificado: { enviado: true, titular: 'STUDIO BELA FORMA LTDA:41986662000160', validade: '2027-03-12', dias_restantes: 126, atualizado_em: '2026-03-12' },
+          plano: { nome: 'Essencial', limite_mensal: 100, usado_no_mes: 37, liberado_ate: '2027-01-31', situacao: 'LIBERADA', situacao_texto: 'Liberada', motivo_bloqueio: null }
+        });
+      }
       if (rota === 'notas.php') {
         if (q.id) {
           var achada = notas.filter(function (n) { return n.id === q.id; })[0];
