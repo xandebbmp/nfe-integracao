@@ -147,3 +147,49 @@ details summary { cursor: pointer; margin-top: 10px; }
   .pront-tag { margin: 4px 0 0; display: table; }
   .pront-subtitulo + .pront-lista .pront-resolver { margin-left: -30px; }
 }
+
+/* ---------- Ficha da empresa: abas, grupos de campos e barra de salvar ---------- */
+/* A janela vira coluna: topo e abas fixos, so o meio rola, rodape (Salvar) fixo. */
+.modal--largo[open] { display: flex; flex-direction: column; overflow: hidden; }
+.modal--largo .modal__topo { position: static; flex: none; }
+.modal--largo .modal__corpo { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.modal__abas { flex: none; border-bottom: 1px solid var(--borda); padding: 0 20px; background: var(--cartao); }
+.modal__abas [role=tablist] { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.aba {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 11px 12px 10px; margin-bottom: -1px;
+  background: none; border: 0; border-bottom: 2px solid transparent; color: var(--suave); font: inherit; font-weight: 600; cursor: pointer;
+}
+.aba:hover { color: var(--texto); }
+.aba[aria-selected=true] { color: var(--destaque); border-bottom-color: var(--destaque); }
+.aba:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: 6px; }
+.aba__alerta { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--st-rejeitado); color: #fff;
+  font-size: 11px; line-height: 18px; text-align: center; }
+.modal__rodape {
+  flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  padding: 12px 20px; border-top: 1px solid var(--borda); background: var(--cartao);
+}
+.modal__rodape[hidden] { display: none; }
+.rodape__texto { flex: 1; min-width: 0; }
+.rodape__mensagem { font-size: 13px; }
+
+.situacao-linha .botao { margin-left: auto; }
+.secao--form { border: 0; padding: 0; }
+.secao--form > h3 { margin: 16px 0 4px; }
+.grupo-campos { border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px 16px 16px; margin: 12px 0 0; min-width: 0; }
+.grupo-campos legend { font-weight: 700; padding: 0 6px; margin-left: -6px; }
+.grupo-campos__descricao { margin: 0 0 10px; font-size: 13px; color: var(--suave); }
+.grupo-campos--recolhido > summary { margin: 0; font-weight: 700; list-style-position: inside; }
+.grupo-campos--recolhido[open] > summary { margin-bottom: 8px; }
+.campo-ajuda { font-size: 12px; color: var(--suave); line-height: 1.35; }
+.campos label[hidden], .campos [hidden] { display: none; }
+.campos textarea { font: inherit; color: var(--texto); background: var(--fundo); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 9px; width: 100%; resize: vertical; }
+.opcoes-linha { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+
+@media (max-width: 760px) {
+  .modal__abas { padding: 0 8px; }
+  .modal__rodape { padding: 10px 16px; }
+  .situacao-linha .botao { margin-left: 0; }
+}
+/* Campos lado a lado ficam alinhados pelo topo (a caixa nao estica com a ajuda do vizinho). */
+.grupo-campos .campos { align-items: start; }
+.grupo-campos .campos label { align-content: start; }
