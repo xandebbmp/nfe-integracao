@@ -206,9 +206,11 @@ reiniciando, vermelha = parado.
 
 | Botão | O que acontece |
 |---|---|
+| **Ligar worker** | Aparece quando o worker está parado. Liga o worker pelo próprio painel, sem terminal (saída em `storage/logs/worker.log`). Se houver notas de **produção** na fila, o painel avisa quantas são e só liga depois de você confirmar, porque elas valem de verdade. |
+| **Desligar worker** | O worker termina a nota atual e para. As notas novas ficam na fila até ligar de novo. |
 | **Pausar envios** | Os workers param de enviar. Notas novas continuam entrando na fila e esperam. Use quando a prefeitura estiver fora do ar ou antes de uma manutenção. |
 | **Retomar envios** | Voltam a enviar, começando pelas que esperaram. |
-| **Reiniciar worker** | Cada worker termina a nota atual e sai; o systemd (ou o pm2) liga de novo em segundos, já com o código e a configuração novos. Use depois de atualizar o sistema. |
+| **Reiniciar worker** | Cada worker termina a nota atual e sai; o que foi ligado pelo painel liga um novo sozinho, e no servidor o systemd (ou o pm2) liga de novo em segundos, já com o código e a configuração novos. Use depois de atualizar o sistema. |
 
 A tela também mostra quantas notas esperam na fila, quantas falharam nas
 últimas 24 h, cada worker ligado (último sinal de vida) e quem deu cada

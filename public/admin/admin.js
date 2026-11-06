@@ -45,6 +45,7 @@ const ACOES_HISTORICO = {
 
 const ACOES_SISTEMA = {
   WORKER_PAUSADO: 'Envios pausados', WORKER_RETOMADO: 'Envios retomados', WORKER_REINICIADO: 'Worker reiniciado',
+  WORKER_LIGADO: 'Worker ligado', WORKER_DESLIGADO: 'Worker desligado',
   BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco', CONFIG_ALTERADA: 'Configurações alteradas',
   PAINEL_PESSOA_CRIADA: 'Pessoa do painel cadastrada', PAINEL_SENHA_REDEFINIDA: 'Senha nova de pessoa do painel',
   PAINEL_PESSOA_ATIVADA: 'Pessoa do painel reativada', PAINEL_PESSOA_DESATIVADA: 'Pessoa do painel desativada',
@@ -1156,14 +1157,22 @@ function abrirSistema(opcoes = {}) {
   const acoesArea = el('div', { class: 'acoes' });
   const retorno = el('div', {});
 
-  async function comandar(acao) {
+  async function comandar(acao, extra = {}) {
     retorno.replaceChildren();
     try {
-      const r = await api('sistema.php', { metodo: 'POST', corpo: { acao } });
+      const r = await api('sistema.php', { metodo: 'POST', corpo: { acao, ...extra } });
       retorno.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
       desenhar(r.status);
       atualizarPontoSistema().catch(() => {});
     } catch (e) {
+      if (e.codigo === 'CONFIRMAR_PRODUCAO') {
+        // Notas de producao na fila: so liga depois de a pessoa ler e confirmar.
+        retorno.replaceChildren(el('div', { class: 'confirmar confirmar--perigo' },
+          el('span', {}, e.message + ' Ligar mesmo assim?'),
+          el('button', { class: 'botao botao--perigo', type: 'button', onclick: () => comandar('ligar', { confirmar_producao: true }) }, 'Ligar e enviar'),
+          el('button', { class: 'botao', type: 'button', onclick: () => retorno.replaceChildren() }, 'Cancelar')));
+        return;
+      }
       retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
   }
@@ -1182,13 +1191,19 @@ function abrirSistema(opcoes = {}) {
       el('strong', {}, s.titulo),
       el('span', { class: 'suave' }, s.texto)));
 
-    acoesArea.replaceChildren(
-      s.pausado
+    const parado = s.situacao === 'PARADO';
+    acoesArea.replaceChildren(...[
+      parado
+        ? el('button', { class: 'botao botao--forte', type: 'button', onclick: () => comandar('ligar') }, 'Ligar worker')
+        : null,
+      parado ? null : s.pausado
         ? el('button', { class: 'botao botao--forte', type: 'button', onclick: () => comandar('retomar') }, 'Retomar envios')
         : el('button', { class: 'botao', type: 'button',
           onclick: () => pedirConfirmacao('Pausar o envio de notas? As notas novas ficam esperando na fila.', 'Pausar envios', 'pausar') }, 'Pausar envios'),
-      el('button', { class: 'botao', type: 'button', disabled: s.situacao === 'PARADO' || s.situacao === 'REINICIANDO',
-        onclick: () => pedirConfirmacao('Reiniciar o worker? Ele termina a nota atual e volta sozinho em alguns segundos. Use depois de atualizar o sistema.', 'Reiniciar', 'reiniciar') }, 'Reiniciar worker'));
+      parado ? null : el('button', { class: 'botao', type: 'button', disabled: s.situacao === 'REINICIANDO',
+        onclick: () => pedirConfirmacao('Reiniciar o worker? Ele termina a nota atual e volta sozinho em alguns segundos. Use depois de atualizar o sistema.', 'Reiniciar', 'reiniciar') }, 'Reiniciar worker'),
+      parado ? null : el('button', { class: 'botao', type: 'button',
+        onclick: () => pedirConfirmacao('Desligar o worker? Ele termina a nota atual e para. Nada vai para a prefeitura até você ligar de novo.', 'Desligar', 'desligar') }, 'Desligar worker')].filter(Boolean));
 
     const f = s.fila;
     filaArea.replaceChildren(...[el('div', { class: 'numeros' },
@@ -1196,6 +1211,7 @@ function abrirSistema(opcoes = {}) {
       el('div', { class: 'numero' }, el('b', {}, f.executando), el('span', {}, 'enviando agora')),
       el('div', { class: 'numero' }, el('b', {}, f.agendados), el('span', {}, 'agendados (consultas)')),
       el('div', { class: 'numero' + (f.falhas_24h > 0 ? ' numero--alerta' : '') }, el('b', {}, f.falhas_24h), el('span', {}, 'falharam nas últimas 24 h'))),
+    f.producao > 0 ? el('p', { class: 'erro' }, `${f.producao} nota(s) de PRODUÇÃO na fila: valem de verdade quando o worker enviar.`) : null,
     f.mais_antigo ? el('p', { class: 'suave' }, `A mais antiga esperando entrou em ${dataHora(f.mais_antigo)}.`) : null].filter(Boolean));
 
     workersArea.replaceChildren(s.workers.length
