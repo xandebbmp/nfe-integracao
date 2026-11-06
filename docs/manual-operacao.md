@@ -704,6 +704,20 @@ sessões abertas.
   lista. Um serviço novo pode ser salvo na própria emissão;
 - clique duplo não gera nota em dobro (referência `PORTAL-<id do envio>`).
 
+**Outras telas do portal:**
+- **Minhas notas:** todas as NFS-e da empresa (do portal ou da API), 20 por
+  página. Filtros por situação (autorizadas, na prefeitura, com problema,
+  canceladas), por mês e busca por tomador, CPF/CNPJ ou número. Clicar na
+  nota mostra o detalhe: o motivo da prefeitura e como corrigir, valores,
+  PDF e XML. Enquanto houver nota na prefeitura, a lista se atualiza sozinha.
+- **Serviços:** cadastrar, editar e remover os serviços salvos. "Usar na
+  nota" abre a emissão com o serviço já escolhido. Remover só esconde da
+  lista: as notas emitidas não mudam.
+- **Tomadores:** lista com busca, editar o cadastro (o CPF/CNPJ não muda),
+  cadastrar um novo (com CNPJ e CEP preenchidos sozinhos) e remover.
+  "Emitir nota" abre a emissão com o tomador preenchido. Editar não muda a
+  ordem da lista (os mais usados ficam em cima).
+
 **Configuração** (`portal` no `config/nfse.php`, troque no
 `config/nfse.local.php`):
 
@@ -722,7 +736,7 @@ chamada que altera algo exige o cabeçalho `X-Portal: 1` (o próprio portal
 envia), o que impede outro site de emitir usando a sessão de alguém.
 
 **Rotas** (`public/v1/portal/`): `entrar`, `sair`, `sessao`, `senha`,
-`inicio`, `servicos`, `tomadores`, `consulta`, `emitir` e `arquivo` (PDF/XML).
+`inicio`, `notas`, `servicos`, `tomadores`, `consulta`, `emitir` e `arquivo` (PDF/XML).
 No painel: `public/v1/admin/portal_usuarios.php`.
 
 ### Alterar o visual ou os textos

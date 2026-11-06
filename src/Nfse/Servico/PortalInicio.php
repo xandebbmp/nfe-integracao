@@ -16,6 +16,8 @@ use Xande\NfeIntegracao\Nfse\Repositorio\PortalRepositorio;
  *   empresa()  topo e menu: razao social, CNPJ, ambiente, certificado
  *   resumo()   tela inicial: numeros do mes e o que precisa de atencao
  *   notas()    ultimas notas da empresa (de qualquer origem: portal ou API)
+ *   listarNotas()  tela "Minhas notas" (busca, filtros, paginas)
+ *   nota()     detalhe de uma nota
  */
 final class PortalInicio
 {
@@ -89,37 +91,94 @@ final class PortalInicio
         ];
     }
 
+    /** Grupos de status do filtro da tela "Minhas notas". */
+    public const FILTROS_STATUS = [
+        'AUTORIZADAS' => [StatusNfse::AUTORIZADO],
+        'EM_ANDAMENTO' => StatusNfse::EM_ANDAMENTO,
+        'COM_PROBLEMA' => [StatusNfse::REJEITADO, StatusNfse::ERRO, StatusNfse::DENEGADO],
+        'CANCELADAS' => [StatusNfse::CANCELADO, StatusNfse::SUBSTITUIDO],
+    ];
+
+    public const POR_PAGINA = 20;
+
     /** @return list<array> ultimas notas de servico da empresa, mais recentes primeiro */
     public function notas(string $cnpj, int $limite = 10): array
     {
-        $documentos = (new DocumentoRepositorio($this->pdo))->listar(['emitente_cnpj' => $cnpj], $limite * 2);
-        $saida = [];
-        foreach ($documentos as $d) {
-            if (!in_array($d['padrao'], Padrao::NFSE, true) || (int)$d['tp_amb'] !== $this->tpAmb) {
-                continue;
-            }
-            $apresentado = DocumentoApresentador::documento($d);
-            $payload = is_array($d['payload'] ?? null) ? $d['payload'] : [];
-            $mensagem = $apresentado['mensagens'][0] ?? null;
-            $saida[] = [
-                'id' => $d['id'],
-                'numero' => $apresentado['nfse']['numero'] ?? null,
-                'dps_rps' => $apresentado['dps_rps']['numero'] ?? null,
-                'tomador' => (string)($payload['tomador']['nome'] ?? ''),
-                'valor' => (float)($payload['valores']['valor_servicos'] ?? 0),
-                'status' => $d['status'],
-                'finalizado' => $apresentado['finalizado'],
-                'motivo' => is_array($mensagem)
-                    ? trim(($mensagem['mensagem'] ?? '') . ' ' . ($mensagem['correcao'] ?? ''))
-                    : ($d['mensagem_retorno'] ?? null),
-                'criado_em' => $d['criado_em'],
-                'links' => self::links($d['id'], $apresentado['links']['pdf'] !== null),
-            ];
-            if (count($saida) >= $limite) {
-                break;
-            }
+        $r = (new PortalRepositorio($this->pdo))->notas($cnpj, $this->tpAmb, Padrao::NFSE, [], '', '', $limite, 0);
+        return array_map([self::class, 'resumoNota'], $r['notas']);
+    }
+
+    /**
+     * Tela "Minhas notas": busca, filtro por situacao e mes, paginas de 20.
+     *
+     * @param array{status?: string, busca?: string, mes?: string, pagina?: int|string} $filtros
+     */
+    public function listarNotas(string $cnpj, array $filtros): array
+    {
+        $grupo = (string)($filtros['status'] ?? '');
+        $pagina = max(1, (int)($filtros['pagina'] ?? 1));
+        $r = (new PortalRepositorio($this->pdo))->notas(
+            $cnpj,
+            $this->tpAmb,
+            Padrao::NFSE,
+            self::FILTROS_STATUS[$grupo] ?? [],
+            mb_substr(trim((string)($filtros['busca'] ?? '')), 0, 60),
+            (string)($filtros['mes'] ?? ''),
+            self::POR_PAGINA,
+            ($pagina - 1) * self::POR_PAGINA
+        );
+        return [
+            'notas' => array_map([self::class, 'resumoNota'], $r['notas']),
+            'total' => $r['total'],
+            'pagina' => $pagina,
+            'paginas' => max(1, (int)ceil($r['total'] / self::POR_PAGINA)),
+        ];
+    }
+
+    /** Detalhe de uma nota da empresa (null = nao existe ou e de outra empresa). */
+    public function nota(string $cnpj, string $id): ?array
+    {
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id)) {
+            return null;
         }
-        return $saida;
+        $d = (new DocumentoRepositorio($this->pdo))->buscar($id);
+        if ($d === null || $d['emitente_cnpj'] !== $cnpj || !in_array($d['padrao'], Padrao::NFSE, true)) {
+            return null;
+        }
+        $apresentado = DocumentoApresentador::documento($d);
+        $payload = is_array($d['payload'] ?? null) ? $d['payload'] : [];
+        return self::resumoNota($d) + [
+            'padrao' => $d['padrao'],
+            'tomador_completo' => $payload['tomador'] ?? [],
+            'servico' => $payload['servico'] ?? [],
+            'valores' => $payload['valores'] ?? [],
+            'competencia' => $payload['competencia'] ?? null,
+            'nfse' => $apresentado['nfse'],
+            'mensagens' => $apresentado['mensagens'],
+        ];
+    }
+
+    /** Uma linha da lista de notas. */
+    private static function resumoNota(array $d): array
+    {
+        $apresentado = DocumentoApresentador::documento($d);
+        $payload = is_array($d['payload'] ?? null) ? $d['payload'] : [];
+        $mensagem = $apresentado['mensagens'][0] ?? null;
+        return [
+            'id' => $d['id'],
+            'numero' => $apresentado['nfse']['numero'] ?? null,
+            'dps_rps' => $apresentado['dps_rps']['numero'] ?? null,
+            'tomador' => (string)($payload['tomador']['nome'] ?? ''),
+            'tomador_documento' => (string)($payload['tomador']['cpf_cnpj'] ?? ''),
+            'valor' => (float)($payload['valores']['valor_servicos'] ?? 0),
+            'status' => $d['status'],
+            'finalizado' => $apresentado['finalizado'],
+            'motivo' => is_array($mensagem)
+                ? trim(($mensagem['mensagem'] ?? '') . ' ' . ($mensagem['correcao'] ?? ''))
+                : ($d['mensagem_retorno'] ?? null),
+            'criado_em' => $d['criado_em'],
+            'links' => self::links($d['id'], $apresentado['links']['pdf'] !== null),
+        ];
     }
 
     /** Links de PDF/XML com a sessao do portal (public/v1/portal/arquivo.php). */

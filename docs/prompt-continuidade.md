@@ -172,10 +172,11 @@ Documentação:
    "Testes NFS-e (PHP 8.3 + PostgreSQL 16)" (`docs/ci.md`).
 7. **Produção:** `tpAmb = 1` só depois da homologação aprovada.
 8. **Portal do cliente** (`public/portal/`, rotas `public/v1/portal/`,
-   banco `0006_portal_criar_usuarios.sql`): login, início e "Emitir nota"
-   já ligados na API. Falta: "Esqueci a senha" por e-mail (hoje o admin
-   gera nova senha), telas de Notas/Serviços/Tomadores completas e testar
-   a consulta de CNPJ/CEP com rede na VPS. Ver `docs/manual-operacao.md`
+   banco `0006_portal_criar_usuarios.sql`): login, início, "Emitir nota",
+   "Minhas notas", "Serviços" e "Tomadores" já ligados na API. Falta:
+   "Esqueci a senha" por e-mail (hoje o admin gera nova senha), telas de
+   Recorrências, Minha empresa e Usuários, cancelamento de nota e testar a
+   consulta de CNPJ/CEP com rede na VPS. Ver `docs/manual-operacao.md`
    seção 13.
 9. **Tudo pelo painel (pedido do xande):** o worker já é acompanhado e
    comandado no botão "Sistema" do painel admin (pausar, retomar,
@@ -198,7 +199,7 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 289/289 com banco e 92/92 sem.
+  - Situação atual: 311/311 com banco e 92/92 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
   `node --check public/admin/admin.js public/monitor/monitor.js public/portal/portal.js` e
   `shellcheck -S warning deploy/*.sh`.
