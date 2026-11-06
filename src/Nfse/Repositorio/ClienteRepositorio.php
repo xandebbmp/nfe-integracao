@@ -16,7 +16,7 @@ final class ClienteRepositorio
     /** Campos que o painel admin pode alterar diretamente. */
     public const CAMPOS_EDITAVEIS = [
         'razao_social', 'nome_fantasia', 'email', 'telefone', 'uf', 'ie', 'inscricao_municipal',
-        'codigo_municipio', 'opcao_simples_nacional', 'regime_apuracao_simples', 'regime_especial_tributacao',
+        'codigo_municipio', 'opcao_simples_nacional', 'regime_apuracao_simples', 'percentual_tributos_simples', 'regime_especial_tributacao',
         'incentivador_cultural', 'regime_especial_abrasf', 'webhook_url', 'webhook_segredo',
         'emissao_liberada', 'motivo_bloqueio', 'liberado_ate', 'limite_mensal', 'padroes_permitidos',
         'plano', 'observacao',
@@ -300,7 +300,7 @@ final class ClienteRepositorio
     private static function colunasSemSegredo(): string
     {
         return 'cnpj, razao_social, nome_fantasia, email, telefone, uf, ie, inscricao_municipal, codigo_municipio,
-                opcao_simples_nacional, regime_apuracao_simples, regime_especial_tributacao, incentivador_cultural,
+                opcao_simples_nacional, regime_apuracao_simples, percentual_tributos_simples, regime_especial_tributacao, incentivador_cultural,
                 regime_especial_abrasf, certificado_validade, certificado_titular, certificado_atualizado_em,
                 (certificado_cifrado IS NOT NULL) AS tem_certificado, token_final, token_gerado_em,
                 (token_hash IS NOT NULL) AS tem_token, webhook_url, (webhook_segredo IS NOT NULL) AS tem_webhook_segredo,
@@ -324,6 +324,10 @@ final class ClienteRepositorio
             if (isset($linha[$campo])) {
                 $linha[$campo] = (int)$linha[$campo];
             }
+        }
+        // NUMERIC chega como texto ("2.00"): vira numero.
+        if (isset($linha['percentual_tributos_simples'])) {
+            $linha['percentual_tributos_simples'] = (float)$linha['percentual_tributos_simples'];
         }
         return $linha;
     }

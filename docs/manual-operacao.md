@@ -518,7 +518,13 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
 1. **+ Nova empresa:**
    - CNPJ e razão social;
    - UF e IE (NF-e) e/ou inscrição municipal (NFS-e);
-   - regime.
+   - regime;
+   - **Simples Nacional ME/EPP:** preencha também o **"% tributos do
+     Simples"** (o contador informa, ex.: 2). Sem ele, a NFS-e Nacional
+     da empresa volta `REJEITADO` com o código `SIMPLES_SEM_PERCENTUAL`,
+     porque o fisco recusaria a nota (rejeição E0712). Se o sistema do
+     cliente mandar `valores.percentual_tributos_simples` na nota, vale o
+     da nota.
 2. **Controle de emissão:**
    - plano;
    - limite mensal (vazio = sem limite);

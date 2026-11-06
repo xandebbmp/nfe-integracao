@@ -32,6 +32,7 @@ return [
     //         'codigo_municipio' => '2927408',
     //         'opcao_simples_nacional' => 3,
     //         'regime_apuracao_simples' => 1,
+    //         'percentual_tributos_simples' => 2.0, // ME/EPP: obrigatorio (informado pelo contador)
     //         'certificado' => [
     //             'arquivo' => __DIR__ . '/../storage/certs/11222333000181.pfx',
     //             'senha' => 'SENHA_DO_CERTIFICADO',

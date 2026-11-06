@@ -310,6 +310,7 @@ function desenharCliente(c) {
       campo('Código IBGE do município', 'codigo_municipio', c.codigo_municipio, { max: 7 }),
       selecao('Simples Nacional', 'opcao_simples_nacional', c.opcao_simples_nacional, [[1, 'Não optante'], [2, 'MEI'], [3, 'ME/EPP']]),
       selecao('Regime de apuração (ME/EPP)', 'regime_apuracao_simples', c.regime_apuracao_simples, [['', '—'], [1, '1'], [2, '2'], [3, '3']]),
+      campo('% tributos do Simples (ME/EPP, do contador)', 'percentual_tributos_simples', c.percentual_tributos_simples ?? '', { max: 6, placeholder: 'ex.: 2' }),
       selecao('Regime especial (NFS-e Nacional)', 'regime_especial_tributacao', c.regime_especial_tributacao, [0, 1, 2, 3, 4, 5, 6].map((v) => [v, v === 0 ? '0 - Nenhum' : String(v)])),
       selecao('Regime especial (Salvador)', 'regime_especial_abrasf', c.regime_especial_abrasf, [['', '—'], 1, 2, 3, 4, 5, 6].map((v) => (Array.isArray(v) ? v : [v, String(v)]))),
       el('label', { class: 'linha-check' }, el('input', { type: 'checkbox', name: 'incentivador_cultural', checked: c.incentivador_cultural }), 'Incentivador cultural'),

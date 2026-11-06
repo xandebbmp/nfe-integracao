@@ -40,6 +40,14 @@ function testesClientesIntegracao(PDO $pdo, array $cfgGeral): void
     Apoio::igual([false, 422], [$r['ok'], $r['http']], 'admin: limite, data e tipo invalidos sao recusados');
     Apoio::igual(3, count($r['erros'] ?? []), 'admin: cada erro de preenchimento e explicado');
 
+    // ---- Percentual de tributos do Simples (pTotTribSN) ----
+    $r = $admin->salvar(['cnpj' => $cnpj, 'opcao_simples_nacional' => 3, 'percentual_tributos_simples' => '2,5'], 'ip');
+    Apoio::igual(2.5, $r['cliente']['percentual_tributos_simples'] ?? null, 'admin: percentual do Simples aceito com virgula e guardado');
+    $r = $admin->salvar(['cnpj' => $cnpj, 'percentual_tributos_simples' => '120'], 'ip');
+    Apoio::igual([false, 422], [$r['ok'], $r['http']], 'admin: percentual do Simples fora de 0 a 100 e recusado');
+    Apoio::igual(2.5, NfseConfig::comClientes($cfgGeral, $pdo)['emitentes'][$cnpj]['percentual_tributos_simples'] ?? null,
+        'admin: percentual do cadastro chega na configuracao da empresa');
+
     // ---- Certificado ----
     $pfx = Apoio::certificado()->writePfx('senha-pfx');
     Apoio::igual('CERTIFICADO_INVALIDO', $admin->enviarCertificado($cnpj, $pfx, 'errada', 'ip')['codigo'] ?? null, 'certificado: senha errada e recusada');

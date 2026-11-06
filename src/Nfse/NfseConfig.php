@@ -39,6 +39,8 @@ final class NfseConfig
         'email' => '',
         'opcao_simples_nacional' => 1,
         'regime_apuracao_simples' => null,
+        // Percentual aproximado dos tributos do Simples (pTotTribSN). Obrigatorio para ME/EPP no Nacional.
+        'percentual_tributos_simples' => null,
         'regime_especial_tributacao' => 0,
         'incentivador_cultural' => false,
         'regime_especial_abrasf' => null,
@@ -185,6 +187,7 @@ final class NfseConfig
                 'email' => (string)($c['email'] ?? ''),
                 'opcao_simples_nacional' => (int)$c['opcao_simples_nacional'],
                 'regime_apuracao_simples' => $c['regime_apuracao_simples'] ?? null,
+                'percentual_tributos_simples' => $c['percentual_tributos_simples'] ?? null,
                 'regime_especial_tributacao' => (int)$c['regime_especial_tributacao'],
                 'incentivador_cultural' => (bool)$c['incentivador_cultural'],
                 'regime_especial_abrasf' => $c['regime_especial_abrasf'] ?? null,

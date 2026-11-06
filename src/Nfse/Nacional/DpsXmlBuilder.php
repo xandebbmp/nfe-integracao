@@ -90,9 +90,23 @@ final class DpsXmlBuilder
         $this->montarPrestador($dom, $inf, $emitente);
         $this->montarTomador($dom, $inf, $p['tomador'] ?? null);
         $this->montarServico($dom, $inf, $p['servico'], (string)$emitente['codigo_municipio']);
-        $this->montarValores($dom, $inf, $p['valores']);
+        $this->montarValores($dom, $inf, self::valoresComPadraoDoEmitente($p['valores'], $emitente));
 
         return ['xml' => $dom->saveXML($dom->documentElement), 'id_dps' => $idDps];
+    }
+
+    /**
+     * Percentual de tributos do Simples (pTotTribSN): vale o da nota; se a
+     * nota nao trouxer, usa o do cadastro da empresa (informado pelo contador).
+     */
+    public static function valoresComPadraoDoEmitente(array $valores, array $emitente): array
+    {
+        $daNota = $valores['percentual_tributos_simples'] ?? null;
+        $doCadastro = $emitente['percentual_tributos_simples'] ?? null;
+        if (($daNota === null || $daNota === '') && $doCadastro !== null && $doCadastro !== '') {
+            $valores['percentual_tributos_simples'] = $doCadastro;
+        }
+        return $valores;
     }
 
     private function montarSubstituicao(DOMDocument $dom, DOMElement $inf, array $p): void
