@@ -154,7 +154,7 @@ final class SistemaRepositorio
     {
         $stmt = $this->pdo->prepare(
             "SELECT acao, ip, criado_em, to_jsonb(l)->>'autor' AS autor FROM fiscal_admin_log l
-              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%' OR acao LIKE 'CONFIG\\_%' OR acao LIKE 'PAINEL\\_%')
+              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%' OR acao LIKE 'CONFIG\\_%' OR acao LIKE 'PAINEL\\_%' OR acao LIKE 'AMBIENTE\\_%')
               ORDER BY id DESC LIMIT :limite"
         );
         $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);

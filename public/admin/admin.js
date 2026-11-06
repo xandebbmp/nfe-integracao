@@ -39,8 +39,8 @@ const ACOES_HISTORICO = {
   CADASTRO: 'Cadastro', ALTERACAO: 'Alteração', CERTIFICADO: 'Certificado enviado', TOKEN: 'Token gerado',
   NUMERACAO: 'Numeração ajustada', PORTAL_USUARIO_CRIADO: 'Acesso ao portal criado', PORTAL_SENHA_REDEFINIDA: 'Nova senha do portal',
   PORTAL_ACESSO_ENVIADO: 'Acesso ao portal enviado por e-mail', PORTAL_USUARIO_ATIVADO: 'Acesso ao portal reativado',
-  PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou administrador do portal',
-  PORTAL_ADMIN_RETIRADO: 'Deixou de ser administrador do portal',
+  PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou responsável da empresa no portal',
+  PORTAL_ADMIN_RETIRADO: 'Deixou de ser responsável da empresa no portal',
 };
 
 const ACOES_SISTEMA = {
@@ -48,7 +48,7 @@ const ACOES_SISTEMA = {
   BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco', CONFIG_ALTERADA: 'Configurações alteradas',
   PAINEL_PESSOA_CRIADA: 'Pessoa do painel cadastrada', PAINEL_SENHA_REDEFINIDA: 'Senha nova de pessoa do painel',
   PAINEL_PESSOA_ATIVADA: 'Pessoa do painel reativada', PAINEL_PESSOA_DESATIVADA: 'Pessoa do painel desativada',
-  PAINEL_ACESSO_ENVIADO: 'Acesso ao painel enviado por e-mail',
+  PAINEL_ACESSO_ENVIADO: 'Acesso ao painel enviado por e-mail', AMBIENTE_ALTERADO: 'Ambiente de emissão trocado',
 };
 
 const ESTADOS_WORKER = { TRABALHANDO: 'Enviando notas', AGUARDANDO: 'Esperando notas', PAUSADO: 'Pausado' };
@@ -225,6 +225,7 @@ async function carregar() {
   const producao = dados.ambiente === 'PRODUCAO';
   $('selo-ambiente').textContent = producao ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
   $('selo-ambiente').className = `selo selo--${producao ? 'producao' : 'homologacao'}`;
+  $('aviso-producao').hidden = !producao;
   const [ano, mes] = dados.mes.split('-');
   $('mes-atual').textContent = `Uso de ${mes}/${ano}`;
   desenhar();
@@ -895,8 +896,8 @@ function secaoPortal(c) {
         el('tbody', {}, ...r.usuarios.map((u) => el('tr', {},
           el('td', {}, u.nome),
           el('td', {}, u.email),
-          // Administrador convida e desativa colegas pela tela Usuarios do portal.
-          el('td', {}, u.administrador ? 'Administrador' : 'Emissor'),
+          // Responsavel da empresa (campo administrador) convida e desativa colegas pela tela Usuarios do portal.
+          el('td', {}, u.administrador ? 'Responsável da empresa' : 'Emissor'),
           el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
           el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
           el('td', {},
@@ -904,7 +905,7 @@ function secaoPortal(c) {
               onclick: () => enviarAcessoDaLinha(u) }, '✉ Enviar acesso por e-mail') : null, ' ',
             el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
             el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id }) },
-              u.administrador ? 'Tirar administrador' : 'Tornar administrador'), ' ',
+              u.administrador ? 'Tirar responsável' : 'Tornar responsável'), ' ',
             el('button', { class: 'botao' + (u.ativo ? ' botao--perigo' : ''), type: 'button',
               onclick: () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null) },
             u.ativo ? 'Desativar' : 'Reativar'))))),
@@ -1317,7 +1318,7 @@ function abrirSistema(opcoes = {}) {
 
     configArea.replaceChildren(
       el('p', { class: 'suave' }, `Ambiente: ${dados.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'}. `,
-        'O ambiente e os tokens só mudam no arquivo config/nfse.local.php, por segurança. O e-mail fica no bloco "E-mail", acima.'),
+        'Os tokens só mudam no arquivo config/nfse.local.php, por segurança. O ambiente e o e-mail têm blocos próprios, acima.'),
       ...blocos,
       el('div', { class: 'acoes' }, salvar),
       retorno);
@@ -1486,7 +1487,8 @@ function abrirSistema(opcoes = {}) {
     }
   }
 
-  abrirModal('Sistema', 'Worker (o programa que envia as notas), banco de dados, diagnóstico e configurações', [
+  abrirModal('Sistema', 'Ambiente, worker (o programa que envia as notas), banco de dados, pessoas, e-mail e configurações', [
+    secaoAmbiente(),
     el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
@@ -1510,6 +1512,76 @@ function abrirSistema(opcoes = {}) {
 // ==========================================================================
 // Inicio
 // ==========================================================================
+
+// ==========================================================================
+// Ambiente de emissao (tela Sistema): homologacao ou PRODUCAO
+// So quem entra no painel admin troca (o servidor confere em ambiente.php).
+// ==========================================================================
+
+function secaoAmbiente() {
+  const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+
+  function desenhar(a, mensagem) {
+    const producao = a.atual === 1;
+    const retorno = el('div', { 'aria-live': 'polite' }, mensagem ? el('p', { class: 'envio-ok' }, '✓ ' + mensagem) : null);
+    const filhos = [
+      el('div', { class: 'ambiente-atual' },
+        el('span', { class: 'suave' }, 'Agora:'),
+        el('span', { class: 'ambiente-atual__nome' + (producao ? ' ambiente-atual__nome--producao' : '') },
+          producao ? '1 - Produção (notas com valor fiscal)' : '2 - Homologação (testes, sem valor fiscal)')),
+      el('p', { class: 'suave' }, 'Vale para o sistema todo: NF-e e NFS-e, API, portal das empresas e worker. '
+        + 'Homologação e produção têm numeração separada.'),
+    ];
+
+    if (!producao) {
+      // Antes de ligar: o que ainda falta nas empresas (so avisa, nao impede).
+      const semCertificado = estado.clientes.filter((c) => !c.tem_certificado && c.situacao === 'LIBERADA');
+      const palavra = el('input', { type: 'text', autocomplete: 'off', placeholder: 'PRODUÇÃO', 'aria-label': 'Digite PRODUÇÃO para confirmar' });
+      const ligar = el('button', { class: 'botao botao--perigo', type: 'button', disabled: true }, 'Ligar produção');
+      palavra.addEventListener('input', () => {
+        ligar.disabled = !/^PRODU[CÇ][AÃ]O$/i.test(palavra.value.trim());
+      });
+      ligar.addEventListener('click', async () => {
+        ligar.disabled = true;
+        try {
+          const r = await api('ambiente.php', { metodo: 'POST', corpo: { tpAmb: 1, confirmacao: palavra.value } });
+          desenhar(r.ambiente, r.mensagem);
+          carregar();
+        } catch (e) {
+          retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+          ligar.disabled = false;
+        }
+      });
+      filhos.push(el('div', { class: 'ambiente-confirmar' },
+        el('strong', {}, 'Passar para produção'),
+        el('p', {}, 'Depois disso, toda nota emitida vale de verdade (vai para a prefeitura e para a SEFAZ). Para confirmar, digite ',
+          el('strong', {}, 'PRODUÇÃO'), ' abaixo.'),
+        semCertificado.length ? el('p', { class: 'aviso' }, `Atenção: ${semCertificado.length} empresa(s) liberada(s) ainda sem certificado: `
+          + semCertificado.map((c) => c.nome_fantasia || c.razao_social).join(', ') + '. As notas delas serão recusadas até enviar o certificado.') : null,
+        el('div', { class: 'acoes' }, palavra, ligar)));
+    } else {
+      const voltar = el('button', { class: 'botao', type: 'button' }, 'Voltar para homologação (testes)');
+      voltar.addEventListener('click', async () => {
+        if (!confirm('Voltar para HOMOLOGAÇÃO? As próximas notas serão só de teste, sem valor fiscal.')) return;
+        voltar.disabled = true;
+        try {
+          const r = await api('ambiente.php', { metodo: 'POST', corpo: { tpAmb: 2 } });
+          desenhar(r.ambiente, r.mensagem);
+          carregar();
+        } catch (e) {
+          retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+          voltar.disabled = false;
+        }
+      });
+      filhos.push(el('div', { class: 'acoes' }, voltar));
+    }
+    filhos.push(retorno);
+    area.replaceChildren(...filhos);
+  }
+
+  api('ambiente.php').then((a) => desenhar(a)).catch((e) => area.replaceChildren(el('p', { class: 'erro' }, e.message)));
+  return el('section', { class: 'secao', id: 'secao-ambiente' }, el('h3', {}, 'Ambiente de emissão'), area);
+}
 
 // ==========================================================================
 // Pessoas do painel (tela Sistema) e "Minha senha"

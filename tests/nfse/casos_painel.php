@@ -7,7 +7,10 @@ declare(strict_types=1);
  * no historico. Incluido por tests/nfse/executar.php.
  */
 
+use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
+use Xande\NfeIntegracao\Nfse\Servico\ConfiguracoesPainel;
+use Xande\NfeIntegracao\Nfse\Servico\PortalAcesso;
 use Xande\NfeIntegracao\Nfse\Servico\EnvioEmail;
 use Xande\NfeIntegracao\Nfse\Servico\PainelAcesso;
 
@@ -80,6 +83,27 @@ function testesPainelIntegracao(PDO $pdo, array $cfg): void
     ClienteRepositorio::$autor = null;
     Apoio::igual('Ana Paula Lima <ana@empresa.com.br>', (new ClienteRepositorio($pdo))->historico('11444777000161', 1)[0]['autor'] ?? null,
         'historico: mostra quem fez a mudanca');
+
+    // ---- Ambiente de emissao (so o painel troca) ----
+    $arquivo = ['tpAmb' => 2] + $cfg;
+    $config = new ConfiguracoesPainel($pdo, $arquivo);
+    Apoio::igual(['atual' => 2, 'arquivo' => 2, 'no_painel' => false], $config->ambiente(), 'ambiente: sem troca vale o arquivo');
+    Apoio::igual('CONFIRMACAO_FALTANDO', $config->trocarAmbiente(1, 'sim', 'ip')['codigo'] ?? null, 'ambiente: producao sem digitar PRODUCAO nao troca');
+    Apoio::igual(2, NfseConfig::comClientes($arquivo, $pdo)['tpAmb'], 'ambiente: continua homologacao');
+    ClienteRepositorio::$autor = 'Ana Paula Lima <ana@empresa.com.br>';
+    Apoio::verificar($config->trocarAmbiente(1, ' produção ', '10.0.0.9')['ok'], 'ambiente: digitando PRODUCAO troca');
+    ClienteRepositorio::$autor = null;
+    Apoio::igual(1, NfseConfig::comClientes($arquivo, $pdo)['tpAmb'], 'ambiente: API, portal e worker passam a usar producao');
+    $log = $pdo->query("SELECT detalhes, autor, ip FROM fiscal_admin_log WHERE acao = 'AMBIENTE_ALTERADO' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    Apoio::verificar(str_contains((string)$log['detalhes'], 'PRODUCAO') && $log['autor'] === 'Ana Paula Lima <ana@empresa.com.br>' && $log['ip'] === '10.0.0.9',
+        'ambiente: historico com de/para, quem trocou e IP');
+    Apoio::verificar($config->trocarAmbiente(2, '', 'ip')['ok'] && !$config->ambiente()['no_painel'], 'ambiente: voltar para homologacao nao pede palavra e apaga o ajuste');
+    Apoio::igual('AMBIENTE_INVALIDO', $config->trocarAmbiente(3, '', 'ip')['codigo'] ?? null, 'ambiente: valor estranho recusado');
+    $portal = new PortalAcesso($pdo, $cfg);
+    $cnpjPortal = (string)$pdo->query('SELECT cnpj FROM fiscal_clientes LIMIT 1')->fetchColumn();
+    $u = $portal->criarUsuario($cnpjPortal, 'Cliente Admin', 'cliente.admin@empresa.com.br', 'ip', true);
+    $tokenPortal = $portal->entrar('cliente.admin@empresa.com.br', $u['senha_provisoria'], false, 'ip', 't')['token'] ?? '';
+    Apoio::verificar($tokenPortal !== '' && $acesso->sessao($tokenPortal) === null, 'ambiente: login do portal (mesmo administrador da empresa) nao entra no painel');
 
     $acesso->sair($token);
     Apoio::igual(null, $acesso->sessao($token), 'sair: codigo deixa de valer');

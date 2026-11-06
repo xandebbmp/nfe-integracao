@@ -233,7 +233,7 @@
     mostrarErro('login-erro', '');
     api('GET', 'esqueci.php').then(function (r) {
       if (!r.disponivel) {
-        mostrarErro('login-erro', 'Peça ao administrador da sua empresa para gerar uma senha nova (tela Usuários). Você cria a sua no primeiro acesso.');
+        mostrarErro('login-erro', 'Peça ao responsável da sua empresa para gerar uma senha nova (tela Usuários). Você cria a sua no primeiro acesso.');
         return;
       }
       el('esqueci-email').value = el('login-email').value.trim();
@@ -1689,8 +1689,8 @@
       listaUsuarios = r.usuarios || [];
       el('botao-convidar').hidden = !r.pode_gerenciar;
       el('usuarios-subtitulo').textContent = r.pode_gerenciar
-        ? 'Quem da sua empresa entra no portal. Você é administrador: pode convidar, desativar e redefinir senhas.'
-        : 'Quem da sua empresa entra no portal. Para convidar ou tirar alguém, fale com um administrador.';
+        ? 'Quem da sua empresa entra no portal. Você é responsável da empresa: pode convidar, desativar e redefinir senhas.'
+        : 'Quem da sua empresa entra no portal. Para convidar ou tirar alguém, fale com o responsável da empresa.';
       desenharUsuarios(r.pode_gerenciar);
     }).catch(function (erro) {
       if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
@@ -1703,14 +1703,14 @@
       var acoes = '';
       if (podeGerenciar && !u.eu) {
         acoes = '<button type="button" class="btn btn--secundario" data-acao="redefinir_senha"><i class="icone icone--p">key</i> Nova senha</button> '
-          + '<button type="button" class="btn btn--icone" data-acao="' + (u.administrador ? 'remover_admin' : 'tornar_admin') + '" title="' + (u.administrador ? 'Tirar administrador' : 'Tornar administrador') + '" aria-label="' + (u.administrador ? 'Tirar administrador de ' : 'Tornar administrador ') + escapar(u.nome) + '"><i class="icone">' + (u.administrador ? 'remove_moderator' : 'add_moderator') + '</i></button>'
+          + '<button type="button" class="btn btn--icone" data-acao="' + (u.administrador ? 'remover_admin' : 'tornar_admin') + '" title="' + (u.administrador ? 'Tirar responsável' : 'Tornar responsável') + '" aria-label="' + (u.administrador ? 'Tirar responsável: ' : 'Tornar responsável: ') + escapar(u.nome) + '"><i class="icone">' + (u.administrador ? 'remove_moderator' : 'add_moderator') + '</i></button>'
           + (u.situacao === 'DESATIVADO'
             ? '<button type="button" class="btn btn--icone" data-acao="ativar" title="Devolver o acesso" aria-label="Devolver o acesso de ' + escapar(u.nome) + '"><i class="icone">person_add_alt</i></button>'
             : '<button type="button" class="btn btn--icone" data-acao="desativar" title="Desativar" aria-label="Desativar ' + escapar(u.nome) + '"><i class="icone">person_off</i></button>');
       }
       return '<tr data-id="' + u.id + '">'
         + '<td><b>' + escapar(u.nome) + '</b>' + (u.eu ? '<span class="eu">você</span>' : '') + '<span class="sub">' + escapar(u.email) + '</span></td>'
-        + '<td>' + (u.administrador ? '<span class="pilula pilula--info">Administrador</span>' : '<span class="pilula pilula--neutro">Emissor</span>') + '</td>'
+        + '<td>' + (u.administrador ? '<span class="pilula pilula--info">Responsável</span>' : '<span class="pilula pilula--neutro">Emissor</span>') + '</td>'
         + '<td>' + '<span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span></td>'
         + '<td class="num">' + escapar(dataCurta(u.ultimo_acesso) || 'nunca entrou') + '</td>'
         + '<td class="acoes">' + acoes + '</td></tr>';

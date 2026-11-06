@@ -18,6 +18,9 @@ use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
  *   salvar()  confere e grava. Valor igual ao do arquivo apaga o ajuste
  *             (volta a valer o arquivo).
  *
+ *   ambiente() / trocarAmbiente()  homologacao ou PRODUCAO, para o sistema
+ *             todo (NF-e e NFS-e; API, portal e worker). So o painel admin
+ *             troca (Api::exigirAdmin); producao exige digitar PRODUCAO.
  *   salvarSenhaEmail()  senha do SMTP digitada no painel: vai CRIPTOGRAFADA
  *             para sistema_ajustes ('email.senha_cifrada'), com a mesma chave
  *             dos certificados. Nunca volta para a tela.
@@ -28,6 +31,8 @@ use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 final class ConfiguracoesPainel
 {
     public const CHAVE_SENHA_EMAIL = 'email.senha_cifrada';
+    /** Ambiente de emissao escolhido no painel (1 = producao, 2 = homologacao). */
+    public const CHAVE_AMBIENTE = 'sistema.tpAmb';
 
     private SistemaRepositorio $sistema;
 
@@ -58,7 +63,7 @@ final class ConfiguracoesPainel
         }
         return [
             'campos' => $campos,
-            'ambiente' => (int)$this->cfgArquivo['tpAmb'] === 1 ? 'PRODUCAO' : 'HOMOLOGACAO',
+            'ambiente' => $this->ambiente()['atual'] === 1 ? 'PRODUCAO' : 'HOMOLOGACAO',
         ];
     }
 
@@ -147,6 +152,61 @@ final class ConfiguracoesPainel
             $cfg['email']['senha'] = (new CofreCertificado((string)($cfg['chave_certificados'] ?? '')))->decifrarTexto($cifrada);
         } catch (Throwable) {
             // Chave mudou ou sumiu: vale a senha do arquivo (se houver).
+        }
+        return $cfg;
+    }
+
+    // =====================================================================
+    // Ambiente de emissao (homologacao / producao)
+    // =====================================================================
+
+    /** @return array{atual: int, arquivo: int, no_painel: bool} */
+    public function ambiente(): array
+    {
+        $arquivo = (int)$this->cfgArquivo['tpAmb'];
+        $painel = self::aplicarAmbiente(['tpAmb' => $arquivo], $this->sistema->ajustes());
+        return ['atual' => (int)$painel['tpAmb'], 'arquivo' => $arquivo, 'no_painel' => $painel['tpAmb'] !== $arquivo];
+    }
+
+    /**
+     * Troca o ambiente do sistema todo. Producao ($tpAmb = 1) so com a
+     * palavra PRODUCAO digitada em $confirmacao (com ou sem acento).
+     */
+    public function trocarAmbiente(int $tpAmb, string $confirmacao, ?string $ip): array
+    {
+        if (!in_array($tpAmb, [1, 2], true)) {
+            return ['ok' => false, 'http' => 422, 'codigo' => 'AMBIENTE_INVALIDO', 'mensagem' => 'Use 1 (produção) ou 2 (homologação).'];
+        }
+        $palavra = strtr(mb_strtoupper(trim($confirmacao)), ['Ç' => 'C', 'Ã' => 'A']);
+        if ($tpAmb === 1 && $palavra !== 'PRODUCAO') {
+            return ['ok' => false, 'http' => 422, 'codigo' => 'CONFIRMACAO_FALTANDO', 'mensagem' => 'Para ligar a produção, digite a palavra PRODUÇÃO no campo de confirmação.'];
+        }
+        $antes = $this->ambiente();
+        if ($antes['atual'] === $tpAmb) {
+            return ['ok' => true, 'mensagem' => 'Nada mudou.', 'ambiente' => $antes];
+        }
+        if ($tpAmb === $antes['arquivo']) {
+            $this->sistema->removerAjuste(self::CHAVE_AMBIENTE);
+        } else {
+            $this->sistema->salvarAjuste(self::CHAVE_AMBIENTE, $tpAmb);
+        }
+        $nome = static fn(int $t): string => $t === 1 ? 'PRODUCAO' : 'HOMOLOGACAO';
+        (new ClienteRepositorio($this->pdo))->registrarLog(null, 'AMBIENTE_ALTERADO', ['de' => $nome($antes['atual']), 'para' => $nome($tpAmb)], $ip);
+        return [
+            'ok' => true,
+            'mensagem' => $tpAmb === 1
+                ? 'PRODUÇÃO ligada: as próximas notas têm valor fiscal. O worker passa a usar em até 1 minuto.'
+                : 'Voltou para homologação (testes, sem valor fiscal). O worker passa a usar em até 1 minuto.',
+            'ambiente' => $this->ambiente(),
+        ];
+    }
+
+    /** Usa na config o ambiente escolhido no painel (vale mais que o arquivo). */
+    public static function aplicarAmbiente(array $cfg, array $ajustes): array
+    {
+        $tpAmb = $ajustes[self::CHAVE_AMBIENTE] ?? null;
+        if ($tpAmb === 1 || $tpAmb === 2) {
+            $cfg['tpAmb'] = $tpAmb;
         }
         return $cfg;
     }

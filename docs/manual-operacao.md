@@ -97,7 +97,7 @@ comentários estão em `config/nfse.php`):
 
 | Chave | O que faz | Exemplo |
 |---|---|---|
-| `tpAmb` | `2` = homologação (testes, sem valor fiscal); `1` = produção | `2` |
+| `tpAmb` | `2` = homologação (testes, sem valor fiscal); `1` = produção. Valor inicial: quem troca no dia a dia é o painel (Sistema > **Ambiente de emissão**), que vale por cima deste | `2` |
 | `admin_token` | Senha do painel admin (`/admin/`). Vazio = painel desligado | `openssl rand -hex 32` |
 | `chave_certificados` | Chave que criptografa os certificados enviados pelo painel. **Guarde cópia.** | `php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'` |
 | `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas. Opcional: quem entra no painel admin já abre o monitor sem ele | `openssl rand -hex 32` |
@@ -511,6 +511,21 @@ e-mail e senha** (script `0014`).
 - O **histórico** (da empresa e da tela Sistema) mostra **quem** fez cada
   mudança: o nome da pessoa ou "Chave de emergência".
 - O banco guarda só o hash das senhas e o sha256 dos logins.
+
+### Ambiente de emissão (homologação ou produção)
+
+Fica em **Sistema > Ambiente de emissão**. Só quem entra no painel admin vê e
+usa esta chave; usuários do portal (nem o responsável da empresa) não podem.
+
+- **Homologação** = testes, sem valor fiscal. **Produção** = notas valem de
+  verdade.
+- Para ligar produção, digite `PRODUÇÃO` na caixa e clique em **Ligar
+  produção**. O painel avisa se há empresas liberadas sem certificado.
+- Em produção aparece uma **faixa vermelha** no topo do painel.
+- **Voltar para homologação** pede só uma confirmação.
+- O que está no painel vale por cima do `tpAmb` do arquivo; o worker passa a
+  usar o novo ambiente em até 1 minuto.
+- A troca fica no **histórico** com o nome de quem fez.
 
 **Primeira vez:** entre com a chave de emergência, clique em **Atualizar
 banco** (Sistema), cadastre você em **Pessoas do painel**, saia e entre com

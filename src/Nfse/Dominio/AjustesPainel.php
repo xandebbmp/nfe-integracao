@@ -13,8 +13,8 @@ namespace Xande\NfeIntegracao\Nfse\Dominio;
  * Ficam FORA de proposito (so no arquivo config/nfse.local.php):
  *   - senhas e tokens (admin_token, monitor_token, chave_certificados, S3);
  *     a senha do e-mail tem campo proprio, criptografado (ConfiguracoesPainel);
- *   - tpAmb (homologacao/producao): trocar por engano emitiria notas com
- *     valor fiscal.
+ *   - tpAmb (homologacao/producao): tem tela propria, com confirmacao
+ *     (ConfiguracoesPainel::trocarAmbiente).
  *
  * Tipos: 'inteiro' (com min e max), 'opcao' (lista fechada), 'url' (https
  * ou vazio), 'texto' (ate 200 letras) e 'email' (endereco ou vazio).

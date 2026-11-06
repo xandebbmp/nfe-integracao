@@ -75,7 +75,7 @@ final class PortalUsuarios
             return self::falha(422, 'ACAO_INVALIDA', 'Ação desconhecida.');
         }
         if (empty($eu['administrador'])) {
-            return self::falha(403, 'SEM_PERMISSAO', 'Só um administrador da empresa pode fazer isso.');
+            return self::falha(403, 'SEM_PERMISSAO', 'Só o responsável da empresa pode fazer isso.');
         }
         $cnpj = (string)$eu['cnpj'];
 
@@ -91,7 +91,7 @@ final class PortalUsuarios
         if ($id === (int)$eu['id']) {
             return self::falha(409, 'NAO_PODE_SI_MESMO', $acao === 'redefinir_senha'
                 ? 'Para trocar a sua senha, use "Minha senha" nesta tela.'
-                : 'Você não pode mudar o seu próprio acesso. Peça a outro administrador.');
+                : 'Você não pode mudar o seu próprio acesso. Peça a outro responsável da empresa.');
         }
         return match ($acao) {
             'redefinir_senha' => $this->acesso->redefinirSenha($cnpj, $id, $ip),

@@ -65,7 +65,7 @@ final class PortalAcesso
 
         if ($usuario['bloqueado_ate'] !== null && strtotime((string)$usuario['bloqueado_ate']) > time()) {
             $minutos = max(1, (int)ceil((strtotime((string)$usuario['bloqueado_ate']) - time()) / 60));
-            return self::falha(429, 'LOGIN_BLOQUEADO', "Muitas tentativas com senha errada. Tente de novo em {$minutos} minuto(s) ou peça ao administrador para redefinir a senha.");
+            return self::falha(429, 'LOGIN_BLOQUEADO', "Muitas tentativas com senha errada. Tente de novo em {$minutos} minuto(s) ou peça ao responsável da empresa para redefinir a senha.");
         }
 
         if (!$senhaOk) {
@@ -276,7 +276,7 @@ final class PortalAcesso
         }
         $this->portal->definirAdministrador($id, $administrador);
         (new ClienteRepositorio($this->pdo))->registrarLog($usuario['cnpj'], $administrador ? 'PORTAL_ADMIN_CONCEDIDO' : 'PORTAL_ADMIN_RETIRADO', ['usuario_id' => $id], $ip);
-        return ['ok' => true, 'mensagem' => $administrador ? 'Agora é administrador.' : 'Agora só emite notas.'];
+        return ['ok' => true, 'mensagem' => $administrador ? 'Agora é responsável da empresa.' : 'Agora só emite notas.'];
     }
 
     // =====================================================================
