@@ -24,7 +24,7 @@ Este manual explica **cada peça que roda no servidor**:
 10. [Como outra aplicação chama a API (autenticação e validação)](#10-como-outra-aplicação-chama-a-api)
 11. [Webhooks: avisos para o sistema do cliente](#11-webhooks)
 12. [Painel admin: empresas, bloqueios, limites e cobrança](#12-painel-admin)
-13. [Como rodar cada front (painel admin e monitor)](#13-como-rodar-cada-front)
+13. [Como rodar cada front (painel admin, monitor e portal do cliente)](#13-como-rodar-cada-front)
 14. [Checklist: está tudo funcionando?](#14-checklist-está-tudo-funcionando)
 15. [Operação do dia a dia e problemas comuns](#15-operação-do-dia-a-dia)
 16. [Segurança](#16-segurança)
@@ -515,7 +515,7 @@ curl -X POST https://SEU_DOMINIO/v1/admin/clientes.php -H "X-ADMIN-TOKEN: <admin
 
 ## 13. Como rodar cada front
 
-O projeto tem **dois fronts**. Os dois são páginas HTML/CSS/JS puras:
+O projeto tem **três fronts**. Todos são páginas HTML/CSS/JS puras:
 - **sem build**: não tem `npm install`, `npm run build` nem Node;
 - **sem servidor próprio**: o mesmo nginx/Apache que serve a API entrega as
   páginas.
@@ -526,6 +526,7 @@ o endereço no navegador.
 | Front | Endereço | Arquivos | Senha pedida na tela | Para quem |
 |---|---|---|---|---|
 | **Painel admin** | `https://SEU_DOMINIO/admin/` | `public/admin/` (`index.html`, `admin.css`, `admin.js`) | `admin_token` do `config/nfse.local.php` | Você: empresas, certificados, tokens, bloqueios, numeração e cobrança |
+| **Portal do cliente** | `https://SEU_DOMINIO/portal/` | `public/portal/` (`index.html`, `portal.css`, `portal.js`) | E-mail e senha da pessoa (criados no painel admin) | A empresa cliente: emite a própria NFS-e num formulário |
 | **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
 
 ### Passo a passo (servidor)
@@ -563,7 +564,8 @@ precisa entrar de novo.
 
 As páginas chamam a API **no mesmo domínio**, por caminho relativo:
 - o painel usa `../v1/admin/`;
-- o monitor usa `../v1/nfse/`.
+- o monitor usa `../v1/nfse/`;
+- o portal usa `../v1/portal/`.
 
 Por isso:
 - **Front e API ficam juntos no mesmo servidor e domínio.** Não é preciso
@@ -577,8 +579,10 @@ Por isso:
 
 ### Restringir quem acessa (recomendado)
 
-Os dois fronts mostram dados de todas as empresas. Além do token, limite
-por IP ou VPN. No nginx, dentro do `server { ... }`:
+O painel e o monitor mostram dados de todas as empresas. Além do token,
+limite por IP ou VPN. **O portal do cliente fica aberto** (é usado pelas
+empresas de qualquer lugar): não coloque `/portal/` nem `/v1/portal/` nessa
+lista. No nginx, dentro do `server { ... }`:
 
 ```nginx
 location ^~ /admin/      { allow 200.100.50.0/24; deny all; }
@@ -589,11 +593,72 @@ location ^~ /monitor/    { allow 200.100.50.0/24; deny all; }
 Troque pelo IP ou faixa do seu escritório ou VPN e rode
 `sudo nginx -t && sudo systemctl reload nginx`.
 
+### Portal do cliente
+
+A empresa cliente entra com **e-mail e senha** e emite a NFS-e num
+formulário de 3 blocos (tomador, serviço, valor). O portal **não tem
+emissão própria**: monta o mesmo JSON de `/v1/nfse/emitir.php` e usa a mesma
+fila. Bloqueios, franquia, cobrança, monitor e webhooks valem igual.
+
+**Instalar:** aplique o script `database/scripts/0006_portal_criar_usuarios.sql`
+(o `deploy/aplicar_banco.sh` já aplica todos). Sem ele, as rotas respondem
+`PORTAL_NAO_INSTALADO`.
+
+**Dar acesso a uma pessoa:**
+1. No painel admin, abra a empresa e vá até **Portal do cliente**.
+2. Informe nome e e-mail e clique em **Dar acesso ao portal**.
+3. Copie os dados de acesso (endereço, e-mail e **senha provisória**) e envie
+   para a pessoa. A senha aparece uma vez só.
+4. No primeiro acesso o portal pede para ela criar a própria senha
+   (mínimo 8 caracteres, com letras e números).
+
+**Esqueceu a senha ou bloqueou:** depois de 5 senhas erradas seguidas o
+acesso fica bloqueado por 15 minutos. No painel, **Nova senha** gera outra
+senha provisória e libera na hora. **Desativar** tira o acesso e encerra as
+sessões abertas.
+
+**O que é automático no formulário:**
+- dados da empresa (prestador), padrão (Nacional ou Salvador) e numeração;
+- tomador pelo CNPJ (consulta pública da Receita via BrasilAPI) e endereço
+  pelo CEP (ViaCEP, com o código IBGE). A consulta é feita pelo servidor e
+  guardada por 30 dias (CNPJ) e 180 dias (CEP) em `portal_consultas`. Se a
+  consulta estiver fora do ar, a pessoa preenche à mão;
+- tomadores ficam salvos na primeira nota (`portal_tomadores`);
+- serviços salvos com códigos e alíquota (`portal_servicos`): escolhidos numa
+  lista. Um serviço novo pode ser salvo na própria emissão;
+- clique duplo não gera nota em dobro (referência `PORTAL-<id do envio>`).
+
+**Configuração** (`portal` no `config/nfse.php`, troque no
+`config/nfse.local.php`):
+
+| Chave | Padrão | Para que serve |
+|---|---|---|
+| `sessao_minutos` | `720` | Duração da sessão sem "Manter conectado" (12 h) |
+| `sessao_lembrar_dias` | `30` | Duração com "Manter conectado" |
+| `tentativas_login` | `5` | Senhas erradas seguidas antes do bloqueio |
+| `bloqueio_minutos` | `15` | Tempo de bloqueio |
+| `padrao` | vazio | Vazio: Nacional (ou Salvador, se for o único contratado). `NACIONAL`/`SALVADOR` força para todas |
+| `url_cnpj`, `url_cep` | BrasilAPI e ViaCEP | Endereços das consultas públicas |
+
+**Segurança da sessão:** cookie `HttpOnly` e `SameSite=Strict` (e `Secure`
+no HTTPS). O banco guarda só o sha256 do cookie e o hash da senha. Toda
+chamada que altera algo exige o cabeçalho `X-Portal: 1` (o próprio portal
+envia), o que impede outro site de emitir usando a sessão de alguém.
+
+**Rotas** (`public/v1/portal/`): `entrar`, `sair`, `sessao`, `senha`,
+`inicio`, `servicos`, `tomadores`, `consulta`, `emitir` e `arquivo` (PDF/XML).
+No painel: `public/v1/admin/portal_usuarios.php`.
+
 ### Alterar o visual ou os textos
 
 - **Cores:** ficam no bloco `:root` do `public/monitor/monitor.css`, que vale
   para os dois fronts. O que é só do painel está em `public/admin/admin.css`.
-- **Textos e telas:** `public/admin/admin.js` e `public/monitor/monitor.js`,
+- **Portal do cliente:** tem cores próprias no `:root` do
+  `public/portal/portal.css` (azul-marinho e cobre, com tema escuro).
+  O `portal-demo.js` é só para a prévia sem servidor: o `index.html` não o
+  carrega.
+- **Textos e telas:** `public/admin/admin.js`, `public/monitor/monitor.js` e
+  `public/portal/portal.js`,
   com comentários em português. Nomes de status e de tipos de nota ficam
   nas constantes do início de cada arquivo.
 - **Depois de alterar:** não há build. Atualize o servidor
@@ -611,7 +676,7 @@ PHP:
 php -S 127.0.0.1:8080 -t public
 ```
 
-Abra `http://127.0.0.1:8080/admin/` ou `/monitor/`. Isso serve só para
+Abra `http://127.0.0.1:8080/admin/`, `/monitor/` ou `/portal/`. Isso serve só para
 conferir a tela: o tempo real e os envios ao fisco precisam do worker e da
 configuração completa do servidor.
 

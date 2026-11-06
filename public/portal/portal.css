@@ -404,3 +404,26 @@ a { color: var(--primaria); }
   .campo--largo, .campo--meio, .campo--terco { grid-column: 1 / -1; }
   .codigos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ==========================================================================
+   Ligacao com a API: servico novo, erros por campo, resultado da emissao
+   ========================================================================== */
+.srv-manual { display: grid; gap: 12px; padding: 14px; border: 1px dashed var(--borda); border-radius: 8px; }
+.kpi__limite { font-size: 15px; font-weight: 600; }
+
+.emitir .campo.invalido input, .emitir .campo.invalido select, .emitir .campo.invalido textarea { border-color: var(--erro-texto); }
+.erro-campo { font-size: 12px; color: var(--erro-texto); }
+
+.resultado { display: grid; gap: 10px; padding: 14px; border-radius: 10px; border: 1px solid var(--borda); font-size: 13px; }
+.resultado--ok { background: var(--ok-fundo); border-color: var(--ok-borda); }
+.resultado--andamento { background: var(--info-fundo); border-color: var(--info-borda); }
+.resultado--erro { background: var(--erro-fundo); border-color: var(--erro-borda); }
+.resultado b { font-size: 14px; }
+.resultado__acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.resultado .btn { padding: 6px 12px; font-size: 12px; }
+
+.tabela .acao-arquivo { color: var(--primaria); text-decoration: none; font-weight: 600; font-size: 12px; margin-right: 8px; }
+.tabela-vazia td { text-align: center; color: var(--apagado); padding: 28px 14px; white-space: normal; }
+.carregando { opacity: .6; pointer-events: none; }
+.selo-certificado--alerta { background: var(--alerta-fundo); border-color: var(--alerta-borda); color: var(--alerta-texto); }
+.resultado .btn--secundario { background: var(--superficie); }

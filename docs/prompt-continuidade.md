@@ -171,7 +171,13 @@ Documentação:
 6. **GitHub:** ativar a proteção da `main` exigindo o check
    "Testes NFS-e (PHP 8.3 + PostgreSQL 16)" (`docs/ci.md`).
 7. **Produção:** `tpAmb = 1` só depois da homologação aprovada.
-8. **Não testados em ambiente real:** `deploy/apache/nfe-integracao.conf` e
+8. **Portal do cliente** (`public/portal/`, rotas `public/v1/portal/`,
+   banco `0006_portal_criar_usuarios.sql`): login, início e "Emitir nota"
+   já ligados na API. Falta: "Esqueci a senha" por e-mail (hoje o admin
+   gera nova senha), telas de Notas/Serviços/Tomadores completas e testar
+   a consulta de CNPJ/CEP com rede na VPS. Ver `docs/manual-operacao.md`
+   seção 13.
+9. **Não testados em ambiente real:** `deploy/apache/nfe-integracao.conf` e
    `deploy/pm2/ecosystem.config.js`.
 
 Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
@@ -185,9 +191,9 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 163/163 com banco e 73/73 sem.
+  - Situação atual: 220/220 com banco e 80/80 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
-  `node --check public/admin/admin.js public/monitor/monitor.js` e
+  `node --check public/admin/admin.js public/monitor/monitor.js public/portal/portal.js` e
   `shellcheck -S warning deploy/*.sh`.
 - **Banco:** toda mudança é um script novo `database/scripts/NNNN_*.sql`
   que pode rodar mais de uma vez. Ele entra sozinho nos testes e no

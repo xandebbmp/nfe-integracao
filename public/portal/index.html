@@ -15,7 +15,7 @@
   <!-- =====================================================================
        TELA DE LOGIN
        ===================================================================== -->
-  <section id="tela-login" class="login">
+  <section id="tela-login" class="login" hidden>
 
     <!-- Lado esquerdo: apresentacao -->
     <div class="login__marca">
@@ -40,7 +40,7 @@
         <div class="login__nota-linha"><span class="login__nota-num">3</span><span>Valor <b class="num">R$ 1.500,00</b></span><span class="login__nota-auto">líquido calculado</span></div>
       </div>
 
-      <p class="login__rodape">Ambiente de homologação · notas sem valor fiscal</p>
+      <p class="login__rodape">Emissão pelo Padrão Nacional ou pela Prefeitura de Salvador</p>
     </div>
 
     <!-- Lado direito: formulario -->
@@ -78,7 +78,30 @@
           Entrar <i class="icone icone--p">arrow_forward</i>
         </button>
 
-        <p class="login__ajuda">Modelo de layout: qualquer e-mail e senha entram.</p>
+        <p class="login__ajuda">Primeiro acesso? Use a senha provisória que você recebeu.</p>
+      </form>
+
+      <!-- Troca obrigatoria da senha provisoria (1o acesso) -->
+      <form id="form-senha" class="login__form" novalidate hidden>
+        <div>
+          <h1>Crie sua senha</h1>
+          <p class="secundario">A senha que você recebeu é provisória. Escolha uma nova para continuar.</p>
+        </div>
+        <div class="campo">
+          <label for="senha-atual">Senha provisória</label>
+          <div class="campo__caixa"><i class="icone">key</i><input id="senha-atual" type="password" autocomplete="current-password" required></div>
+        </div>
+        <div class="campo">
+          <label for="senha-nova">Nova senha</label>
+          <div class="campo__caixa"><i class="icone">lock</i><input id="senha-nova" type="password" autocomplete="new-password" minlength="8" required></div>
+          <small class="dica">Mínimo de 8 caracteres, com letras e números.</small>
+        </div>
+        <div class="campo">
+          <label for="senha-confirma">Repita a nova senha</label>
+          <div class="campo__caixa"><i class="icone">lock</i><input id="senha-confirma" type="password" autocomplete="new-password" required></div>
+        </div>
+        <p id="senha-erro" class="erro" hidden></p>
+        <button type="submit" class="btn btn--primario btn--largo">Salvar e entrar <i class="icone icone--p">arrow_forward</i></button>
       </form>
     </div>
   </section>
@@ -104,13 +127,13 @@
       </div>
 
       <div class="topo__direita">
-        <span class="pilula pilula--alerta" title="As notas emitidas aqui não têm valor fiscal">Homologação</span>
+        <span id="selo-ambiente" class="pilula pilula--alerta" title="As notas emitidas aqui não têm valor fiscal" hidden>Homologação</span>
 
         <div class="empresa-atual">
           <i class="icone">storefront</i>
           <div>
-            <b id="empresa-nome">Studio Bela Forma Ltda</b>
-            <span id="empresa-cnpj" class="mono">41.986.662/0001-60</span>
+            <b id="empresa-nome"></b>
+            <span id="empresa-cnpj" class="mono"></span>
           </div>
         </div>
 
@@ -119,8 +142,8 @@
         </button>
 
         <button type="button" class="usuario" title="Minha conta">
-          <span class="avatar" id="usuario-iniciais">MS</span>
-          <span class="usuario__nome" id="usuario-nome">Mariana</span>
+          <span class="avatar" id="usuario-iniciais"></span>
+          <span class="usuario__nome" id="usuario-nome"></span>
         </button>
       </div>
     </header>
@@ -133,7 +156,7 @@
             <div class="menu__titulo">Notas fiscais</div>
             <a class="menu__item" href="#inicio"><i class="icone">space_dashboard</i><span>Início</span></a>
             <a class="menu__item" href="#emitir"><i class="icone">post_add</i><span>Emitir nota</span></a>
-            <a class="menu__item" href="#notas"><i class="icone">receipt_long</i><span>Minhas notas</span><span class="menu__marca menu__marca--qtd" title="Notas rejeitadas">1</span></a>
+            <a class="menu__item" href="#notas"><i class="icone">receipt_long</i><span>Minhas notas</span><span id="menu-rejeitadas" class="menu__marca menu__marca--qtd" title="Notas não autorizadas" hidden></span></a>
             <a class="menu__item" href="#recorrencias"><i class="icone">event_repeat</i><span>Recorrências</span><span class="menu__marca menu__marca--breve">em breve</span></a>
           </nav>
 
@@ -152,9 +175,9 @@
         </div>
 
         <div class="menu__rodape">
-          <div class="selo-certificado" title="Certificado A1 válido até 12/03/2027">
+          <div id="selo-certificado" class="selo-certificado">
             <i class="icone">verified_user</i>
-            <div><b>Certificado A1 válido</b>até 12/03/2027</div>
+            <div><b id="certificado-titulo">Certificado A1</b><span id="certificado-texto"></span></div>
           </div>
         </div>
       </aside>
@@ -169,34 +192,34 @@
             <div style="display:grid;gap:20px">
               <div class="titulo-pagina">
                 <div>
-                  <h1>Olá, <span id="saudacao-nome">Mariana</span></h1>
-                  <p class="secundario">Resumo de novembro/2026 da sua empresa.</p>
+                  <h1>Olá, <span id="saudacao-nome"></span></h1>
+                  <p class="secundario" id="inicio-subtitulo">Resumo do mês da sua empresa.</p>
                 </div>
                 <a href="#emitir" class="btn btn--primario"><i class="icone icone--p">add</i> Nova NFS-e</a>
               </div>
 
-              <div class="aviso-exemplo"><i class="icone icone--p">info</i> Dados de exemplo para visualizar o layout.</div>
+              <div id="aviso-demo" class="aviso-exemplo" hidden><i class="icone icone--p">info</i> Demonstração com dados de exemplo: nada é enviado à prefeitura.</div>
 
               <div class="kpis">
                 <div class="cartao kpi">
                   <div class="kpi__topo">Notas no mês <i class="icone">receipt</i></div>
-                  <div class="kpi__valor">37</div>
-                  <div class="kpi__rodape">35 autorizadas · 1 rejeitada · 1 cancelada</div>
+                  <div class="kpi__valor" id="kpi-notas">–</div>
+                  <div class="kpi__rodape" id="kpi-notas-detalhe"></div>
                 </div>
                 <div class="cartao kpi">
                   <div class="kpi__topo">Faturado no mês <i class="icone">payments</i></div>
-                  <div class="kpi__valor">R$ 48.320</div>
-                  <div class="kpi__rodape">ISS devido R$ 1.932,80</div>
+                  <div class="kpi__valor" id="kpi-faturado">–</div>
+                  <div class="kpi__rodape">notas autorizadas no mês</div>
                 </div>
                 <div class="cartao kpi">
                   <div class="kpi__topo">Aguardando prefeitura <i class="icone">hourglass_top</i></div>
-                  <div class="kpi__valor">2</div>
-                  <div class="kpi__rodape">atualiza sozinho</div>
+                  <div class="kpi__valor" id="kpi-andamento">–</div>
+                  <div class="kpi__rodape">atualiza a cada 20 segundos</div>
                 </div>
                 <div class="cartao kpi">
                   <div class="kpi__topo">Franquia do plano <i class="icone">data_usage</i></div>
-                  <div class="kpi__valor">37 <span class="apagado" style="font-size:15px;font-weight:600">/ 100</span></div>
-                  <div class="barra" aria-label="37 de 100 notas usadas"><div class="barra__cheio" style="width:37%"></div></div>
+                  <div class="kpi__valor"><span id="kpi-franquia">–</span> <span class="apagado kpi__limite" id="kpi-franquia-limite"></span></div>
+                  <div class="barra" id="kpi-franquia-barra"><div class="barra__cheio" id="kpi-franquia-cheio" style="width:0%"></div></div>
                 </div>
               </div>
 
@@ -211,33 +234,14 @@
                       <thead>
                         <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th>Status</th></tr>
                       </thead>
-                      <tbody>
-                        <tr><td class="mono">000124</td><td>Clínica Vida Plena</td><td class="num">05/11/2026</td><td class="direita num">R$ 1.500,00</td><td><span class="pilula pilula--info">Processando</span></td></tr>
-                        <tr><td class="mono">000123</td><td>Ana Paula Souza</td><td class="num">05/11/2026</td><td class="direita num">R$ 320,00</td><td><span class="pilula pilula--ok">Autorizada</span></td></tr>
-                        <tr><td class="mono">000122</td><td>Construtora Atlântico</td><td class="num">04/11/2026</td><td class="direita num">R$ 7.800,00</td><td><span class="pilula pilula--erro">Rejeitada</span></td></tr>
-                        <tr><td class="mono">000121</td><td>Escola Pequeno Saber</td><td class="num">03/11/2026</td><td class="direita num">R$ 2.150,00</td><td><span class="pilula pilula--ok">Autorizada</span></td></tr>
-                        <tr><td class="mono">000120</td><td>Mercado Bom Preço</td><td class="num">01/11/2026</td><td class="direita num">R$ 980,00</td><td><span class="pilula pilula--neutro">Cancelada</span></td></tr>
-                      </tbody>
+                      <tbody id="inicio-notas"></tbody>
                     </table>
                   </div>
                 </div>
 
                 <div class="cartao bloco">
                   <div class="bloco__cabeca"><h2>Precisa da sua atenção</h2></div>
-                  <div class="bloco__corpo">
-                    <a class="atalho" href="#notas">
-                      <i class="icone">error_outline</i>
-                      <div><b>Nota 000122 rejeitada</b><small>CEP do tomador não encontrado. Corrigir e reenviar.</small></div>
-                    </a>
-                    <a class="atalho" href="#recorrencias">
-                      <i class="icone">event_repeat</i>
-                      <div><b>3 mensalidades dia 10</b><small>Saem sozinhas quando a recorrência estiver ativa.</small></div>
-                    </a>
-                    <a class="atalho" href="#empresa">
-                      <i class="icone">verified_user</i>
-                      <div><b>Certificado vence em 126 dias</b><small>Avisaremos 30 dias antes.</small></div>
-                    </a>
-                  </div>
+                  <div class="bloco__corpo" id="inicio-avisos"></div>
                 </div>
               </div>
             </div>
@@ -252,7 +256,7 @@
                   <h1>Emitir NFS-e</h1>
                   <p class="secundario">Preencha o tomador, o serviço e o valor. O resto vem do cadastro da sua empresa.</p>
                 </div>
-                <span class="pilula pilula--neutro">Padrão Nacional · DPS série 1</span>
+                <span class="pilula pilula--neutro" id="emitir-padrao"></span>
               </div>
 
               <div class="emitir__grade">
@@ -275,9 +279,6 @@
                         <label for="tom-salvo">Ou escolha um tomador salvo</label>
                         <select id="tom-salvo">
                           <option value="">Selecione…</option>
-                          <option value="00394460005887">Clínica Vida Plena</option>
-                          <option value="52998224725">Ana Paula Souza (CPF)</option>
-                          <option value="11222333000181">Construtora Atlântico</option>
                         </select>
                       </div>
                     </div>
@@ -306,26 +307,36 @@
                     <div class="linha-campos">
                       <div class="campo campo--largo">
                         <label for="srv-salvo">Serviço</label>
-                        <select id="srv-salvo">
-                          <option value="">Selecione um serviço salvo…</option>
-                          <option value="consultoria" selected>Consultoria em gestão — 17.01 · ISS 5%</option>
-                          <option value="software">Desenvolvimento de software — 01.01 · ISS 2%</option>
-                          <option value="treinamento">Treinamento profissional — 08.02 · ISS 3%</option>
-                        </select>
+                        <select id="srv-salvo"></select>
                       </div>
                     </div>
 
                     <div class="campo">
                       <label for="srv-descricao">Descrição que vai na nota</label>
-                      <textarea id="srv-descricao" rows="3" maxlength="2000">Consultoria em gestão financeira referente a novembro/2026.</textarea>
+                      <textarea id="srv-descricao" rows="3" maxlength="2000" placeholder="O que foi feito. Use {mes} para o mês da competência."></textarea>
                       <small class="dica"><span id="srv-contador">0</span>/2000 caracteres</small>
                     </div>
 
-                    <div class="codigos" id="srv-codigos">
-                      <div><span class="apagado">Cód. tributação nacional</span><b class="mono" id="srv-cod-nacional">170101</b></div>
-                      <div><span class="apagado">Item LC 116</span><b class="mono" id="srv-item">17.01</b></div>
-                      <div><span class="apagado">Alíquota ISS</span><b class="mono" id="srv-aliquota-txt">5,00%</b></div>
-                      <div><span class="apagado">Local da prestação</span><b>Salvador-BA</b></div>
+                    <div class="codigos" id="srv-codigos" hidden>
+                      <div><span class="apagado">Cód. tributação nacional</span><b class="mono" id="srv-cod-nacional"></b></div>
+                      <div><span class="apagado">Item LC 116</span><b class="mono" id="srv-item"></b></div>
+                      <div><span class="apagado">Alíquota ISS</span><b class="mono" id="srv-aliquota-txt"></b></div>
+                      <div><span class="apagado">Local da prestação</span><b id="srv-local">Município da empresa</b></div>
+                    </div>
+
+                    <!-- Servico novo: codigos digitados (aparece em "Outro servico") -->
+                    <div id="srv-manual" class="srv-manual" hidden>
+                      <div class="linha-campos">
+                        <div class="campo campo--terco"><label for="srv-in-nacional">Cód. tributação nacional</label><input id="srv-in-nacional" inputmode="numeric" maxlength="8" placeholder="010101"></div>
+                        <div class="campo campo--terco"><label for="srv-in-item">Item LC 116</label><input id="srv-in-item" maxlength="5" placeholder="01.01"></div>
+                        <div class="campo campo--terco"><label for="srv-in-aliquota">Alíquota ISS (%)</label><input id="srv-in-aliquota" inputmode="decimal" placeholder="5"></div>
+                      </div>
+                      <small class="dica">Não sabe os códigos? Eles estão em uma nota antiga da empresa ou com o seu contador.</small>
+                      <label class="interruptor">
+                        <input id="srv-salvar" type="checkbox" checked>
+                        <span>Salvar este serviço <small class="apagado">na próxima nota é só escolher na lista</small></span>
+                      </label>
+                      <div class="campo" id="srv-nome-campo"><label for="srv-in-nome">Nome na lista</label><input id="srv-in-nome" maxlength="120" placeholder="Ex.: Consultoria mensal"></div>
                     </div>
                   </fieldset>
 
@@ -336,11 +347,11 @@
                     <div class="linha-campos">
                       <div class="campo campo--meio">
                         <label for="val-servico">Valor do serviço</label>
-                        <div class="campo__moeda"><span>R$</span><input id="val-servico" inputmode="decimal" placeholder="0,00" value="1.500,00"></div>
+                        <div class="campo__moeda"><span>R$</span><input id="val-servico" inputmode="decimal" placeholder="0,00"></div>
                       </div>
                       <div class="campo campo--meio">
                         <label for="val-competencia">Competência</label>
-                        <input id="val-competencia" type="month" value="2026-11">
+                        <input id="val-competencia" type="month">
                       </div>
                     </div>
 
@@ -350,11 +361,14 @@
                     </label>
 
                     <details class="mais">
-                      <summary>Mais opções <span class="apagado">descontos e retenções federais</span></summary>
+                      <summary>Mais opções <span class="apagado">desconto e retenções federais</span></summary>
                       <div class="linha-campos">
                         <div class="campo campo--terco"><label for="val-desconto">Desconto incondicionado</label><div class="campo__moeda"><span>R$</span><input id="val-desconto" inputmode="decimal" placeholder="0,00"></div></div>
                         <div class="campo campo--terco"><label for="val-ir">IR retido</label><div class="campo__moeda"><span>R$</span><input id="val-ir" inputmode="decimal" placeholder="0,00"></div></div>
-                        <div class="campo campo--terco"><label for="val-pcc">PIS/COFINS/CSLL retidos</label><div class="campo__moeda"><span>R$</span><input id="val-pcc" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-inss">INSS retido</label><div class="campo__moeda"><span>R$</span><input id="val-inss" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-pis">PIS retido</label><div class="campo__moeda"><span>R$</span><input id="val-pis" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-cofins">COFINS retido</label><div class="campo__moeda"><span>R$</span><input id="val-cofins" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-csll">CSLL retido</label><div class="campo__moeda"><span>R$</span><input id="val-csll" inputmode="decimal" placeholder="0,00"></div></div>
                       </div>
                     </details>
                   </fieldset>
@@ -374,7 +388,8 @@
                   <ul class="checagem" id="checagem"></ul>
 
                   <button type="submit" class="btn btn--primario btn--largo" id="botao-emitir"><i class="icone icone--p">send</i> Emitir nota</button>
-                  <p id="emitir-retorno" class="dica" hidden></p>
+                  <p id="emitir-retorno" class="erro" role="alert" hidden></p>
+                  <div id="emitir-resultado" class="resultado" role="status" hidden></div>
                   <p class="dica">Ao emitir, a nota entra na fila e o status aparece em <a href="#notas">Minhas notas</a>.</p>
                 </aside>
               </div>

@@ -5,6 +5,7 @@
    cabecalho X-ADMIN-TOKEN:
      clientes.php     lista (GET) e cadastro/alteracao (POST)
      cliente.php      detalhe: uso 12 meses, status do mes, historico
+     portal_usuarios.php  quem da empresa entra no portal do cliente
      certificado.php  envio do .pfx (multipart)
      token.php        gera token novo (aparece uma unica vez)
      uso.php          relatorio de cobranca do mes (JSON ou CSV)
@@ -324,7 +325,7 @@ function desenharCliente(c) {
   partes.push(formControle, formDados, el('div', { class: 'acoes' }, botaoSalvar, mensagemSalvar));
 
   if (!novo) {
-    partes.push(secaoCertificado(c), secaoToken(c), secaoNumeracao(c), secaoUso(c), secaoHistorico(c));
+    partes.push(secaoCertificado(c), secaoToken(c), secaoPortal(c), secaoNumeracao(c), secaoUso(c), secaoHistorico(c));
   } else {
     partes.push(el('p', { class: 'suave' }, 'Depois de cadastrar, envie o certificado e gere o token de acesso.'));
   }
@@ -428,6 +429,89 @@ function secaoToken(c) {
     area,
     el('p', { class: 'suave' }, 'O sistema do cliente envia o token em todas as chamadas. Ele só consegue emitir pelo CNPJ desta empresa:'),
     el('pre', { class: 'exemplo mono' }, exemplo),
+  );
+}
+
+// ---- Portal do cliente (usuarios que entram com e-mail e senha) ----
+function secaoPortal(c) {
+  const lista = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const area = el('div', {});
+  const nome = el('input', { type: 'text', placeholder: 'Nome da pessoa', autocomplete: 'off' });
+  const email = el('input', { type: 'email', placeholder: 'email@empresa.com.br', autocomplete: 'off' });
+  const mensagem = el('span', {});
+  const linkPortal = new URL('../portal/', window.location.href).href;
+
+  // Senha provisoria aparece uma vez so, com botao de copiar.
+  function mostrarSenha(r) {
+    const texto = `Portal: ${linkPortal}\nE-mail: ${r.email}\nSenha provisória: ${r.senha_provisoria}`;
+    const copiar = el('button', { class: 'botao', type: 'button', onclick: async () => {
+      try { await navigator.clipboard.writeText(texto); copiar.textContent = 'Copiado!'; } catch { copiar.textContent = 'Selecione e copie'; }
+    } }, 'Copiar dados de acesso');
+    area.replaceChildren(el('div', { class: 'token-box' },
+      el('strong', {}, 'Envie para a pessoa (a senha não será mostrada de novo):'),
+      el('pre', { class: 'exemplo mono' }, texto),
+      el('div', { class: 'acoes' }, copiar),
+      el('p', { class: 'suave' }, 'No primeiro acesso o portal pede para ela criar a própria senha.')));
+  }
+
+  async function acao(corpo, confirmar) {
+    if (confirmar && !confirm(confirmar)) return;
+    try {
+      const r = await api('portal_usuarios.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, ...corpo } });
+      if (r.senha_provisoria) mostrarSenha(r); else area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      await recarregar();
+    } catch (e) {
+      area.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  async function recarregar() {
+    try {
+      const r = await api('portal_usuarios.php?cnpj=' + encodeURIComponent(c.cnpj));
+      if (!r.usuarios.length) {
+        lista.replaceChildren(el('p', { class: 'suave' }, 'Ninguém desta empresa tem acesso ao portal ainda.'));
+        return;
+      }
+      lista.replaceChildren(el('table', { class: 'mini' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
+        el('tbody', {}, ...r.usuarios.map((u) => el('tr', {},
+          el('td', {}, u.nome),
+          el('td', {}, u.email),
+          el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
+          el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
+          el('td', {},
+            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
+            el('button', { class: 'botao' + (u.ativo ? ' botao--perigo' : ''), type: 'button',
+              onclick: () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null) },
+            u.ativo ? 'Desativar' : 'Reativar'))))),
+      ));
+    } catch (e) {
+      lista.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  const botao = el('button', { class: 'botao', type: 'button' }, 'Dar acesso ao portal');
+  botao.addEventListener('click', async () => {
+    mensagem.textContent = '';
+    if (nome.value.trim().length < 2 || !email.checkValidity() || !email.value) {
+      mensagem.className = 'erro';
+      mensagem.textContent = 'Informe o nome e um e-mail válido.';
+      return;
+    }
+    botao.disabled = true;
+    await acao({ acao: 'criar', nome: nome.value, email: email.value });
+    if (area.querySelector('.token-box')) { nome.value = ''; email.value = ''; }
+    botao.disabled = false;
+  });
+
+  recarregar();
+  return el('section', { class: 'secao' },
+    el('h3', {}, 'Portal do cliente'),
+    el('p', { class: 'suave' }, `Pessoas desta empresa que emitem NFS-e pelo formulário em ${linkPortal}`),
+    lista,
+    el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
+    el('div', { class: 'acoes' }, botao, mensagem),
+    area,
   );
 }
 
