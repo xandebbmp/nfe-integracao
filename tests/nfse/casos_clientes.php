@@ -123,6 +123,11 @@ function testesClientesIntegracao(PDO $pdo, array $cfgGeral): void
         'admin: UF/IE normalizados e todos os tipos liberados por padrao');
     Apoio::igual('LIBERADA', $r['cliente']['situacao'], 'admin: empresa nova fica LIBERADA');
 
+    $r = $admin->salvar(['cnpj' => '11.111.111/1111-11', 'razao_social' => 'Digitado errado'], 'ip');
+    Apoio::igual([false, 'CNPJ_INVALIDO'], [$r['ok'], $r['codigo'] ?? null], 'admin: CNPJ com digito verificador errado e recusado');
+    Apoio::igual([false, 'CNPJ_INVALIDO'], [false, $admin->salvar(['cnpj' => '41.986.662/0001-61', 'razao_social' => 'X'], 'ip')['codigo'] ?? null],
+        'admin: CNPJ com o ultimo digito trocado e recusado');
+
     $r = $admin->salvar(['cnpj' => $cnpj, 'limite_mensal' => -3, 'liberado_ate' => '31/12/2026', 'padroes_permitidos' => ['NFCE']], '10.0.0.1');
     Apoio::igual([false, 422], [$r['ok'], $r['http']], 'admin: limite, data e tipo invalidos sao recusados');
     Apoio::igual(3, count($r['erros'] ?? []), 'admin: cada erro de preenchimento e explicado');

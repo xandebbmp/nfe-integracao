@@ -503,7 +503,8 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   - franquia usada, com barra;
   - vencimento e validade do certificado;
   - final do token.
-- **Ao clicar numa empresa:**
+- **Ao clicar numa empresa** (uma página só: o essencial à mostra, o resto em
+  blocos que abrem com um clique; o botão **Salvar** fica fixo embaixo):
   - **Pronta para emitir?** (primeiro bloco da ficha, veja abaixo);
   - botão **Ver notas desta empresa**: abre o monitor já filtrado nela,
     com XML, PDF (DANFSe) e o motivo de cada rejeição;

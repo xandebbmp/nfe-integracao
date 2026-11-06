@@ -152,18 +152,10 @@ details summary { cursor: pointer; margin-top: 10px; }
 /* A janela vira coluna: topo e abas fixos, so o meio rola, rodape (Salvar) fixo. */
 .modal--largo[open] { display: flex; flex-direction: column; overflow: hidden; }
 .modal--largo .modal__topo { position: static; flex: none; }
-.modal--largo .modal__corpo { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+/* flex 1 1 auto + min-height 0: no Safari, flex: 1 deixava o meio da janela com altura zero. */
+.modal--largo .modal__corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .modal__abas { flex: none; border-bottom: 1px solid var(--borda); padding: 0 20px; background: var(--cartao); }
-.modal__abas [role=tablist] { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.aba {
-  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 11px 12px 10px; margin-bottom: -1px;
-  background: none; border: 0; border-bottom: 2px solid transparent; color: var(--suave); font: inherit; font-weight: 600; cursor: pointer;
-}
-.aba:hover { color: var(--texto); }
-.aba[aria-selected=true] { color: var(--destaque); border-bottom-color: var(--destaque); }
-.aba:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: 6px; }
-.aba__alerta { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--st-rejeitado); color: #fff;
-  font-size: 11px; line-height: 18px; text-align: center; }
+.modal__abas[hidden] { display: none; }
 .modal__rodape {
   flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 12px;
   padding: 12px 20px; border-top: 1px solid var(--borda); background: var(--cartao);
@@ -173,13 +165,23 @@ details summary { cursor: pointer; margin-top: 10px; }
 .rodape__mensagem { font-size: 13px; }
 
 .situacao-linha .botao { margin-left: auto; }
-.secao--form { border: 0; padding: 0; }
-.secao--form > h3 { margin: 16px 0 4px; }
+/* Formulario da empresa: blocos curtos, um embaixo do outro. */
+.form-empresa > h3 { margin: 20px 0 4px; }
+.grupo-campos[hidden] { display: none; }
 .grupo-campos { border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px 16px 16px; margin: 12px 0 0; min-width: 0; }
 .grupo-campos legend { font-weight: 700; padding: 0 6px; margin-left: -6px; }
-.grupo-campos__descricao { margin: 0 0 10px; font-size: 13px; color: var(--suave); }
-.grupo-campos--recolhido > summary { margin: 0; font-weight: 700; list-style-position: inside; }
-.grupo-campos--recolhido[open] > summary { margin-bottom: 8px; }
+
+/* Blocos que abrem e fecham (Mais opções, Certificado, Acessos...). */
+.recolhivel { border: 1px solid var(--borda); border-radius: var(--raio); margin-top: 12px; }
+.recolhivel > summary { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 16px; margin: 0; cursor: pointer; }
+.recolhivel > summary:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: var(--raio); }
+.recolhivel__titulo { font-weight: 700; }
+.recolhivel__resumo { color: var(--suave); font-size: 13px; }
+.recolhivel__corpo { padding: 0 16px 16px; }
+/* Dentro do bloco, a secao antiga perde a moldura e o titulo repetido (fica so para o "Ir para"). */
+.recolhivel__corpo > .secao { border: 0; padding: 0; margin-top: 8px; }
+.recolhivel__corpo > .secao + .secao { border-top: 1px solid var(--borda); padding-top: 12px; }
+.recolhivel__corpo > .secao:first-child > h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .campo-ajuda { font-size: 12px; color: var(--suave); line-height: 1.35; }
 .campos label[hidden], .campos [hidden] { display: none; }
 .campos textarea { font: inherit; color: var(--texto); background: var(--fundo); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 9px; width: 100%; resize: vertical; }

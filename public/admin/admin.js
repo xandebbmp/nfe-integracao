@@ -249,10 +249,12 @@ function linhaCliente(c) {
 function abrirModal(titulo, subtitulo, conteudo, opcoes = {}) {
   $('modal-titulo').textContent = titulo;
   $('modal-subtitulo').textContent = subtitulo || '';
-  $('modal-abas').replaceChildren(...(opcoes.abas ? [opcoes.abas] : []));
-  $('modal-abas').hidden = !opcoes.abas;
-  $('modal-rodape').replaceChildren(...(opcoes.rodape || []));
-  $('modal-rodape').hidden = !opcoes.rodape;
+  // Se o navegador guardou um index.html antigo (sem abas/rodape), segue sem eles.
+  const abas = $('modal-abas');
+  const rodape = $('modal-rodape');
+  if (abas) { abas.replaceChildren(...(opcoes.abas ? [opcoes.abas] : [])); abas.hidden = !opcoes.abas; }
+  if (rodape) { rodape.replaceChildren(...(opcoes.rodape || [])); rodape.hidden = !opcoes.rodape; }
+  else if (opcoes.rodape) conteudo = [...conteudo, el('div', { class: 'acoes' }, ...opcoes.rodape)];
   $('modal-corpo').replaceChildren(...conteudo);
   $('modal-corpo').scrollTop = 0;
   if (!$('modal').open) $('modal').showModal();
@@ -283,170 +285,117 @@ function selecao(rotulo, nome, valor, opcoes) {
 }
 
 // ---- Ficha da empresa ----
-// Organizada em abas para nao mostrar tudo de uma vez:
-//   Resumo | Cadastro | Contrato | Certificado e acessos | Numeração | Uso e histórico
-// Cadastro e Contrato sao salvos juntos pela barra fixa no rodape da janela.
+// Uma pagina so, curta:
+//   1. situacao + lista "Pronta para emitir" (so o que falta);
+//   2. formulario com o essencial a mostra (tipos de nota, identificacao,
+//      onde emite, impostos) e o resto recolhido em "Mais opções";
+//   3. certificado, acessos, numeracao e uso em blocos recolhidos.
 // Campos que so valem para um tipo de nota (ex.: inscricao estadual = NF-e)
-// aparecem so quando aquele tipo esta contratado (atributo data-tipos).
-const ABAS_FICHA = [
-  { id: 'resumo', nome: 'Resumo' },
-  { id: 'cadastro', nome: 'Cadastro', salvar: true },
-  { id: 'contrato', nome: 'Contrato', salvar: true },
-  { id: 'acessos', nome: 'Certificado e acessos' },
-  { id: 'numeracao', nome: 'Numeração' },
-  { id: 'uso', nome: 'Uso e histórico' },
-];
-let abaFicha = 'resumo'; // aba aberta (mantida ao salvar e redesenhar)
+// aparecem so quando aquele tipo esta marcado (atributo data-tipos).
 
 /** Campo com rotulo e, se houver, uma explicacao curta embaixo. */
 function campoAjuda(rotulo, nome, valor, extra = {}) {
   const label = campo(rotulo, nome, valor, extra);
   if (extra.ajuda) label.append(el('span', { class: 'campo-ajuda' }, extra.ajuda));
   if (extra.tipos) label.dataset.tipos = extra.tipos;
+  if (extra.mostrarSe) label.dataset.mostrarSe = extra.mostrarSe;
   return label;
 }
 
-/** Grupo de campos com titulo (fieldset). */
-function grupoCampos(titulo, descricao, ...campos) {
-  return el('fieldset', { class: 'grupo-campos' },
-    el('legend', {}, titulo),
-    descricao ? el('p', { class: 'grupo-campos__descricao' }, descricao) : null,
-    el('div', { class: 'campos' }, ...campos));
+/** Bloco de campos com titulo curto. */
+function grupoCampos(titulo, ...campos) {
+  return el('fieldset', { class: 'grupo-campos' }, el('legend', {}, titulo), el('div', { class: 'campos' }, ...campos));
 }
 
-function formularioDados(c, novo) {
+/** Bloco que abre e fecha (resumo sempre visivel). */
+function recolhivel(titulo, resumo, aberto, ...conteudo) {
+  return el('details', { class: 'recolhivel', open: aberto },
+    el('summary', {}, el('span', { class: 'recolhivel__titulo' }, titulo), resumo ? el('span', { class: 'recolhivel__resumo' }, resumo) : null),
+    el('div', { class: 'recolhivel__corpo' }, ...conteudo));
+}
+
+function formularioEmpresa(c, novo) {
   const simples = selecao('Simples Nacional', 'opcao_simples_nacional', c.opcao_simples_nacional, [[1, 'Não optante'], [2, 'MEI'], [3, 'ME/EPP (Simples)']]);
   const regimeApuracao = selecao('Regime de apuração (ME/EPP)', 'regime_apuracao_simples', c.regime_apuracao_simples, [['', 'Escolha'], [1, '1'], [2, '2'], [3, '3']]);
   regimeApuracao.dataset.mostrarSe = 'mepp';
-  regimeApuracao.append(el('span', { class: 'campo-ajuda' }, 'Quem informa é o contador.'));
-  const percentual = campoAjuda('% tributos do Simples', 'percentual_tributos_simples', c.percentual_tributos_simples ?? '',
-    { max: 6, placeholder: 'ex.: 2', ajuda: 'Quem informa é o contador. Sem ele a NFS-e Nacional é recusada.' });
-  percentual.dataset.mostrarSe = 'mepp';
+  regimeApuracao.append(el('span', { class: 'campo-ajuda' }, 'O contador informa.'));
   const regimeNacional = selecao('Regime especial (NFS-e Nacional)', 'regime_especial_tributacao', c.regime_especial_tributacao,
     [0, 1, 2, 3, 4, 5, 6].map((v) => [v, v === 0 ? 'Nenhum' : String(v)]));
   regimeNacional.dataset.tipos = 'NACIONAL';
   const regimeSalvador = selecao('Regime especial (Salvador)', 'regime_especial_abrasf', c.regime_especial_abrasf,
     [['', 'Nenhum'], 1, 2, 3, 4, 5, 6].map((v) => (Array.isArray(v) ? v : [v, String(v)])));
   regimeSalvador.dataset.tipos = 'SALVADOR';
-  const incentivador = el('label', { class: 'linha-check', 'data-tipos': 'SALVADOR' },
-    el('input', { type: 'checkbox', name: 'incentivador_cultural', checked: c.incentivador_cultural }), 'Incentivador cultural (Salvador)');
-  const observacao = el('label', { class: 'largo' }, 'Observação interna (só a equipe vê)',
-    el('textarea', { name: 'observacao', maxlength: 2000, rows: 3 }, c.observacao || ''));
 
-  const form = el('form', { class: 'secao secao--form' },
+  const form = el('form', { class: 'form-empresa', novalidate: false },
     el('h3', {}, 'Dados da empresa'),
-    grupoCampos('Identificação', null,
-      campoAjuda('CNPJ', 'cnpj', novo ? '' : cnpj(c.cnpj), { obrigatorio: true, placeholder: '00.000.000/0000-00' }),
-      campoAjuda('Razão social', 'razao_social', c.razao_social, { obrigatorio: true, max: 150 }),
-      campoAjuda('Nome fantasia', 'nome_fantasia', c.nome_fantasia, { max: 150 }),
-      campoAjuda('E-mail', 'email', c.email, { tipo: 'email', max: 120, ajuda: 'Aparece nas notas.' }),
-      campoAjuda('Telefone', 'telefone', c.telefone, { max: 20 })),
-    grupoCampos('Onde a empresa emite', novo ? 'Só aparecem os campos dos tipos de nota marcados acima.' : 'Só aparecem os campos dos tipos de nota contratados (aba Contrato).',
-      campoAjuda('Código IBGE do município', 'codigo_municipio', c.codigo_municipio,
-        { max: 7, ajuda: '7 números. Salvador = 2927408.', tipos: 'NACIONAL SALVADOR' }),
-      campoAjuda('Inscrição municipal (NFS-e)', 'inscricao_municipal', c.inscricao_municipal,
-        { max: 20, ajuda: 'Obrigatória em Salvador.', tipos: 'NACIONAL SALVADOR' }),
-      campoAjuda('UF (NF-e)', 'uf', c.uf, { max: 2, placeholder: 'BA', tipos: 'NFE' }),
-      campoAjuda('Inscrição estadual (NF-e)', 'ie', c.ie, { max: 20, tipos: 'NFE' })),
-    grupoCampos('Impostos', null, simples, regimeApuracao, percentual, regimeNacional, regimeSalvador, incentivador),
-    el('details', { class: 'grupo-campos grupo-campos--recolhido', open: Boolean(c.webhook_url) },
-      el('summary', {}, 'Integração com o sistema do cliente (webhook)'),
-      el('p', { class: 'grupo-campos__descricao' }, 'Opcional. A API avisa este endereço quando a situação de uma nota muda.'),
-      el('div', { class: 'campos' },
-        campoAjuda('URL do webhook', 'webhook_url', c.webhook_url, { largo: true, max: 500, placeholder: 'https://seu-sistema/webhook' }),
-        campoAjuda('Segredo do webhook', 'webhook_segredo', '', { max: 200,
-          ajuda: c.tem_webhook_segredo ? 'Já preenchido. Digite só para trocar.' : 'Usado para assinar os avisos.' }))),
-    grupoCampos('Anotações', null, observacao));
-  if (!novo) form.querySelector('[name=cnpj]').readOnly = true;
-  return form;
-}
-
-function formularioControle(c) {
-  const motivo = campoAjuda('Motivo do bloqueio', 'motivo_bloqueio', c.motivo_bloqueio, { max: 300, largo: true, ajuda: 'O cliente vê esta mensagem ao tentar emitir.' });
-  motivo.dataset.mostrarSe = 'bloqueada';
-  return el('form', { class: 'secao secao--form' },
-    el('h3', {}, 'Controle de emissão'),
-    grupoCampos('Tipos de nota contratados', 'Define o que a empresa pode emitir e quais campos o cadastro pede.',
+    grupoCampos('O que a empresa emite',
       el('div', { class: 'largo opcoes-linha' },
         ...TIPOS.map((t) => el('label', { class: 'linha-check' },
           el('input', { type: 'checkbox', name: 'padroes_permitidos', value: t.padrao, checked: (c.padroes_permitidos || []).includes(t.padrao) }), t.nome)))),
-    grupoCampos('Liberação', null,
-      el('label', { class: 'linha-check largo' }, el('input', { type: 'checkbox', name: 'emissao_liberada', checked: c.emissao_liberada }), 'Emissão liberada'),
-      motivo,
-      campoAjuda('Liberado até', 'liberado_ate', c.liberado_ate, { tipo: 'date', ajuda: 'Vencimento. Vazio = sem vencimento.' })),
-    grupoCampos('Plano', null,
-      campoAjuda('Nome do plano', 'plano', c.plano, { max: 60, placeholder: 'Ex.: Básico, Pro' }),
-      campoAjuda('Limite de notas por mês', 'limite_mensal', c.limite_mensal, { tipo: 'number', min: 1, ajuda: 'Vazio = sem limite.' })));
+    grupoCampos('Empresa',
+      campoAjuda('CNPJ', 'cnpj', novo ? '' : cnpj(c.cnpj), { obrigatorio: true, placeholder: '00.000.000/0000-00' }),
+      campoAjuda('Razão social', 'razao_social', c.razao_social, { obrigatorio: true, max: 150 }),
+      campoAjuda('Nome fantasia', 'nome_fantasia', c.nome_fantasia, { max: 150 }),
+      campoAjuda('E-mail', 'email', c.email, { tipo: 'email', max: 120 }),
+      campoAjuda('Telefone', 'telefone', c.telefone, { max: 20 })),
+    grupoCampos('Inscrições',
+      campoAjuda('Código IBGE do município', 'codigo_municipio', c.codigo_municipio, { max: 7, ajuda: 'Salvador = 2927408', tipos: 'NACIONAL SALVADOR' }),
+      campoAjuda('Inscrição municipal (NFS-e)', 'inscricao_municipal', c.inscricao_municipal, { max: 20, tipos: 'NACIONAL SALVADOR' }),
+      campoAjuda('UF (NF-e)', 'uf', c.uf, { max: 2, placeholder: 'BA', tipos: 'NFE' }),
+      campoAjuda('Inscrição estadual (NF-e)', 'ie', c.ie, { max: 20, tipos: 'NFE' })),
+    grupoCampos('Impostos',
+      simples, regimeApuracao,
+      campoAjuda('% tributos do Simples', 'percentual_tributos_simples', c.percentual_tributos_simples ?? '',
+        { max: 6, placeholder: 'ex.: 2', ajuda: 'O contador informa.', mostrarSe: 'mepp' })),
+    recolhivel('Mais opções', 'Liberação, plano, regimes especiais, webhook e anotações', false,
+      el('div', { class: 'campos' },
+        el('label', { class: 'linha-check largo' }, el('input', { type: 'checkbox', name: 'emissao_liberada', checked: c.emissao_liberada }), 'Emissão liberada'),
+        campoAjuda('Motivo do bloqueio (o cliente vê)', 'motivo_bloqueio', c.motivo_bloqueio, { max: 300, largo: true, mostrarSe: 'bloqueada' }),
+        campoAjuda('Liberado até', 'liberado_ate', c.liberado_ate, { tipo: 'date', ajuda: 'Vazio = sem vencimento' }),
+        campoAjuda('Plano', 'plano', c.plano, { max: 60, placeholder: 'Ex.: Básico' }),
+        campoAjuda('Limite de notas por mês', 'limite_mensal', c.limite_mensal, { tipo: 'number', min: 1, ajuda: 'Vazio = sem limite' }),
+        regimeNacional, regimeSalvador,
+        el('label', { class: 'linha-check', 'data-tipos': 'SALVADOR' },
+          el('input', { type: 'checkbox', name: 'incentivador_cultural', checked: c.incentivador_cultural }), 'Incentivador cultural (Salvador)'),
+        campoAjuda('Webhook (URL)', 'webhook_url', c.webhook_url, { largo: true, max: 500, placeholder: 'https://seu-sistema/webhook' }),
+        campoAjuda('Segredo do webhook', 'webhook_segredo', '', { max: 200, ajuda: c.tem_webhook_segredo ? 'Já preenchido. Digite só para trocar.' : '' }),
+        el('label', { class: 'largo' }, 'Anotações internas (só a equipe vê)',
+          el('textarea', { name: 'observacao', maxlength: 2000, rows: 2 }, c.observacao || '')))));
+  if (!novo) form.querySelector('[name=cnpj]').readOnly = true;
+
+  // Mostra so os campos que valem para o que esta marcado agora.
+  const ajustar = () => {
+    const tipos = [...form.querySelectorAll('[name=padroes_permitidos]:checked')].map((i) => i.value);
+    const mepp = form.querySelector('[name=opcao_simples_nacional]').value === '3';
+    const bloqueada = !form.querySelector('[name=emissao_liberada]').checked;
+    for (const item of form.querySelectorAll('[data-tipos]')) item.hidden = !item.dataset.tipos.split(' ').some((t) => tipos.includes(t));
+    for (const item of form.querySelectorAll('[data-mostrar-se]')) item.hidden = item.dataset.mostrarSe === 'mepp' ? !mepp : !bloqueada;
+    // Bloco sem nenhum campo visivel some (ex.: Inscricoes sem tipo marcado).
+    for (const grupo of form.querySelectorAll('.grupo-campos')) {
+      grupo.hidden = ![...grupo.querySelectorAll('.campos > *')].some((i) => !i.hidden);
+    }
+  };
+  form.addEventListener('change', ajustar);
+  ajustar();
+  return form;
 }
 
-/** Mostra so os campos que valem para o que esta marcado agora. */
-function ajustarCamposVisiveis(formDados, formControle) {
-  const tipos = [...formControle.querySelectorAll('[name=padroes_permitidos]:checked')].map((i) => i.value);
-  const mepp = formDados.querySelector('[name=opcao_simples_nacional]').value === '3';
-  const bloqueada = !formControle.querySelector('[name=emissao_liberada]').checked;
-  for (const item of formDados.querySelectorAll('[data-tipos]')) {
-    item.hidden = !item.dataset.tipos.split(' ').some((t) => tipos.includes(t));
-  }
-  for (const item of [...formDados.querySelectorAll('[data-mostrar-se]'), ...formControle.querySelectorAll('[data-mostrar-se]')]) {
-    item.hidden = item.dataset.mostrarSe === 'mepp' ? !mepp : !bloqueada;
-  }
-}
-
-/** Abre a aba que contem o elemento (usado pelo "Ir para" da lista Pronta para emitir). */
+/** Abre os blocos recolhidos que contem o elemento (usado pelo "Ir para"). */
 function mostrarAbaDe(elemento) {
-  const painel = elemento.closest('[data-aba]');
-  if (painel && painel.hidden) trocarAba(painel.dataset.aba);
-}
-
-function trocarAba(id) {
-  abaFicha = id;
-  for (const botao of document.querySelectorAll('#modal-abas [role=tab]')) {
-    const ativa = botao.dataset.aba === id;
-    botao.setAttribute('aria-selected', String(ativa));
-    botao.tabIndex = ativa ? 0 : -1;
-  }
-  for (const painel of document.querySelectorAll('#modal-corpo [data-aba]')) painel.hidden = painel.dataset.aba !== id;
-  const aba = ABAS_FICHA.find((a) => a.id === id);
-  $('modal-rodape').hidden = !(aba && aba.salvar);
-  $('modal-corpo').scrollTop = 0;
-}
-
-function barraAbas(faltam) {
-  const barra = el('div', { role: 'tablist', 'aria-label': 'Partes da ficha da empresa' },
-    ...ABAS_FICHA.map((a) => el('button', { type: 'button', role: 'tab', class: 'aba', 'data-aba': a.id, 'aria-controls': `aba-${a.id}`,
-      onclick: () => trocarAba(a.id) },
-    a.nome,
-    a.id === 'resumo' && faltam > 0 ? el('span', { class: 'aba__alerta', title: `${faltam} item(ns) faltando para emitir` }, String(faltam)) : null)));
-  // Setas do teclado trocam de aba (padrao de acessibilidade para abas).
-  barra.addEventListener('keydown', (e) => {
-    if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-    const i = ABAS_FICHA.findIndex((a) => a.id === abaFicha);
-    const proxima = ABAS_FICHA[(i + (e.key === 'ArrowRight' ? 1 : -1) + ABAS_FICHA.length) % ABAS_FICHA.length];
-    trocarAba(proxima.id);
-    barra.querySelector(`[data-aba=${proxima.id}]`).focus();
-  });
-  return barra;
+  for (let d = elemento.closest('details'); d; d = d.parentElement.closest('details')) d.open = true;
 }
 
 function desenharCliente(c) {
   const novo = c === null;
   c = c || { padroes_permitidos: TIPOS.map((t) => t.padrao), emissao_liberada: true, codigo_municipio: '2927408', opcao_simples_nacional: 1, regime_especial_tributacao: 0 };
+  const form = formularioEmpresa(c, novo);
 
-  const formDados = formularioDados(c, novo);
-  const formControle = formularioControle(c);
-  const ajustar = () => ajustarCamposVisiveis(formDados, formControle);
-  formDados.addEventListener('change', ajustar);
-  formControle.addEventListener('change', ajustar);
-  ajustar();
-
-  // ---- Barra de salvar (rodape fixo da janela) ----
+  // ---- Botao salvar (barra fixa embaixo da janela) ----
   const mensagemSalvar = el('span', { class: 'rodape__mensagem', role: 'status' });
   const botaoSalvar = el('button', { class: 'botao botao--forte', type: 'button' }, novo ? 'Cadastrar empresa' : 'Salvar alterações');
-  const marcarAlterado = () => { mensagemSalvar.className = 'rodape__mensagem aviso'; mensagemSalvar.textContent = 'Alterações não salvas'; };
-  formDados.addEventListener('input', marcarAlterado);
-  formControle.addEventListener('input', marcarAlterado);
+  form.addEventListener('input', () => { mensagemSalvar.className = 'rodape__mensagem aviso'; mensagemSalvar.textContent = 'Alterações não salvas'; });
   botaoSalvar.addEventListener('click', async () => {
-    const corpo = lerFormulario(formDados, formControle);
+    const corpo = lerFormulario(form);
     if (!corpo) return;
     botaoSalvar.disabled = true;
     mensagemSalvar.className = 'rodape__mensagem suave';
@@ -454,7 +403,6 @@ function desenharCliente(c) {
     try {
       const { cliente } = await api('clientes.php', { metodo: 'POST', corpo });
       await carregar();
-      if (novo) abaFicha = 'resumo';
       desenharCliente(cliente);
     } catch (e) {
       mensagemSalvar.className = 'rodape__mensagem erro';
@@ -465,26 +413,24 @@ function desenharCliente(c) {
   const rodape = [el('div', { class: 'rodape__texto' }, mensagemSalvar), botaoSalvar];
 
   if (novo) {
-    abrirModal('Nova empresa', 'Preencha o básico. Certificado, acessos e numeração aparecem depois de cadastrar.', [
-      formControle, formDados,
-    ], { rodape });
+    abrirModal('Nova empresa', 'Preencha o básico. Certificado e acessos aparecem depois de cadastrar.', [form], { rodape });
     return;
   }
 
-  const painel = (id, ...conteudo) => el('div', { 'data-aba': id, id: `aba-${id}`, role: 'tabpanel' }, ...conteudo);
-  const paineis = [
-    painel('resumo',
-      el('div', { class: 'acoes situacao-linha' }, seloSituacao(c.situacao), el('span', {}, c.situacao_mensagem),
-        el('a', { class: 'botao', href: `../monitor/?emitente=${encodeURIComponent(c.cnpj)}` }, 'Ver notas desta empresa')),
-      c.prontidao ? secaoProntidao(c.prontidao) : null),
-    painel('cadastro', formDados),
-    painel('contrato', formControle),
-    painel('acessos', secaoCertificado(c), secaoToken(c), secaoPortal(c)),
-    painel('numeracao', secaoNumeracao(c)),
-    painel('uso', secaoUso(c), secaoHistorico(c)),
-  ];
-  abrirModal(c.nome_fantasia || c.razao_social, cnpj(c.cnpj), paineis, { abas: barraAbas(c.prontidao?.faltam || 0), rodape });
-  trocarAba(ABAS_FICHA.some((a) => a.id === abaFicha) ? abaFicha : 'resumo');
+  const certificado = c.tem_certificado
+    ? (c.certificado_dias_restantes < 0 ? 'vencido' : `válido até ${dataCurta(c.certificado_validade)}`)
+    : 'não enviado';
+  const series = (c.numeracao || []).length;
+  abrirModal(c.nome_fantasia || c.razao_social, cnpj(c.cnpj), [
+    el('div', { class: 'acoes situacao-linha' }, seloSituacao(c.situacao), el('span', {}, c.situacao_mensagem),
+      el('a', { class: 'botao', href: `../monitor/?emitente=${encodeURIComponent(c.cnpj)}` }, 'Ver notas desta empresa')),
+    c.prontidao ? secaoProntidao(c.prontidao) : null,
+    form,
+    recolhivel('Certificado digital', certificado, !c.tem_certificado, secaoCertificado(c)),
+    recolhivel('Acesso à API e portal', c.tem_token ? 'token ativo' : 'sem token', false, secaoToken(c), secaoPortal(c)),
+    recolhivel('Numeração', series ? `${series} série(s) em uso` : 'nenhuma nota ainda', false, secaoNumeracao(c)),
+    recolhivel('Uso e histórico', `${c.autorizadas_mes?.total ?? 0} nota(s) autorizada(s) no mês`, false, secaoUso(c), secaoHistorico(c)),
+  ], { rodape });
 }
 
 // ---- Pronta para emitir ----
@@ -643,14 +589,6 @@ async function atualizarProntidao(numeroCnpj) {
     // Mantem aberto o "Ver os itens ok" se a pessoa tinha aberto.
     if (atual.querySelector('.pront-oks')?.open) nova.querySelector('.pront-oks')?.setAttribute('open', '');
     atual.replaceWith(nova);
-    // Numero de pendencias na aba "Resumo".
-    const abaResumo = document.querySelector('#modal-abas [data-aba=resumo]');
-    if (abaResumo) {
-      const nova = barraAbas(cliente.prontidao.faltam || 0).querySelector('[data-aba=resumo]');
-      nova.setAttribute('aria-selected', abaResumo.getAttribute('aria-selected'));
-      nova.tabIndex = abaResumo.tabIndex;
-      abaResumo.replaceWith(nova);
-    }
     const novoRetorno = nova.querySelector('.pront-retorno');
     if (novoRetorno) { novoRetorno.className = 'pront-retorno suave'; novoRetorno.textContent = 'Lista conferida de novo.'; }
   } catch {
@@ -660,21 +598,15 @@ async function atualizarProntidao(numeroCnpj) {
   }
 }
 
-function lerFormulario(formDados, formControle) {
-  if (!formDados.reportValidity()) return null;
-  const valor = (form, nome) => form.querySelector(`[name=${nome}]`);
-  const corpo = {};
-  for (const input of formDados.querySelectorAll('input, select, textarea')) {
-    if (input.type === 'checkbox') corpo[input.name] = input.checked;
+function lerFormulario(form) {
+  if (!form.reportValidity()) return null;
+  const corpo = { padroes_permitidos: [] };
+  for (const input of form.querySelectorAll('input, select, textarea')) {
+    if (input.name === 'padroes_permitidos') { if (input.checked) corpo.padroes_permitidos.push(input.value); }
+    else if (input.type === 'checkbox') corpo[input.name] = input.checked;
     else if (input.name === 'webhook_segredo' && input.value === '') continue; // vazio = manter o atual
     else corpo[input.name] = input.value;
   }
-  corpo.emissao_liberada = valor(formControle, 'emissao_liberada').checked;
-  corpo.motivo_bloqueio = valor(formControle, 'motivo_bloqueio').value;
-  corpo.liberado_ate = valor(formControle, 'liberado_ate').value;
-  corpo.limite_mensal = valor(formControle, 'limite_mensal').value;
-  corpo.plano = valor(formControle, 'plano').value;
-  corpo.padroes_permitidos = [...formControle.querySelectorAll('[name=padroes_permitidos]:checked')].map((i) => i.value);
   if (!corpo.emissao_liberada && !corpo.motivo_bloqueio.trim()
       && !confirm('Bloquear sem informar o motivo? O cliente verá só "Emissão bloqueada".')) {
     return null;
