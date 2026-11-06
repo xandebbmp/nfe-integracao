@@ -11,6 +11,7 @@
      uso.php          relatorio de cobranca do mes (JSON ou CSV)
      sistema.php      tela Sistema: worker ligado? fila; pausar/retomar/reiniciar
      banco.php        tela Sistema: scripts do banco pendentes; botao Atualizar banco
+     diagnostico.php  tela Sistema: botao Diagnostico (confere tudo, nao altera nada)
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -713,6 +714,9 @@ function abrirSistema() {
   const historicoArea = el('div', {});
   const bancoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   const bancoRetorno = el('div', {});
+  const diagArea = el('div', {}, el('p', { class: 'suave' },
+    'Confere servidor, configuração, banco, worker, certificados das empresas e acesso à internet da prefeitura. Não altera nada e não envia nota.'));
+  const diagBotao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Rodar diagnóstico');
   const acoesArea = el('div', { class: 'acoes' });
   const retorno = el('div', {});
 
@@ -784,6 +788,48 @@ function abrirSistema() {
     }
   }
 
+  // ---- Diagnostico ----
+  const NIVEIS = { ERRO: { nome: 'Erro', ponto: 'PARADO' }, ATENCAO: { nome: 'Atenção', ponto: 'PAUSADO' }, OK: { nome: 'OK', ponto: 'LIGADO' } };
+
+  function itemDiagnostico(i, grupo) {
+    return el('li', { class: 'diag-item' },
+      el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[i.nivel].ponto}`, title: NIVEIS[i.nivel].nome }),
+      el('div', {},
+        el('div', {}, grupo ? el('span', { class: 'suave' }, `${grupo} · `) : null, i.texto),
+        i.resolver ? el('div', { class: 'diag-resolver' }, el('strong', {}, 'Como resolver: '), i.resolver) : null));
+  }
+
+  async function rodarDiagnostico() {
+    diagBotao.disabled = true;
+    diagBotao.textContent = 'Conferindo... (até 10 s)';
+    try {
+      const d = await api('diagnostico.php');
+      const problemas = [];
+      const certos = [];
+      for (const g of d.grupos) {
+        for (const i of g.itens) (i.nivel === 'OK' ? certos : problemas).push([i, g.titulo]);
+      }
+      problemas.sort((a, b) => (a[0].nivel === 'ERRO' ? 0 : 1) - (b[0].nivel === 'ERRO' ? 0 : 1));
+      const t = d.total;
+      const resumo = d.resultado === 'OK' ? 'Tudo certo'
+        : [t.ERRO ? `${t.ERRO} erro(s)` : null, t.ATENCAO ? `${t.ATENCAO} aviso(s)` : null].filter(Boolean).join(' e ');
+      diagArea.replaceChildren(...[
+        el('div', { class: 'sistema-estado' },
+          el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[d.resultado].ponto}` }),
+          el('strong', {}, resumo),
+          el('span', { class: 'suave' }, `${t.OK} item(ns) ok · conferido em ${dataHora(d.feito_em)}`)),
+        problemas.length ? el('ul', { class: 'diag-lista' }, ...problemas.map(([i, g]) => itemDiagnostico(i, g))) : null,
+        el('details', {}, el('summary', { class: 'suave' }, `Ver os ${certos.length} itens ok`),
+          el('ul', { class: 'diag-lista' }, ...certos.map(([i, g]) => itemDiagnostico(i, g)))),
+      ].filter(Boolean));
+    } catch (e) {
+      diagArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+    diagBotao.disabled = false;
+    diagBotao.textContent = 'Rodar de novo';
+  }
+  diagBotao.addEventListener('click', rodarDiagnostico);
+
   // ---- Banco de dados ----
   function desenharBanco(b) {
     const nomes = { APLICADO: 'aplicado', PENDENTE: 'pendente', ALTERADO: 'arquivo mudou: aplicar de novo' };
@@ -832,11 +878,12 @@ function abrirSistema() {
     recarregar();
   }
 
-  abrirModal('Sistema', 'Worker (o programa que envia as notas), fila de envio e banco de dados', [
+  abrirModal('Sistema', 'Worker (o programa que envia as notas), fila, banco de dados e diagnóstico', [
     el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
+    el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
   ]);
   recarregar();

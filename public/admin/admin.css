@@ -62,3 +62,8 @@ pre.exemplo { background: var(--fundo); padding: 10px; border-radius: 8px; overf
 .numero span { font-size: 12px; color: var(--suave); }
 .numero--alerta b { color: var(--st-rejeitado); }
 .confirmar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--fundo); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.diag-lista { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.diag-item { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+.diag-item .ponto-sistema { margin-top: 6px; }
+.diag-resolver { font-size: 13px; color: var(--suave); margin-top: 2px; }
+details summary { cursor: pointer; margin-top: 10px; }

@@ -322,6 +322,7 @@ echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
 // ===========================================================================
 
 testesPortalUnidade();
+testesSistemaUnidade($cfgGeral);
 
 $dsn = getenv('NFSE_TESTE_PG');
 if (!$dsn) {
@@ -493,7 +494,7 @@ if (!$dsn) {
     testesNfeIntegracao($pdo, $cfgGeral, $worker, $soapNfe);
     testesClientesIntegracao($pdo, $cfgGeral);
     testesPortalIntegracao($pdo, $cfgGeral);
-    testesSistemaIntegracao($pdo);
+    testesSistemaIntegracao($pdo, $cfgGeral);
 }
 
 // ===========================================================================

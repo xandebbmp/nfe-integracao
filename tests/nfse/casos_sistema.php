@@ -11,8 +11,21 @@ declare(strict_types=1);
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\AtualizacaoBanco;
 use Xande\NfeIntegracao\Nfse\Servico\ControleSistema;
+use Xande\NfeIntegracao\Nfse\Servico\Diagnostico;
 
-function testesSistemaIntegracao(PDO $pdo): void
+/** Sem banco: o diagnostico avisa e continua conferindo o resto. */
+function testesSistemaUnidade(array $cfg): void
+{
+    echo "\n[12a] Diagnostico sem banco\n";
+    $d = (new Diagnostico($cfg, null, dirname(__DIR__, 2)))->executar(false);
+    $banco = array_values(array_filter($d['grupos'], fn($g) => $g['titulo'] === 'Banco de dados e worker'))[0] ?? null;
+    Apoio::igual('ERRO', $banco['itens'][0]['nivel'] ?? null, 'sem banco: item de erro');
+    Apoio::verificar(str_contains($banco['itens'][0]['resolver'] ?? '', 'database.local.php'), 'diz onde conferir a conexao');
+    Apoio::igual('ERRO', $d['resultado'], 'resultado geral ERRO');
+    Apoio::verificar(!in_array('Internet: acesso ao fisco', array_column($d['grupos'], 'titulo'), true), 'internet pulada quando pedido');
+}
+
+function testesSistemaIntegracao(PDO $pdo, array $cfg): void
 {
     echo "\n[12] Painel: tela Sistema (worker e fila)\n";
 
@@ -110,4 +123,17 @@ function testesSistemaIntegracao(PDO $pdo): void
     $pdo->exec("DELETE FROM sistema_scripts WHERE nome LIKE '900%'");
     array_map('unlink', glob("{$pasta}/*.sql"));
     rmdir($pasta);
+
+    // ---- Diagnostico (sem internet) ----
+    $d = (new Diagnostico($cfg, $pdo, dirname(__DIR__, 2)))->executar(false);
+    $textos = [];
+    foreach ($d['grupos'] as $g) {
+        foreach ($g['itens'] as $i) {
+            $textos[] = $i['texto'];
+            Apoio::verificar(in_array($i['nivel'], ['OK', 'ATENCAO', 'ERRO'], true) && ($i['nivel'] === 'OK' || $i['resolver'] !== ''), "diagnostico: '{$i['texto']}' tem nivel e como resolver");
+        }
+    }
+    Apoio::verificar(in_array('Conexão com o PostgreSQL', $textos, true), 'diagnostico confere a conexao');
+    Apoio::verificar((bool)preg_grep('/^Banco em dia/', $textos), 'diagnostico ve o banco em dia');
+    Apoio::igual(array_sum($d['total']), count($textos), 'total bate com os itens');
 }

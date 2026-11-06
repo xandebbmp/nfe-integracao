@@ -221,6 +221,17 @@ só não aparece no painel.
 > "Reiniciar" só religa o worker se ele estiver no systemd ou no pm2. Um
 > worker iniciado à mão no terminal apenas para.
 
+### Diagnóstico pelo painel
+
+Na mesma tela **Sistema**, o botão **Rodar diagnóstico** confere servidor,
+configuração, banco, worker, certificados de cada empresa e se o servidor
+alcança a Sefin, Salvador e a SEFAZ. Mostra primeiro os erros, depois os
+avisos, cada um com **Como resolver**. Não altera nada, não assina e não
+envia nota (a conferência da internet só pergunta "você responde?", sem
+certificado). São as mesmas regras do `bin/nfse_verificar.php` no terminal
+(`src/Nfse/Servico/Diagnostico.php`); o terminal confere, a mais, os
+arquivos de configuração e os serviços do systemd.
+
 ### Quantos rodar
 
 Dois processos atendem bem até alguns milhares de notas por dia. Para mais
@@ -543,6 +554,7 @@ Para planilha, acrescente `&formato=csv`.
 | `POST /v1/admin/sistema.php` | `{"acao": "pausar" \| "retomar" \| "reiniciar"}` |
 | `GET /v1/admin/banco.php` | Scripts do banco aplicados e pendentes |
 | `POST /v1/admin/banco.php` | `{"acao": "aplicar"}`: roda os pendentes |
+| `GET /v1/admin/diagnostico.php[?rede=0]` | Diagnóstico (não altera nada; `rede=0` pula a internet) |
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
 exemplo, ao detectar fatura em atraso:
