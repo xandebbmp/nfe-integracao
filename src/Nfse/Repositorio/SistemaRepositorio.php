@@ -149,12 +149,12 @@ final class SistemaRepositorio
     // Historico (o registro em si e gravado por ClienteRepositorio::registrarLog)
     // ------------------------------------------------------------------
 
-    /** Ultimas ordens dadas na tela Sistema (worker e banco). */
+    /** Ultimas ordens dadas na tela Sistema (worker, banco, configuracoes e pessoas do painel). */
     public function acoesRecentes(int $limite = 10): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT acao, ip, criado_em FROM fiscal_admin_log
-              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%' OR acao LIKE 'CONFIG\\_%')
+            "SELECT acao, ip, criado_em, to_jsonb(l)->>'autor' AS autor FROM fiscal_admin_log l
+              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%' OR acao LIKE 'CONFIG\\_%' OR acao LIKE 'PAINEL\\_%')
               ORDER BY id DESC LIMIT :limite"
         );
         $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);

@@ -299,7 +299,7 @@ final class PortalAcesso
     }
 
     /** 10 caracteres faceis de ditar (sem 0/O, 1/l/I). */
-    private static function senhaProvisoria(): string
+    public static function senhaProvisoria(): string
     {
         $letras = 'abcdefghjkmnpqrstuvwxyz';
         $numeros = '23456789';

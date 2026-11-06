@@ -7,7 +7,9 @@ use PDO;
 use Throwable;
 use Xande\NfeIntegracao\Database\ConnectionFactory;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
+use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\DocumentoRepositorio;
+use Xande\NfeIntegracao\Nfse\Servico\PainelAcesso;
 
 /**
  * Funcoes comuns a todos os endpoints de public/v1/nfse/.
@@ -108,6 +110,9 @@ final class Api
             if (strlen($tokenAdmin) >= 24 && hash_equals($tokenAdmin, $token)) {
                 return ['consumidor' => null, 'painel' => true];
             }
+            if ((new PainelAcesso($this->pdo(), $this->cfg))->sessao($token) !== null) {
+                return ['consumidor' => null, 'painel' => true];
+            }
         }
 
         // Ambiente de desenvolvimento sem nenhum token configurado: libera
@@ -120,21 +125,35 @@ final class Api
         $this->erro(401, 'NAO_AUTORIZADO', 'Token de API ausente ou invalido.');
     }
 
+    /** Quem entrou no painel (null = chave de emergencia). Preenchido por exigirAdmin(). */
+    public ?array $pessoaPainel = null;
+
     /**
-     * Exige o token de ADMINISTRADOR (painel /admin/): cabecalho X-ADMIN-TOKEN.
-     * Configure 'admin_token' em config/nfse.local.php (openssl rand -hex 32).
+     * Exige login no PAINEL ADMIN (cabecalho X-ADMIN-TOKEN). Aceita:
+     *   - o codigo do login com e-mail e senha (Servico/PainelAcesso.php);
+     *   - o 'admin_token' de config/nfse.local.php, que e a CHAVE DE EMERGENCIA
+     *     (cadastrar a primeira pessoa ou se todos ficarem sem acesso).
+     * Quem esta com senha provisoria so passa onde $aceitaSenhaProvisoria.
+     * Tambem diz ao historico quem esta fazendo as mudancas.
      */
-    public function exigirAdmin(): void
+    public function exigirAdmin(bool $aceitaSenhaProvisoria = false): void
     {
-        $esperado = (string)($this->cfg['admin_token'] ?? '');
         $token = self::cabecalho('X-ADMIN-TOKEN');
-        if ($esperado === '' || strlen($esperado) < 24) {
-            $this->erro(503, 'ADMIN_DESLIGADO', "Painel admin desligado: configure 'admin_token' (24+ caracteres) em config/nfse.local.php.");
+        $chave = (string)($this->cfg['admin_token'] ?? '');
+        if (strlen($chave) >= 24 && $token !== '' && hash_equals($chave, $token)) {
+            ClienteRepositorio::$autor = 'Chave de emergência';
+            return;
         }
-        if ($token === '' || !hash_equals($esperado, $token)) {
+        $pessoa = $token !== '' ? (new PainelAcesso($this->pdo(), $this->cfg))->sessao($token) : null;
+        if ($pessoa === null) {
             usleep(300_000); // dificulta tentativa e erro
-            $this->erro(401, 'NAO_AUTORIZADO', 'Token de administrador invalido.');
+            $this->erro(401, 'NAO_AUTORIZADO', 'Sessão encerrada. Entre de novo com seu e-mail e senha.');
         }
+        if ($pessoa['trocar_senha'] && !$aceitaSenhaProvisoria) {
+            $this->erro(403, 'TROCAR_SENHA', 'Crie a sua senha antes de continuar.');
+        }
+        $this->pessoaPainel = $pessoa;
+        ClienteRepositorio::$autor = "{$pessoa['nome']} <{$pessoa['email']}>";
     }
 
     /** IP de quem chamou (para o historico do painel admin). */
