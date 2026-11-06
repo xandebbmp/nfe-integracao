@@ -848,7 +848,9 @@ function secaoNumeracao(c) {
         el('td', {}, dataHora(n.atualizado_em))))))
     : el('p', { class: 'suave' }, 'Nenhuma série usada ainda neste ambiente: a primeira nota de cada série sai com o número 1.');
 
-  const tipo = el('select', {}, ...TIPOS.map((t) => el('option', { value: t.padrao }, t.nome)));
+  // So os tipos que a empresa emite (se nenhum marcado, mostra todos).
+  const contratados = TIPOS.filter((t) => (c.padroes_permitidos || []).includes(t.padrao));
+  const tipo = el('select', {}, ...(contratados.length ? contratados : TIPOS).map((t) => el('option', { value: t.padrao }, t.nome)));
   const serie = el('input', { type: 'text', maxlength: 5 });
   const ultimo = el('input', { type: 'number', min: 0, placeholder: 'Ex.: 1520' });
   const mensagem = el('span', {});
