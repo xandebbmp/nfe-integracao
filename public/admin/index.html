@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Painel Administrativo</title>
   <!-- Mesmo visual do monitor + ajustes do painel -->
-  <link rel="stylesheet" href="../monitor/monitor.css?v=20261106l">
-  <link rel="stylesheet" href="admin.css?v=20261106l">
+  <link rel="stylesheet" href="../monitor/monitor.css?v=20261106m">
+  <link rel="stylesheet" href="admin.css?v=20261106m">
 </head>
 <body>
 
@@ -15,12 +15,39 @@
   <section id="tela-acesso" class="acesso" hidden>
     <form id="form-acesso" class="cartao acesso__cartao">
       <h1>Painel Administrativo</h1>
-      <p class="suave">Informe o token de administrador (admin_token em config/nfse.local.php).</p>
-      <label for="campo-token">Token de administrador</label>
-      <input id="campo-token" type="password" autocomplete="current-password" required>
-      <label class="linha-check"><input id="campo-lembrar" type="checkbox"> Lembrar neste navegador</label>
+      <p id="acesso-explica" class="suave">Entre com o seu e-mail e a sua senha.</p>
+      <div id="acesso-pessoa" class="acesso__campos">
+        <label for="campo-email">E-mail</label>
+        <input id="campo-email" type="email" autocomplete="username" placeholder="voce@empresa.com.br">
+        <label for="campo-senha">Senha</label>
+        <input id="campo-senha" type="password" autocomplete="current-password">
+      </div>
+      <div id="acesso-chave" class="acesso__campos" hidden>
+        <label for="campo-token">Chave de emergência</label>
+        <input id="campo-token" type="password" autocomplete="off">
+      </div>
+      <label class="linha-check"><input id="campo-lembrar" type="checkbox"> Manter conectado neste computador</label>
       <p id="erro-acesso" class="erro" hidden></p>
       <button type="submit" class="botao botao--primario">Entrar</button>
+      <button type="button" id="trocar-modo-acesso" class="link-botao acesso__alternar">Entrar com a chave de emergência</button>
+    </form>
+
+    <!-- 1o acesso (senha provisoria): a pessoa cria a propria senha -->
+    <form id="form-nova-senha" class="cartao acesso__cartao" hidden>
+      <h1>Crie a sua senha</h1>
+      <p id="nova-senha-quem" class="suave"></p>
+      <div id="nova-senha-atual" class="acesso__campos">
+        <label for="campo-senha-atual">Senha provisória (a que você recebeu)</label>
+        <input id="campo-senha-atual" type="password" autocomplete="current-password">
+      </div>
+      <label for="campo-senha-nova">Nova senha</label>
+      <input id="campo-senha-nova" type="password" autocomplete="new-password" required>
+      <label for="campo-senha-repetir">Repita a nova senha</label>
+      <input id="campo-senha-repetir" type="password" autocomplete="new-password" required>
+      <p class="suave">Pelo menos 8 caracteres, com letras e números.</p>
+      <p id="erro-nova-senha" class="erro" hidden></p>
+      <button type="submit" class="botao botao--primario">Salvar e entrar</button>
+      <button type="button" id="nova-senha-sair" class="link-botao acesso__alternar">Sair</button>
     </form>
   </section>
 
@@ -37,9 +64,12 @@
         <a class="botao" href="../monitor/" title="Notas de todas as empresas, em tempo real, com XML e PDF">Notas (monitor)</a>
         <button id="botao-relatorio" class="botao">Relatório de cobrança</button>
         <button id="botao-nova" class="botao botao--forte">+ Nova empresa</button>
+        <button id="botao-eu" class="botao" title="Trocar a minha senha" hidden></button>
         <button id="botao-sair" class="botao">Sair</button>
       </div>
     </header>
+
+    <div id="aviso-chave" class="aviso-chave" hidden></div>
 
     <main class="conteudo">
       <section id="contadores" class="contadores" aria-label="Resumo"></section>
@@ -96,6 +126,6 @@
     <div id="modal-rodape" class="modal__rodape" hidden></div>
   </dialog>
 
-  <script src="admin.js?v=20261106l"></script>
+  <script src="admin.js?v=20261106m"></script>
 </body>
 </html>

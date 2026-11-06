@@ -46,11 +46,14 @@ const ACOES_HISTORICO = {
 const ACOES_SISTEMA = {
   WORKER_PAUSADO: 'Envios pausados', WORKER_RETOMADO: 'Envios retomados', WORKER_REINICIADO: 'Worker reiniciado',
   BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco', CONFIG_ALTERADA: 'Configurações alteradas',
+  PAINEL_PESSOA_CRIADA: 'Pessoa do painel cadastrada', PAINEL_SENHA_REDEFINIDA: 'Senha nova de pessoa do painel',
+  PAINEL_PESSOA_ATIVADA: 'Pessoa do painel reativada', PAINEL_PESSOA_DESATIVADA: 'Pessoa do painel desativada',
+  PAINEL_ACESSO_ENVIADO: 'Acesso ao painel enviado por e-mail',
 };
 
 const ESTADOS_WORKER = { TRABALHANDO: 'Enviando notas', AGUARDANDO: 'Esperando notas', PAUSADO: 'Pausado' };
 
-const estado = { token: '', clientes: [], ambiente: '', mes: '', filtroSituacao: '' };
+const estado = { token: '', pessoa: null, senhaDigitada: '', modoChave: false, clientes: [], ambiente: '', mes: '', filtroSituacao: '' };
 
 // ==========================================================================
 // Utilitarios
@@ -108,8 +111,12 @@ async function api(caminho, opcoes = {}) {
   }
   const resposta = await fetch(API + caminho, { method: opcoes.metodo || 'GET', headers: cabecalhos, body: corpo });
   if (resposta.status === 401) {
-    sair('Token de administrador inválido.');
+    sair('Sua sessão terminou. Entre de novo.');
     throw new Error('nao autorizado');
+  }
+  if (resposta.status === 403 && !opcoes.blob) {
+    const j = await resposta.clone().json().catch(() => ({}));
+    if (j.erro?.codigo === 'TROCAR_SENHA') { pedirNovaSenha(estado.pessoa); throw new Error('nao autorizado'); }
   }
   if (opcoes.blob) {
     if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
@@ -141,23 +148,66 @@ function salvarToken(token, lembrar) {
 }
 
 function sair(mensagem) {
-  // O monitor usa o mesmo login: sair aqui sai de la tambem.
+  // Encerra o login no servidor (se havia um). O monitor usa o mesmo login: sai de la tambem.
+  if (estado.token && !mensagem) fetch(API + 'entrar.php', { method: 'DELETE', headers: { 'X-ADMIN-TOKEN': estado.token } }).catch(() => {});
   try {
     for (const chave of [CHAVE_TOKEN, 'nfse_monitor_token']) { sessionStorage.removeItem(chave); localStorage.removeItem(chave); }
   } catch { /* ignora */ }
   estado.token = '';
+  estado.pessoa = null;
   $('tela-painel').hidden = true;
   $('tela-acesso').hidden = false;
+  $('form-acesso').hidden = false;
+  $('form-nova-senha').hidden = true;
+  $('campo-senha').value = '';
+  $('campo-token').value = '';
+  if (estado.modoChave) $('trocar-modo-acesso').click(); // volta para e-mail e senha
   $('erro-acesso').hidden = !mensagem;
   $('erro-acesso').textContent = mensagem || '';
 }
 
+// Entrou (pelo e-mail ou pela chave): confere quem e e abre o painel.
 async function entrar(token) {
   estado.token = token;
+  const eu = await api('entrar.php');
+  estado.pessoa = eu.pessoa;
+  if (eu.pessoa?.trocar_senha) { pedirNovaSenha(eu.pessoa); return false; }
   await carregar();
   $('tela-acesso').hidden = true;
   $('tela-painel').hidden = false;
+  $('botao-eu').hidden = !eu.pessoa;
+  $('botao-eu').textContent = eu.pessoa ? '👤 ' + eu.pessoa.nome.split(' ')[0] : '';
+  mostrarAvisoChave(eu);
   atualizarPontoSistema().catch(() => {});
+  return true;
+}
+
+// Quem entrou com a chave de emergencia ve um aviso para cadastrar as pessoas.
+function mostrarAvisoChave(eu) {
+  const aviso = $('aviso-chave');
+  aviso.hidden = !eu.chave_emergencia;
+  if (!eu.chave_emergencia) return;
+  aviso.replaceChildren(
+    el('strong', {}, 'Você entrou com a chave de emergência.'),
+    el('span', {}, !eu.instalado ? 'Primeiro clique em "Atualizar banco" (em Sistema). Depois cadastre quem vai usar o painel.'
+      : (eu.tem_pessoas ? 'O histórico vai mostrar "Chave de emergência". Prefira entrar com o seu e-mail.'
+        : 'Cadastre você e a sua equipe: cada um entra com o próprio e-mail e senha.')),
+    el('button', { class: 'botao botao--forte', type: 'button', onclick: () => abrirSistema({ focar: eu.instalado ? 'pessoas' : 'banco' }) },
+      eu.instalado ? 'Cadastrar pessoas do painel' : 'Abrir Sistema'));
+}
+
+// 1o acesso (senha provisoria) ou "Minha senha": tela para criar a senha.
+function pedirNovaSenha(pessoa) {
+  $('tela-painel').hidden = true;
+  $('tela-acesso').hidden = false;
+  $('form-acesso').hidden = true;
+  $('form-nova-senha').hidden = false;
+  $('nova-senha-quem').textContent = pessoa ? `${pessoa.nome} (${pessoa.email}): no primeiro acesso você cria a sua própria senha.` : '';
+  // Se acabou de digitar a provisoria no login, nao pede de novo.
+  $('nova-senha-atual').hidden = Boolean(estado.senhaDigitada);
+  $('campo-senha-atual').value = estado.senhaDigitada || '';
+  $('erro-nova-senha').hidden = true;
+  ($('nova-senha-atual').hidden ? $('campo-senha-nova') : $('campo-senha-atual')).focus();
 }
 
 // Bolinha do botao "Sistema" sempre atualizada.
@@ -985,6 +1035,12 @@ function secaoUso(c) {
 }
 
 // ---- Historico ----
+/** "por Ana Paula" no historico (nome completo e e-mail ao passar o mouse). */
+function autorDoRegistro(r) {
+  if (!r.autor) return null;
+  return el('span', { title: r.autor }, ' por ', el('strong', {}, r.autor.replace(/\s*<[^>]*>$/, '')));
+}
+
 function secaoHistorico(c) {
   const itens = (c.historico || []).map((h) => {
     let detalhe = '';
@@ -1000,7 +1056,7 @@ function secaoHistorico(c) {
       detalhe = `${h.detalhes.titular}, válido até ${dataCurta(h.detalhes.validade)}`;
     }
     return el('li', {}, el('time', { class: 'suave' }, dataHora(h.criado_em)), ' · ', el('strong', {}, ACOES_HISTORICO[h.acao] || h.acao),
-      h.ip ? el('span', { class: 'suave' }, ` (IP ${h.ip})`) : null, detalhe ? el('div', { class: 'suave' }, detalhe) : null);
+      autorDoRegistro(h), h.ip ? el('span', { class: 'suave' }, ` (IP ${h.ip})`) : null, detalhe ? el('div', { class: 'suave' }, detalhe) : null);
   });
   return el('section', { class: 'secao' },
     el('h3', {}, 'Histórico de alterações'),
@@ -1143,7 +1199,7 @@ function abrirSistema(opcoes = {}) {
     historicoArea.replaceChildren(s.acoes_recentes.length
       ? el('ul', { class: 'linha-tempo' }, ...s.acoes_recentes.map((a) => el('li', {},
         el('time', { class: 'suave' }, dataHora(a.criado_em)), ' · ', el('strong', {}, ACOES_SISTEMA[a.acao] || a.acao),
-        a.ip ? el('span', { class: 'suave' }, ` (IP ${a.ip})`) : null)))
+        autorDoRegistro(a), a.ip ? el('span', { class: 'suave' }, ` (IP ${a.ip})`) : null)))
       : el('p', { class: 'suave' }, 'Nenhuma ação ainda.'));
   }
 
@@ -1434,8 +1490,9 @@ function abrirSistema(opcoes = {}) {
     el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
-    el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
+    el('section', { class: 'secao', id: 'secao-banco' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
+    secaoPessoasPainel(),
     el('section', { class: 'secao', id: 'secao-email' }, el('h3', {}, 'E-mail'), emailArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
@@ -1444,7 +1501,8 @@ function abrirSistema(opcoes = {}) {
   carregarBanco();
   carregarConfiguracoes();
   carregarEmail();
-  if (opcoes.focar === 'email') setTimeout(() => $('secao-email')?.scrollIntoView({ block: 'start' }), 50);
+  const focos = { email: 'secao-email', pessoas: 'secao-pessoas', banco: 'secao-banco' };
+  if (focos[opcoes.focar]) setTimeout(() => $(focos[opcoes.focar])?.scrollIntoView({ block: 'start' }), 50);
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }
@@ -1453,16 +1511,212 @@ function abrirSistema(opcoes = {}) {
 // Inicio
 // ==========================================================================
 
+// ==========================================================================
+// Pessoas do painel (tela Sistema) e "Minha senha"
+// ==========================================================================
+
+function secaoPessoasPainel() {
+  const lista = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const area = el('div', { 'aria-live': 'polite' });
+  const nome = el('input', { type: 'text', placeholder: 'Nome da pessoa', autocomplete: 'off' });
+  const email = el('input', { type: 'email', placeholder: 'email@empresa.com.br', autocomplete: 'off' });
+  const porEmail = el('input', { type: 'checkbox', checked: true });
+  const mensagem = el('span', {});
+  const linkPainel = new URL('./', window.location.href).href;
+
+  // Senha provisoria: aparece uma vez so, com "Enviar por e-mail" e "Copiar".
+  function mostrarSenha(r, enviarJa) {
+    const texto = `Painel: ${linkPainel}\nE-mail: ${r.email}\nSenha provisória: ${r.senha_provisoria}`;
+    const resultado = el('div', { 'aria-live': 'polite' });
+    const enviar = el('button', { class: 'botao botao--forte', type: 'button' }, `✉ Enviar por e-mail para ${r.email}`);
+    const copiar = el('button', { class: 'botao', type: 'button', onclick: async () => {
+      try { await navigator.clipboard.writeText(texto); copiar.textContent = '✓ Copiado'; } catch { copiar.textContent = 'Selecione o texto e copie'; }
+    } }, 'Copiar dados de acesso');
+    enviar.addEventListener('click', async () => {
+      enviar.disabled = true;
+      enviar.textContent = 'Enviando... (até 20 s)';
+      try {
+        const e = await api('pessoas.php', { metodo: 'POST', corpo: { acao: 'enviar_acesso', id: r.id, senha: r.senha_provisoria, link_painel: linkPainel } });
+        resultado.replaceChildren(el('p', { class: 'envio-ok' }, `✓ E-mail enviado para ${e.email}. Peça para a pessoa olhar também a caixa de spam.`));
+        enviar.textContent = 'Enviar de novo';
+      } catch (e) {
+        resultado.replaceChildren(el('div', { class: e.codigo === 'EMAIL_NAO_CONFIGURADO' ? 'envio-aviso' : '' },
+          el('p', { class: e.codigo === 'EMAIL_NAO_CONFIGURADO' ? '' : 'erro' }, e.codigo === 'EMAIL_NAO_CONFIGURADO'
+            ? 'O e-mail do sistema ainda não foi configurado (bloco "E-mail", abaixo). Por enquanto, copie os dados e mande pelo WhatsApp.' : e.message)));
+        enviar.textContent = `✉ Tentar de novo para ${r.email}`;
+      }
+      enviar.disabled = false;
+    });
+    area.replaceChildren(el('div', { class: 'token-box acesso-box' },
+      el('strong', { class: 'acesso-box__titulo' }, `Acesso pronto para ${r.email}`),
+      el('p', { class: 'suave' }, 'A senha só aparece aqui agora. No primeiro login o painel pede para a pessoa criar a própria senha.'),
+      el('pre', { class: 'exemplo mono' }, texto),
+      el('div', { class: 'acoes' }, enviar, copiar),
+      resultado));
+    if (enviarJa) enviar.click();
+  }
+
+  async function acao(corpo, confirmar, enviarJa = false) {
+    if (confirmar && !confirm(confirmar)) return;
+    try {
+      const r = await api('pessoas.php', { metodo: 'POST', corpo });
+      if (r.senha_provisoria) mostrarSenha(r, enviarJa); else area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      await recarregar();
+    } catch (e) {
+      area.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  async function recarregar() {
+    try {
+      const r = await api('pessoas.php');
+      if (!r.pessoas.length) {
+        lista.replaceChildren(el('p', { class: 'aviso' }, 'Ninguém cadastrado ainda: hoje só a chave de emergência entra. Cadastre você primeiro.'));
+        return;
+      }
+      lista.replaceChildren(el('table', { class: 'mini' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
+        el('tbody', {}, ...r.pessoas.map((p) => el('tr', {},
+          el('td', {}, p.nome, p.id === r.eu ? el('span', { class: 'suave' }, ' (você)') : null),
+          el('td', {}, p.email),
+          el('td', {}, p.ultimo_acesso ? dataHora(p.ultimo_acesso) : 'nunca entrou'),
+          el('td', {}, !p.ativo ? el('span', { class: 'ruim' }, 'Desativada') : (p.bloqueado ? el('span', { class: 'aviso' }, 'Bloqueada (senhas erradas)')
+            : (p.trocar_senha ? 'Aguardando 1º acesso' : 'Ativa'))),
+          el('td', {},
+            p.ativo && p.id !== r.eu ? el('button', { class: 'botao botao--forte', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail',
+              onclick: () => acao({ acao: 'redefinir_senha', id: p.id }, `Enviar o acesso ao painel para ${p.email}?\n\nO sistema gera uma senha provisória nova e manda por e-mail. A senha atual dessa pessoa para de funcionar.`, true) },
+            '✉ Enviar acesso por e-mail') : null, ' ',
+            p.id !== r.eu ? el('button', { class: 'botao' + (p.ativo ? ' botao--perigo' : ''), type: 'button',
+              onclick: () => acao({ acao: p.ativo ? 'desativar' : 'ativar', id: p.id }, p.ativo ? `Desativar o acesso de ${p.email} ao painel?` : null) },
+            p.ativo ? 'Desativar' : 'Reativar') : el('button', { class: 'botao', type: 'button', onclick: () => abrirMinhaSenha() }, 'Trocar minha senha')))))));
+    } catch (e) {
+      lista.replaceChildren(el('p', { class: e.message.includes('Atualizar banco') ? 'aviso' : 'erro' }, e.message));
+    }
+  }
+
+  const botao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Cadastrar pessoa');
+  botao.addEventListener('click', async () => {
+    mensagem.textContent = '';
+    if (nome.value.trim().length < 2 || !email.checkValidity() || !email.value) {
+      mensagem.className = 'erro';
+      mensagem.textContent = 'Informe o nome e um e-mail válido.';
+      return;
+    }
+    botao.disabled = true;
+    await acao({ acao: 'criar', nome: nome.value, email: email.value }, null, porEmail.checked);
+    if (area.querySelector('.acesso-box')) { nome.value = ''; email.value = ''; }
+    botao.disabled = false;
+  });
+
+  recarregar();
+  return el('section', { class: 'secao', id: 'secao-pessoas' },
+    el('h3', {}, 'Pessoas do painel'),
+    el('p', { class: 'suave' }, 'Quem entra neste painel. Cada pessoa usa o próprio e-mail e senha, e o histórico mostra quem fez cada mudança.'),
+    lista,
+    el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
+    el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
+    el('div', { class: 'acoes' }, botao, mensagem),
+    area);
+}
+
+/** Janela "Minha senha" (botao com o nome, no topo). */
+function abrirMinhaSenha() {
+  const atual = el('input', { type: 'password', autocomplete: 'current-password' });
+  const nova = el('input', { type: 'password', autocomplete: 'new-password' });
+  const repetir = el('input', { type: 'password', autocomplete: 'new-password' });
+  const retorno = el('div', {});
+  const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Trocar senha');
+  salvar.addEventListener('click', async () => {
+    if (nova.value !== repetir.value) { retorno.replaceChildren(el('p', { class: 'erro' }, 'As duas senhas novas não são iguais.')); return; }
+    salvar.disabled = true;
+    try {
+      const r = await api('minha_senha.php', { metodo: 'POST', corpo: { atual: atual.value, nova: nova.value } });
+      atual.value = nova.value = repetir.value = '';
+      retorno.replaceChildren(el('p', { class: 'envio-ok' }, '✓ ' + r.mensagem + ' Os seus logins em outros computadores foram encerrados.'));
+    } catch (e) {
+      retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+    salvar.disabled = false;
+  });
+  abrirModal('Minha senha', estado.pessoa ? `${estado.pessoa.nome} · ${estado.pessoa.email}` : '', [
+    el('section', { class: 'secao' },
+      el('div', { class: 'campos' },
+        el('label', {}, 'Senha atual', atual), el('label', {}, 'Nova senha', nova), el('label', {}, 'Repita a nova senha', repetir)),
+      el('p', { class: 'suave' }, 'Pelo menos 8 caracteres, com letras e números.'),
+      el('div', { class: 'acoes' }, salvar),
+      retorno),
+  ]);
+}
+
+// ---- Tela de login ----
+$('trocar-modo-acesso').addEventListener('click', () => {
+  estado.modoChave = !estado.modoChave;
+  $('acesso-pessoa').hidden = estado.modoChave;
+  $('acesso-chave').hidden = !estado.modoChave;
+  $('acesso-explica').textContent = estado.modoChave
+    ? 'Chave de emergência: o admin_token do arquivo config/nfse.local.php. Use para cadastrar a primeira pessoa ou se ninguém conseguir entrar.'
+    : 'Entre com o seu e-mail e a sua senha.';
+  $('trocar-modo-acesso').textContent = estado.modoChave ? 'Entrar com e-mail e senha' : 'Entrar com a chave de emergência';
+  $('erro-acesso').hidden = true;
+  (estado.modoChave ? $('campo-token') : $('campo-email')).focus();
+});
+
 $('form-acesso').addEventListener('submit', async (evento) => {
   evento.preventDefault();
-  const token = $('campo-token').value.trim();
+  const erro = $('erro-acesso');
+  erro.hidden = true;
+  const lembrar = $('campo-lembrar').checked;
   try {
+    let token;
+    if (estado.modoChave) {
+      token = $('campo-token').value.trim();
+      if (!token) throw new Error('Cole a chave de emergência.');
+      const teste = await fetch(API + 'entrar.php', { headers: { 'X-ADMIN-TOKEN': token } });
+      if (teste.status === 401) throw new Error('Chave de emergência incorreta.');
+    } else {
+      const email = $('campo-email').value.trim();
+      const senha = $('campo-senha').value;
+      if (!email || !senha) throw new Error('Informe o e-mail e a senha.');
+      const resposta = await fetch(API + 'entrar.php', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha, lembrar }) });
+      const json = await resposta.json().catch(() => ({}));
+      if (!resposta.ok) throw new Error(json.erro?.mensagem || `HTTP ${resposta.status}`);
+      token = json.token;
+      estado.senhaDigitada = senha;
+    }
+    salvarToken(token, lembrar);
     await entrar(token);
-    salvarToken(token, $('campo-lembrar').checked);
   } catch (e) {
-    if (e.message !== 'nao autorizado') sair(e.message);
+    if (e.message === 'nao autorizado') return;
+    // Chave errada: api() ja voltou para esta tela; mostra o motivo.
+    erro.textContent = e.message;
+    erro.hidden = false;
   }
 });
+
+$('form-nova-senha').addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  const erro = $('erro-nova-senha');
+  erro.hidden = true;
+  const nova = $('campo-senha-nova').value;
+  if (nova !== $('campo-senha-repetir').value) { erro.textContent = 'As duas senhas novas não são iguais.'; erro.hidden = false; return; }
+  try {
+    await api('minha_senha.php', { metodo: 'POST', corpo: { atual: $('campo-senha-atual').value, nova } });
+    estado.senhaDigitada = '';
+    for (const id of ['campo-senha-atual', 'campo-senha-nova', 'campo-senha-repetir']) $(id).value = '';
+    $('form-nova-senha').hidden = true;
+    $('form-acesso').hidden = false;
+    await entrar(estado.token);
+  } catch (e) {
+    if (e.message === 'nao autorizado') return;
+    // Senha provisoria errada: mostra o campo para digitar de novo.
+    if (/atual/i.test(e.message)) { $('nova-senha-atual').hidden = false; estado.senhaDigitada = ''; }
+    erro.textContent = e.message;
+    erro.hidden = false;
+  }
+});
+$('nova-senha-sair').addEventListener('click', () => sair());
+$('botao-eu').addEventListener('click', () => abrirMinhaSenha());
 $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
@@ -1477,4 +1731,5 @@ $('filtro-situacao').addEventListener('change', (e) => { estado.filtroSituacao =
   const salvo = lerTokenSalvo();
   if (!salvo) { sair(); return; }
   try { await entrar(salvo); } catch (e) { if (e.message !== 'nao autorizado') sair(e.message); }
+  $('campo-email').focus();
 })();

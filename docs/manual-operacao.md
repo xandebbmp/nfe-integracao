@@ -491,7 +491,30 @@ if (!crypto.timingSafeEqual(Buffer.from(esperado), Buffer.from(req.headers['x-nf
 
 ## 12. Painel admin
 
-Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
+Endereço: `https://SEU_DOMINIO/admin/`. Cada pessoa entra com o **próprio
+e-mail e senha** (script `0014`).
+
+### Quem entra no painel
+
+- **Pessoas do painel** (tela **Sistema**): cadastre nome e e-mail. O sistema
+  gera uma senha provisória e (com a caixa marcada) manda por e-mail; no
+  primeiro login a pessoa cria a própria senha. Na lista: **✉ Enviar acesso
+  por e-mail** (senha nova + e-mail num clique), **Desativar**/**Reativar**.
+  Ninguém desativa a si mesmo.
+- **5 senhas erradas** bloqueiam a pessoa por 15 minutos. Para destravar na
+  hora, outra pessoa usa **✉ Enviar acesso por e-mail**.
+- Login de 12 horas, ou 30 dias com **Manter conectado**. Trocar a senha (botão
+  com o nome, no topo) encerra os logins em outros computadores.
+- **Chave de emergência:** o `admin_token` de `config/nfse.local.php` ainda
+  entra (link "Entrar com a chave de emergência"). Use para cadastrar a
+  primeira pessoa ou se ninguém conseguir entrar; o painel mostra um aviso.
+- O **histórico** (da empresa e da tela Sistema) mostra **quem** fez cada
+  mudança: o nome da pessoa ou "Chave de emergência".
+- O banco guarda só o hash das senhas e o sha256 dos logins.
+
+**Primeira vez:** entre com a chave de emergência, clique em **Atualizar
+banco** (Sistema), cadastre você em **Pessoas do painel**, saia e entre com
+o seu e-mail.
 
 ### O que a tela mostra
 
@@ -515,7 +538,7 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   - numeração de cada série (último usado e próxima nota);
   - uso dos últimos 12 meses;
   - documentos do mês por status;
-  - histórico de alterações, com data e IP.
+  - histórico de alterações, com data, IP e quem fez.
 
 ### Colocar uma empresa nova para emitir
 
