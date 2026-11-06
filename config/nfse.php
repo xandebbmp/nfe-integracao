@@ -164,6 +164,23 @@ $cfg = [
     // Gere UMA vez com:  php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'
     // Guarde copia com os backups (sem ela, os certificados precisam ser reenviados).
     'chave_certificados' => '',
+
+    // Portal do cliente (/portal/): a empresa entra com e-mail e senha e
+    // emite a propria NFS-e. Usuarios sao criados no painel admin.
+    'portal' => [
+        // Sessao normal (minutos) e com "manter conectado" (dias).
+        'sessao_minutos' => 720,
+        'sessao_lembrar_dias' => 30,
+        // Senhas erradas seguidas antes de bloquear, e por quantos minutos.
+        'tentativas_login' => 5,
+        'bloqueio_minutos' => 15,
+        // Vazio = Nacional (ou Salvador, se for o unico contratado).
+        // 'NACIONAL' ou 'SALVADOR' forca para todas as empresas.
+        'padrao' => '',
+        // Consultas publicas para preencher o tomador sozinho.
+        'url_cnpj' => 'https://brasilapi.com.br/api/cnpj/v1/{cnpj}',
+        'url_cep' => 'https://viacep.com.br/ws/{cep}/json/',
+    ],
 ];
 
 $localConfigFile = __DIR__ . '/nfse.local.php';
