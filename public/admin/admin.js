@@ -436,7 +436,8 @@ function desenharCliente(c) {
     c.prontidao ? secaoProntidao(c.prontidao) : null,
     form,
     recolhivel('Certificado digital', certificado, !c.tem_certificado, secaoCertificado(c)),
-    recolhivel('Acesso à API e portal', c.tem_token ? 'token ativo' : 'sem token', false, secaoToken(c), secaoPortal(c)),
+    recolhivel('Portal do cliente', 'quem entra no portal · enviar acesso por e-mail', true, secaoPortal(c)),
+    recolhivel('Acesso à API (token)', c.tem_token ? 'token ativo' : 'sem token', false, secaoToken(c)),
     recolhivel('Numeração', series ? `${series} série(s) em uso` : 'nenhuma nota ainda', false, secaoNumeracao(c)),
     recolhivel('Uso e histórico', `${c.autorizadas_mes?.total ?? 0} nota(s) autorizada(s) no mês`, false, secaoUso(c), secaoHistorico(c)),
   ], { rodape });
