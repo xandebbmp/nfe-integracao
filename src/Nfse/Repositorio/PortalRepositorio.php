@@ -239,21 +239,27 @@ final class PortalRepositorio
         return $this->uma('SELECT * FROM portal_tomadores WHERE cnpj = :cnpj AND cpf_cnpj = :doc', [':cnpj' => $cnpj, ':doc' => $cpfCnpj]);
     }
 
-    /** Cria ou atualiza o tomador (chave: empresa + CPF/CNPJ). */
-    public function salvarTomador(string $cnpj, array $t): void
+    /**
+     * Cria ou atualiza o tomador (chave: empresa + CPF/CNPJ).
+     * $emissao = true: veio de uma nota (sobe na lista de mais usados).
+     * $emissao = false: edicao na tela Tomadores (nao mexe na ordem).
+     */
+    public function salvarTomador(string $cnpj, array $t, bool $emissao = true): void
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO portal_tomadores (cnpj, cpf_cnpj, nome, email, telefone, cep, logradouro, numero, complemento,
                     bairro, codigo_municipio, cidade, uf, ultima_emissao)
              VALUES (:cnpj, :doc, :nome, :email, :telefone, :cep, :logradouro, :numero, :complemento,
-                    :bairro, :municipio, :cidade, :uf, CURRENT_TIMESTAMP)
+                    :bairro, :municipio, :cidade, :uf, CASE WHEN CAST(:emissao AS BOOLEAN) THEN CURRENT_TIMESTAMP END)
              ON CONFLICT (cnpj, cpf_cnpj) DO UPDATE
                 SET nome = EXCLUDED.nome, email = EXCLUDED.email, telefone = EXCLUDED.telefone, cep = EXCLUDED.cep,
                     logradouro = EXCLUDED.logradouro, numero = EXCLUDED.numero, complemento = EXCLUDED.complemento,
                     bairro = EXCLUDED.bairro, codigo_municipio = EXCLUDED.codigo_municipio, cidade = EXCLUDED.cidade,
-                    uf = EXCLUDED.uf, ultima_emissao = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP'
+                    uf = EXCLUDED.uf, ultima_emissao = COALESCE(EXCLUDED.ultima_emissao, portal_tomadores.ultima_emissao),
+                    atualizado_em = CURRENT_TIMESTAMP'
         );
         $stmt->execute([
+            ':emissao' => $emissao ? 'true' : 'false',
             ':cnpj' => $cnpj,
             ':doc' => $t['cpf_cnpj'],
             ':nome' => $t['nome'],
@@ -328,5 +334,80 @@ final class PortalRepositorio
         $s['aliquota_iss'] = $s['aliquota_iss'] !== null ? (float)$s['aliquota_iss'] : null;
         $s['valor_padrao'] = $s['valor_padrao'] !== null ? (float)$s['valor_padrao'] : null;
         return $s;
+    }
+    public function removerTomador(string $cnpj, string $cpfCnpj): bool
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM portal_tomadores WHERE cnpj = :cnpj AND cpf_cnpj = :doc');
+        $stmt->execute([':cnpj' => $cnpj, ':doc' => $cpfCnpj]);
+        return $stmt->rowCount() === 1;
+    }
+
+    // ------------------------------------------------------------------
+    // Minhas notas (le nfse_documentos, a mesma tabela da API)
+    // ------------------------------------------------------------------
+
+    /**
+     * Notas de servico da empresa, mais novas primeiro.
+     *
+     * @param list<string> $padroes   ex.: ['NACIONAL', 'SALVADOR']
+     * @param list<string> $status    vazio = todos
+     * @param string       $busca     nome ou CPF/CNPJ do tomador, ou numero da NFS-e/DPS
+     * @param string       $mes       'AAAA-MM' ou vazio
+     * @return array{total: int, notas: list<array>}
+     */
+    public function notas(string $cnpj, int $tpAmb, array $padroes, array $status, string $busca, string $mes, int $limite, int $pular): array
+    {
+        $where = ['emitente_cnpj = :cnpj', 'tp_amb = :amb'];
+        $params = [':cnpj' => $cnpj, ':amb' => $tpAmb];
+        $where[] = 'padrao IN (' . $this->marcadores('p', $padroes, $params) . ')';
+        if ($status !== []) {
+            $where[] = 'status IN (' . $this->marcadores('s', $status, $params) . ')';
+        }
+        if ($busca !== '') {
+            $where[] = "(payload->'tomador'->>'nome' ILIKE :busca_nome OR payload->'tomador'->>'cpf_cnpj' LIKE :busca_doc
+                         OR numero_nfse = :busca_nfse OR numero::text = :busca_dps)";
+            $params[':busca_nome'] = '%' . $busca . '%';
+            $params[':busca_doc'] = '%' . (preg_replace('/\D/', '', $busca) ?: $busca) . '%';
+            $params[':busca_nfse'] = $busca;
+            $params[':busca_dps'] = $busca;
+        }
+        if (preg_match('/^\d{4}-\d{2}$/', $mes)) {
+            $where[] = "criado_em >= to_date(:mes_ini, 'YYYY-MM') AND criado_em < to_date(:mes_fim, 'YYYY-MM') + INTERVAL '1 month'";
+            $params[':mes_ini'] = $mes;
+            $params[':mes_fim'] = $mes;
+        }
+        $filtro = ' FROM nfse_documentos WHERE ' . implode(' AND ', $where);
+
+        $contar = $this->pdo->prepare('SELECT count(*)' . $filtro);
+        $contar->execute($params);
+
+        $stmt = $this->pdo->prepare('SELECT *' . $filtro . ' ORDER BY criado_em DESC, numero DESC LIMIT :limite OFFSET :pular');
+        foreach ($params as $nome => $valor) {
+            $stmt->bindValue($nome, $valor, is_int($valor) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $stmt->bindValue(':pular', $pular, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $notas = array_map(static function (array $d): array {
+            $d['payload'] = json_decode((string)$d['payload'], true) ?? [];
+            $d['mensagens'] = json_decode((string)($d['mensagens'] ?? '[]'), true) ?? [];
+            $d['tp_amb'] = (int)$d['tp_amb'];
+            $d['numero'] = $d['numero'] === null ? null : (int)$d['numero'];
+            return $d;
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+
+        return ['total' => (int)$contar->fetchColumn(), 'notas' => $notas];
+    }
+
+    /** ":p0, :p1..." para um IN (...), ja colocando os valores em $params. */
+    private function marcadores(string $prefixo, array $valores, array &$params): string
+    {
+        $nomes = [];
+        foreach (array_values($valores) as $i => $valor) {
+            $nomes[] = ":{$prefixo}{$i}";
+            $params[":{$prefixo}{$i}"] = (string)$valor;
+        }
+        return $nomes === [] ? 'NULL' : implode(', ', $nomes);
     }
 }

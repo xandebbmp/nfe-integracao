@@ -395,17 +395,99 @@
               </div>
             </form>
           </section>
+          <!-- ===== Minhas notas ===== -->
           <section data-pagina="notas" data-titulo="Minhas notas" hidden>
-            <div class="cartao vazio"><i class="icone">receipt_long</i><h2>Minhas notas</h2><p class="secundario">Lista com status em tempo real, PDF, XML e cancelamento (fase 1).</p></div>
+            <div class="pagina-lista">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Minhas notas</h1>
+                  <p class="secundario" id="notas-subtitulo">Todas as NFS-e da sua empresa, do portal ou do seu sistema.</p>
+                </div>
+                <a href="#emitir" class="btn btn--primario"><i class="icone icone--p">add</i> Nova NFS-e</a>
+              </div>
+
+              <div class="cartao filtros">
+                <div class="chips" role="group" aria-label="Situação" id="notas-filtro-status">
+                  <button type="button" class="chip" data-status="" aria-pressed="true">Todas</button>
+                  <button type="button" class="chip" data-status="AUTORIZADAS" aria-pressed="false">Autorizadas</button>
+                  <button type="button" class="chip" data-status="EM_ANDAMENTO" aria-pressed="false">Na prefeitura</button>
+                  <button type="button" class="chip" data-status="COM_PROBLEMA" aria-pressed="false">Com problema</button>
+                  <button type="button" class="chip" data-status="CANCELADAS" aria-pressed="false">Canceladas</button>
+                </div>
+                <div class="filtros__campos">
+                  <label class="busca"><i class="icone icone--p">search</i>
+                    <input id="notas-busca" type="search" placeholder="Tomador, CPF/CNPJ ou número" aria-label="Buscar notas">
+                  </label>
+                  <input id="notas-mes" type="month" aria-label="Mês de emissão" title="Mês de emissão">
+                </div>
+              </div>
+
+              <div class="cartao">
+                <div class="tabela-rolagem">
+                  <table class="tabela tabela--clicavel">
+                    <thead>
+                      <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th>Status</th><th><span class="so-leitor">Arquivos</span></th></tr>
+                    </thead>
+                    <tbody id="notas-linhas"></tbody>
+                  </table>
+                </div>
+                <div class="paginacao" id="notas-paginacao" hidden>
+                  <span id="notas-contagem" class="secundario"></span>
+                  <div>
+                    <button type="button" class="btn btn--secundario" id="notas-anterior"><i class="icone icone--p">chevron_left</i> Anterior</button>
+                    <button type="button" class="btn btn--secundario" id="notas-proxima">Próxima <i class="icone icone--p">chevron_right</i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
           <section data-pagina="recorrencias" data-titulo="Recorrências" hidden>
             <div class="cartao vazio"><i class="icone">event_repeat</i><h2>Recorrências</h2><p class="secundario">Notas mensais automáticas (fase 3).</p></div>
           </section>
+          <!-- ===== Tomadores ===== -->
           <section data-pagina="tomadores" data-titulo="Tomadores" hidden>
-            <div class="cartao vazio"><i class="icone">groups</i><h2>Tomadores</h2><p class="secundario">Clientes salvos para não redigitar (fase 2).</p></div>
+            <div class="pagina-lista">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Tomadores</h1>
+                  <p class="secundario">Quem recebe as suas notas. Cada tomador é salvo sozinho na primeira emissão.</p>
+                </div>
+                <button type="button" class="btn btn--primario" id="botao-novo-tomador"><i class="icone icone--p">person_add</i> Novo tomador</button>
+              </div>
+
+              <div class="cartao filtros">
+                <div class="filtros__campos">
+                  <label class="busca"><i class="icone icone--p">search</i>
+                    <input id="tomadores-busca" type="search" placeholder="Nome ou CPF/CNPJ" aria-label="Buscar tomadores">
+                  </label>
+                </div>
+              </div>
+
+              <div class="cartao">
+                <div class="tabela-rolagem">
+                  <table class="tabela">
+                    <thead>
+                      <tr><th>Nome</th><th>CPF/CNPJ</th><th>E-mail</th><th>Cidade</th><th>Última nota</th><th class="direita"><span class="so-leitor">Ações</span></th></tr>
+                    </thead>
+                    <tbody id="tomadores-linhas"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </section>
+
+          <!-- ===== Servicos ===== -->
           <section data-pagina="servicos" data-titulo="Serviços" hidden>
-            <div class="cartao vazio"><i class="icone">design_services</i><h2>Serviços</h2><p class="secundario">Serviços com código fiscal e alíquota salvos (fase 2).</p></div>
+            <div class="pagina-lista">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Serviços</h1>
+                  <p class="secundario">Os serviços que você fatura, com os códigos fiscais. Na nota é só escolher.</p>
+                </div>
+                <button type="button" class="btn btn--primario" id="botao-novo-servico"><i class="icone icone--p">add</i> Novo serviço</button>
+              </div>
+              <div class="cartoes-servico" id="servicos-lista"></div>
+            </div>
           </section>
           <section data-pagina="empresa" data-titulo="Minha empresa" hidden>
             <div class="cartao vazio"><i class="icone">business</i><h2>Minha empresa</h2><p class="secundario">Dados fiscais, certificado e plano (somente leitura).</p></div>
@@ -418,6 +500,85 @@
       </main>
     </div>
   </div>
+
+  <!-- =====================================================================
+       JANELAS (dialog): detalhe da nota, cadastro de servico e de tomador
+       ===================================================================== -->
+  <dialog id="janela-nota" class="janela janela--larga" aria-labelledby="nota-titulo">
+    <div class="janela__cabeca">
+      <div><h2 id="nota-titulo">Nota</h2><p class="secundario" id="nota-subtitulo"></p></div>
+      <button type="button" class="btn btn--icone" data-fechar aria-label="Fechar"><i class="icone">close</i></button>
+    </div>
+    <div class="janela__corpo" id="nota-corpo"></div>
+  </dialog>
+
+  <dialog id="janela-servico" class="janela" aria-labelledby="servico-titulo">
+    <form id="form-servico" class="emitir" novalidate>
+      <div class="janela__cabeca">
+        <h2 id="servico-titulo">Novo serviço</h2>
+        <button type="button" class="btn btn--icone" data-fechar aria-label="Fechar"><i class="icone">close</i></button>
+      </div>
+      <div class="janela__corpo">
+        <input type="hidden" id="srvf-id">
+        <div class="linha-campos">
+          <div class="campo campo--largo"><label for="srvf-nome">Nome para achar na lista</label><input id="srvf-nome" maxlength="120" placeholder="Ex.: Consultoria mensal"></div>
+          <div class="campo campo--terco"><label for="srvf-valor">Valor de costume</label>
+            <div class="campo__moeda"><span>R$</span><input id="srvf-valor" inputmode="decimal" placeholder="opcional"></div></div>
+        </div>
+        <div class="campo"><label for="srvf-descricao">Descrição que vai na nota</label>
+          <textarea id="srvf-descricao" maxlength="2000" placeholder="Ex.: Consultoria em gestão referente a {mes}"></textarea>
+          <small class="dica">Escreva <b>{mes}</b> e ele vira o mês da nota (ex.: novembro/2026).</small></div>
+        <div class="linha-campos">
+          <div class="campo campo--terco"><label for="srvf-nacional">Código nacional</label><input id="srvf-nacional" inputmode="numeric" maxlength="8" placeholder="010101"></div>
+          <div class="campo campo--terco"><label for="srvf-item">Item da LC 116</label><input id="srvf-item" maxlength="5" placeholder="01.01"></div>
+          <div class="campo campo--terco"><label for="srvf-aliquota">Alíquota do ISS (%)</label><input id="srvf-aliquota" inputmode="decimal" placeholder="2,00"></div>
+        </div>
+        <details class="mais">
+          <summary>Mais códigos <span class="apagado">só se a prefeitura pedir</span></summary>
+          <div class="linha-campos">
+            <div class="campo campo--meio"><label for="srvf-municipal">Código municipal</label><input id="srvf-municipal" maxlength="20"></div>
+            <div class="campo campo--meio"><label for="srvf-cnae">CNAE</label><input id="srvf-cnae" inputmode="numeric" maxlength="9"></div>
+          </div>
+        </details>
+        <p id="servico-erro" class="erro" role="alert" hidden></p>
+      </div>
+      <div class="janela__rodape">
+        <button type="button" class="btn btn--secundario" data-fechar>Cancelar</button>
+        <button type="submit" class="btn btn--primario" id="botao-salvar-servico"><i class="icone icone--p">save</i> Salvar serviço</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="janela-tomador" class="janela" aria-labelledby="tomador-titulo">
+    <form id="form-tomador" class="emitir" novalidate>
+      <div class="janela__cabeca">
+        <h2 id="tomador-titulo">Novo tomador</h2>
+        <button type="button" class="btn btn--icone" data-fechar aria-label="Fechar"><i class="icone">close</i></button>
+      </div>
+      <div class="janela__corpo">
+        <div class="linha-campos">
+          <div class="campo campo--meio"><label for="tomf-doc">CPF ou CNPJ</label><input id="tomf-doc" inputmode="numeric" maxlength="18" autocomplete="off">
+            <small class="dica" id="tomf-doc-info">Com CNPJ, nome e endereço vêm sozinhos.</small></div>
+          <div class="campo campo--meio"><label for="tomf-nome">Nome / razão social</label><input id="tomf-nome" maxlength="150"></div>
+          <div class="campo campo--meio"><label for="tomf-email">E-mail</label><input id="tomf-email" type="email"></div>
+          <div class="campo campo--meio"><label for="tomf-telefone">Telefone</label><input id="tomf-telefone" inputmode="tel" maxlength="20"></div>
+        </div>
+        <div class="linha-campos">
+          <div class="campo campo--terco"><label for="tomf-cep">CEP</label><input id="tomf-cep" inputmode="numeric" maxlength="9" placeholder="00000-000"></div>
+          <div class="campo campo--largo"><label for="tomf-logradouro">Logradouro</label><input id="tomf-logradouro"></div>
+          <div class="campo campo--terco"><label for="tomf-numero">Número</label><input id="tomf-numero"></div>
+          <div class="campo campo--largo"><label for="tomf-complemento">Complemento</label><input id="tomf-complemento"></div>
+          <div class="campo campo--meio"><label for="tomf-bairro">Bairro</label><input id="tomf-bairro"></div>
+          <div class="campo campo--meio"><label for="tomf-cidade">Cidade / UF</label><input id="tomf-cidade" readonly placeholder="pelo CEP"></div>
+        </div>
+        <p id="tomador-erro" class="erro" role="alert" hidden></p>
+      </div>
+      <div class="janela__rodape">
+        <button type="button" class="btn btn--secundario" data-fechar>Cancelar</button>
+        <button type="submit" class="btn btn--primario" id="botao-salvar-tomador"><i class="icone icone--p">save</i> Salvar tomador</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="portal.js"></script>
 </body>

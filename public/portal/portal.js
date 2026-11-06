@@ -9,7 +9,8 @@
      3. Menu, telas e tema
      4. Tela inicial
      5. Tela "Emitir nota"
-     6. Inicio do portal
+     6. Minhas notas, Servicos e Tomadores
+     7. Inicio do portal
 
    Demonstracao sem servidor: portal-demo.js define window.PORTAL_DEMO e
    responde no lugar da API (usado so na previa do layout).
@@ -321,6 +322,9 @@
     pararAtualizacao();
     if (nome === 'inicio') { carregarInicio(); }
     if (nome === 'emitir') { abrirEmissao(); }
+    if (nome === 'notas') { carregarNotas(); }
+    if (nome === 'servicos') { carregarListaServicos(); }
+    if (nome === 'tomadores') { carregarListaTomadores(); }
 
     fecharMenuCelular();
     window.scrollTo(0, 0);
@@ -474,13 +478,21 @@
     }
     carregarServicos();
     carregarTomadores();
+    // Veio da tela Tomadores ou do detalhe de uma nota: ja preenche o tomador.
+    if (tomadorPendente) {
+      el('tom-doc').value = tomadorPendente;
+      tomadorPendente = null;
+      buscarDocumento(true);
+    }
     atualizar();
   }
 
   function carregarServicos() {
     return api('GET', 'servicos.php').then(function (r) {
       servicos = r.servicos || [];
-      var escolhido = el('srv-salvo').value;
+      var pendente = servicoPendente;
+      servicoPendente = null;
+      var escolhido = pendente || el('srv-salvo').value;
       el('srv-salvo').innerHTML = (servicos.length ? '<option value="">Selecione um serviço salvo…</option>' : '')
         + servicos.map(function (s) {
           var codigo = s.item_lista_servico || s.codigo_tributacao_nacional || '';
@@ -491,7 +503,7 @@
       if (escolhido && el('srv-salvo').querySelector('option[value="' + escolhido + '"]')) { el('srv-salvo').value = escolhido; }
       else if (!servicos.length) { el('srv-salvo').value = 'novo'; }
       else if (servicos.length === 1) { el('srv-salvo').value = String(servicos[0].id); }
-      aplicarServico(false);
+      aplicarServico(!!pendente);
     }).catch(function () { /* lista vazia: segue com "Outro servico" */ });
   }
 
@@ -850,7 +862,524 @@
   });
 
   // ==================================================================
-  // 6. INICIO DO PORTAL
+  // 6. MINHAS NOTAS, SERVICOS E TOMADORES
+  // ==================================================================
+
+  // ---- Utilidades das telas de lista ----
+
+  /** Espera a pessoa parar de digitar antes de buscar (evita uma chamada por letra). */
+  function depoisDeDigitar(funcao, ms) {
+    var timer = null;
+    return function () { clearTimeout(timer); timer = setTimeout(funcao, ms || 300); };
+  }
+
+  function abrirJanela(id) { var j = el(id); if (!j.open) { j.showModal(); } }
+  function fecharJanela(id) { var j = el(id); if (j.open) { j.close(); } }
+  document.querySelectorAll('dialog [data-fechar]').forEach(function (botao) {
+    botao.addEventListener('click', function () { botao.closest('dialog').close(); });
+  });
+  // Clicar fora da janela de detalhe tambem fecha.
+  el('janela-nota').addEventListener('click', function (evento) { if (evento.target === this) { this.close(); } });
+
+  /**
+   * Mostra os erros da API ao lado de cada campo de um formulario.
+   * mapa: nome do campo na API -> id do input. O que nao tiver campo vai para idGeral.
+   */
+  function mostrarErrosForm(form, erros, mapa, idGeral) {
+    form.querySelectorAll('.erro-campo').forEach(function (e) { e.remove(); });
+    form.querySelectorAll('.campo.invalido').forEach(function (c) { c.classList.remove('invalido'); });
+    mostrarErro(idGeral, '');
+    var semCampo = [];
+    (erros || []).forEach(function (e) {
+      var alvo = mapa[e.campo] && el(mapa[e.campo]);
+      if (!alvo) { semCampo.push(e.mensagem); return; }
+      var campo = alvo.closest('.campo');
+      campo.classList.add('invalido');
+      var msg = document.createElement('small');
+      msg.className = 'erro-campo';
+      msg.textContent = e.mensagem + (e.correcao ? ' ' + e.correcao : '');
+      campo.appendChild(msg);
+      var detalhes = alvo.closest('details');
+      if (detalhes) { detalhes.open = true; }
+    });
+    if (semCampo.length) { mostrarErro(idGeral, semCampo.join(' ')); }
+    var primeiro = form.querySelector('.campo.invalido input, .campo.invalido textarea');
+    if (primeiro) { primeiro.focus(); }
+  }
+
+  /** Troca o conteudo de um lugar por "Remover? Sim / Nao" (sem a caixa feia do navegador). */
+  function confirmarRemocao(lugar, pergunta, aoConfirmar) {
+    var antes = lugar.innerHTML;
+    lugar.innerHTML = '<span class="confirmar">' + escapar(pergunta)
+      + ' <button type="button" class="btn btn--perigo" data-sim>Remover</button>'
+      + '<button type="button" class="btn btn--secundario" data-nao>Não</button></span>';
+    lugar.querySelector('[data-nao]').addEventListener('click', function (evento) { evento.stopPropagation(); lugar.innerHTML = antes; });
+    lugar.querySelector('[data-sim]').addEventListener('click', function (evento) { evento.stopPropagation(); aoConfirmar(); });
+    lugar.querySelector('[data-nao]').focus();
+  }
+
+  // Ao sair de Servicos/Tomadores para emitir, a tela "Emitir nota" ja abre preenchida.
+  var servicoPendente = null;
+  var tomadorPendente = null;
+  function emitirCom(tipo, valor) {
+    if (tipo === 'servico') { servicoPendente = String(valor); } else { tomadorPendente = valor; }
+    window.location.hash = 'emitir';
+  }
+
+  // ---- Minhas notas ----
+  var filtroNotas = { status: '', busca: '', mes: '', pagina: 1 };
+
+  function carregarNotas() {
+    var q = 'status=' + encodeURIComponent(filtroNotas.status) + '&busca=' + encodeURIComponent(filtroNotas.busca)
+      + '&mes=' + encodeURIComponent(filtroNotas.mes) + '&pagina=' + filtroNotas.pagina;
+    el('notas-linhas').classList.add('carregando');
+    api('GET', 'notas.php?' + q).then(function (r) {
+      desenharListaNotas(r);
+      // Nota ainda na prefeitura: confere de novo daqui a pouco.
+      var andando = r.notas.some(function (n) { return !n.finalizado; });
+      pararAtualizacao();
+      if (andando && window.location.hash.replace('#', '') === 'notas') {
+        timerInicio = setTimeout(carregarNotas, ATUALIZAR_INICIO_MS);
+      }
+    }).catch(function (erro) {
+      if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
+    }).then(function () { el('notas-linhas').classList.remove('carregando'); });
+  }
+
+  function desenharListaNotas(r) {
+    var corpo = el('notas-linhas');
+    var filtrando = filtroNotas.status || filtroNotas.busca || filtroNotas.mes;
+    if (!r.notas.length) {
+      corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="6">' + (filtrando
+        ? 'Nenhuma nota com esses filtros. <a href="#notas" data-limpar>Limpar filtros</a>.'
+        : 'Nenhuma nota ainda. <a href="#emitir">Emita a primeira</a>.') + '</td></tr>';
+      var limpar = corpo.querySelector('[data-limpar]');
+      if (limpar) { limpar.addEventListener('click', function (evento) { evento.preventDefault(); limparFiltrosNotas(); }); }
+    } else {
+      corpo.innerHTML = r.notas.map(function (n) {
+        var numero = n.numero ? 'NFS-e ' + n.numero : (n.dps_rps ? 'DPS ' + n.dps_rps : '—');
+        var arquivos = n.links && n.links.pdf
+          ? '<a class="acao-arquivo" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener">PDF</a><a class="acao-arquivo" href="' + escapar(linkApi(n.links.xml)) + '">XML</a>'
+          : '';
+        return '<tr data-id="' + escapar(n.id) + '" tabindex="0">'
+          + '<td class="mono">' + escapar(numero) + '</td>'
+          + '<td>' + escapar(n.tomador || '—') + '<span class="sub mono">' + escapar(formatarDoc(n.tomador_documento || '')) + '</span></td>'
+          + '<td class="num">' + escapar(dataCurta(n.criado_em)) + '</td>'
+          + '<td class="direita num">' + reais(n.valor) + '</td>'
+          + '<td' + (n.motivo ? ' title="' + escapar(n.motivo) + '"' : '') + '>' + pilulaStatus(n.status) + '</td>'
+          + '<td class="acoes">' + arquivos + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+    el('notas-paginacao').hidden = r.total === 0;
+    el('notas-contagem').textContent = r.total + (r.total === 1 ? ' nota' : ' notas') + (r.paginas > 1 ? ' · página ' + r.pagina + ' de ' + r.paginas : '');
+    el('notas-anterior').disabled = r.pagina <= 1;
+    el('notas-proxima').disabled = r.pagina >= r.paginas;
+  }
+
+  function limparFiltrosNotas() {
+    filtroNotas = { status: '', busca: '', mes: '', pagina: 1 };
+    el('notas-busca').value = '';
+    el('notas-mes').value = '';
+    marcarChip('');
+    carregarNotas();
+  }
+
+  function marcarChip(status) {
+    el('notas-filtro-status').querySelectorAll('.chip').forEach(function (chip) {
+      chip.setAttribute('aria-pressed', chip.getAttribute('data-status') === status ? 'true' : 'false');
+    });
+  }
+
+  el('notas-filtro-status').addEventListener('click', function (evento) {
+    var chip = evento.target.closest('.chip');
+    if (!chip) { return; }
+    filtroNotas.status = chip.getAttribute('data-status');
+    filtroNotas.pagina = 1;
+    marcarChip(filtroNotas.status);
+    carregarNotas();
+  });
+  el('notas-busca').addEventListener('input', depoisDeDigitar(function () {
+    filtroNotas.busca = el('notas-busca').value.trim();
+    filtroNotas.pagina = 1;
+    carregarNotas();
+  }));
+  el('notas-mes').addEventListener('change', function () {
+    filtroNotas.mes = this.value;
+    filtroNotas.pagina = 1;
+    carregarNotas();
+  });
+  el('notas-anterior').addEventListener('click', function () { filtroNotas.pagina--; carregarNotas(); });
+  el('notas-proxima').addEventListener('click', function () { filtroNotas.pagina++; carregarNotas(); });
+
+  // Clique (ou Enter) na linha abre o detalhe. Os links de PDF/XML seguem normais.
+  function aoEscolherLinha(evento) {
+    if (evento.type === 'keydown' && evento.key !== 'Enter') { return; }
+    if (evento.target.closest('a, button')) { return; }
+    var linha = evento.target.closest('tr[data-id]');
+    if (linha) { abrirNota(linha.getAttribute('data-id')); }
+  }
+  el('notas-linhas').addEventListener('click', aoEscolherLinha);
+  el('notas-linhas').addEventListener('keydown', aoEscolherLinha);
+
+  function linhaDetalhe(rotulo, valor) {
+    if (valor === null || valor === undefined || valor === '') { return ''; }
+    return '<div><dt>' + escapar(rotulo) + '</dt><dd>' + escapar(valor) + '</dd></div>';
+  }
+
+  function abrirNota(id) {
+    el('nota-titulo').textContent = 'Carregando…';
+    el('nota-subtitulo').textContent = '';
+    el('nota-corpo').innerHTML = '';
+    abrirJanela('janela-nota');
+    api('GET', 'notas.php?id=' + encodeURIComponent(id)).then(function (r) {
+      desenharNota(r.nota);
+    }).catch(function (erro) {
+      el('nota-titulo').textContent = 'Nota';
+      el('nota-corpo').innerHTML = '<p class="erro">' + escapar(erro.message) + '</p>';
+    });
+  }
+
+  function desenharNota(n) {
+    var t = n.tomador_completo || {};
+    var end = t.endereco || {};
+    var s = n.servico || {};
+    var v = n.valores || {};
+    var bruto = Number(v.valor_servicos || 0);
+    var desconto = Number(v.desconto_incondicionado || 0);
+    var aliquota = Number(v.aliquota_iss || 0);
+    var iss = Math.round(Math.max(bruto - desconto, 0) * aliquota) / 100;
+    var federais = ['valor_ir', 'valor_inss', 'valor_pis', 'valor_cofins', 'valor_csll'].reduce(function (soma, campo) { return soma + Number(v[campo] || 0); }, 0);
+    var retencoes = federais + (v.iss_retido ? iss : 0);
+
+    el('nota-titulo').innerHTML = escapar(n.numero ? 'NFS-e nº ' + n.numero : (n.dps_rps ? 'DPS nº ' + n.dps_rps : 'Nota')) + ' ' + pilulaStatus(n.status);
+    el('nota-subtitulo').textContent = 'Enviada em ' + dataCurta(n.criado_em) + (n.padrao === 'SALVADOR' ? ' · Prefeitura de Salvador' : ' · Padrão Nacional');
+
+    var html = '';
+    // O que a prefeitura disse (rejeicao, erro) vem primeiro: e o que a pessoa precisa resolver.
+    if (n.mensagens && n.mensagens.length && n.status !== 'AUTORIZADO') {
+      html += '<div class="resultado resultado--' + (n.finalizado ? 'erro' : 'andamento') + '"><b>' + (n.finalizado ? 'O que a prefeitura disse' : 'Situação') + '</b>'
+        + n.mensagens.map(function (m) {
+          return '<span>' + escapar(m.mensagem || '') + (m.correcao ? ' <b>Como corrigir:</b> ' + escapar(m.correcao) : '') + (m.codigo ? ' <span class="apagado mono">(' + escapar(m.codigo) + ')</span>' : '') + '</span>';
+        }).join('') + '</div>';
+    } else if (!n.finalizado) {
+      html += '<div class="resultado resultado--andamento"><b>Na prefeitura</b><span>A nota ainda está sendo processada. Esta lista se atualiza sozinha.</span></div>';
+    }
+
+    var acoes = '';
+    if (n.links && n.links.pdf) {
+      acoes += '<a class="btn btn--primario" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener"><i class="icone icone--p">picture_as_pdf</i> Baixar PDF</a>'
+        + '<a class="btn btn--secundario" href="' + escapar(linkApi(n.links.xml)) + '"><i class="icone icone--p">code</i> Baixar XML</a>';
+    }
+    if (t.cpf_cnpj) {
+      acoes += '<button type="button" class="btn btn--secundario" data-emitir-para="' + escapar(t.cpf_cnpj) + '"><i class="icone icone--p">add</i> Nova nota para este tomador</button>';
+    }
+    if (acoes) { html += '<div class="detalhe__acoes">' + acoes + '</div>'; }
+
+    html += '<div class="detalhe">'
+      + '<section class="detalhe__bloco"><h3>Tomador</h3><dl>'
+      + linhaDetalhe('Nome', t.nome) + linhaDetalhe('CPF/CNPJ', formatarDoc(t.cpf_cnpj || '')) + linhaDetalhe('E-mail', t.email)
+      + linhaDetalhe('Endereço', [end.logradouro, end.numero].filter(Boolean).join(', '))
+      + linhaDetalhe('Cidade', end.uf ? (end.bairro ? end.bairro + ' · ' : '') + end.uf + (end.cep ? ' · ' + formatarCep(end.cep) : '') : '')
+      + '</dl></section>'
+      + '<section class="detalhe__bloco"><h3>Valores</h3><dl>'
+      + linhaDetalhe('Serviço', reais(bruto))
+      + (desconto ? linhaDetalhe('Desconto', '− ' + reais(desconto)) : '')
+      + linhaDetalhe('ISS ' + formatarValor(aliquota).replace(',00', '') + '%', reais(iss) + (v.iss_retido ? ' (retido)' : ''))
+      + (retencoes ? linhaDetalhe('Retenções', '− ' + reais(retencoes)) : '')
+      + '<div class="total"><dt>Líquido</dt><dd>' + reais(Math.max(bruto - desconto - retencoes, 0)) + '</dd></div>'
+      + '</dl></section>'
+      + '<section class="detalhe__bloco detalhe__bloco--largo"><h3>Serviço</h3>'
+      + '<p class="detalhe__texto">' + escapar(s.descricao || '—') + '</p><dl>'
+      + linhaDetalhe('Código nacional', s.codigo_tributacao_nacional) + linhaDetalhe('Item LC 116', s.item_lista_servico)
+      + linhaDetalhe('Código municipal', s.codigo_tributacao_municipal) + linhaDetalhe('CNAE', s.codigo_cnae)
+      + linhaDetalhe('Competência', mesPorExtenso(String(n.competencia || '').slice(0, 7)))
+      + '</dl></section>';
+    if (n.nfse) {
+      html += '<section class="detalhe__bloco detalhe__bloco--largo"><h3>Autorização</h3><dl>'
+        + linhaDetalhe('Número da NFS-e', n.nfse.numero) + linhaDetalhe('Autorizada em', dataCurta(n.nfse.data_autorizacao))
+        + linhaDetalhe('Código de verificação', n.nfse.codigo_verificacao) + linhaDetalhe('Chave de acesso', n.nfse.chave_acesso)
+        + '</dl></section>';
+    }
+    html += '</div>';
+    el('nota-corpo').innerHTML = html;
+
+    var botaoNova = el('nota-corpo').querySelector('[data-emitir-para]');
+    if (botaoNova) {
+      botaoNova.addEventListener('click', function () {
+        fecharJanela('janela-nota');
+        emitirCom('tomador', this.getAttribute('data-emitir-para'));
+      });
+    }
+  }
+
+  // ---- Servicos ----
+  var listaServicos = [];
+
+  function carregarListaServicos() {
+    api('GET', 'servicos.php').then(function (r) {
+      listaServicos = r.servicos || [];
+      desenharServicos();
+    }).catch(function (erro) {
+      if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
+    });
+  }
+
+  function desenharServicos() {
+    var caixa = el('servicos-lista');
+    if (!listaServicos.length) {
+      caixa.innerHTML = '<div class="cartao vazio" style="grid-column:1/-1"><i class="icone">design_services</i><h2>Nenhum serviço salvo</h2>'
+        + '<p class="secundario">Salve os serviços que você mais fatura. Na hora de emitir, é só escolher e os códigos vêm prontos.</p>'
+        + '<button type="button" class="btn btn--primario" data-novo><i class="icone icone--p">add</i> Cadastrar o primeiro</button></div>';
+      caixa.querySelector('[data-novo]').addEventListener('click', function () { abrirFormServico(null); });
+      return;
+    }
+    caixa.innerHTML = listaServicos.map(function (s) {
+      var codigos = [
+        s.codigo_tributacao_nacional ? 'Nacional ' + s.codigo_tributacao_nacional : '',
+        s.item_lista_servico ? 'LC 116 ' + s.item_lista_servico : '',
+        s.aliquota_iss !== null ? 'ISS ' + formatarValor(s.aliquota_iss).replace(',00', '') + '%' : ''
+      ].filter(Boolean).map(function (c) { return '<span class="pilula pilula--neutro">' + escapar(c) + '</span>'; }).join('');
+      return '<article class="cartao servico" data-id="' + s.id + '">'
+        + '<div class="servico__topo"><h3>' + escapar(s.nome) + '</h3>'
+        + (s.valor_padrao ? '<span class="servico__valor">' + reais(s.valor_padrao) + '</span>' : '') + '</div>'
+        + '<p class="servico__descricao">' + escapar(s.descricao) + '</p>'
+        + '<div class="servico__codigos">' + codigos + '</div>'
+        + '<div class="servico__acoes">'
+        + '<button type="button" class="btn btn--primario" data-acao="usar"><i class="icone icone--p">send</i> Usar na nota</button>'
+        + '<button type="button" class="btn btn--secundario" data-acao="editar"><i class="icone icone--p">edit</i> Editar</button>'
+        + '<button type="button" class="btn btn--icone" data-acao="remover" aria-label="Remover ' + escapar(s.nome) + '" title="Remover"><i class="icone">delete_outline</i></button>'
+        + '</div></article>';
+    }).join('');
+  }
+
+  el('servicos-lista').addEventListener('click', function (evento) {
+    var botao = evento.target.closest('[data-acao]');
+    if (!botao) { return; }
+    var cartao = botao.closest('[data-id]');
+    var id = Number(cartao.getAttribute('data-id'));
+    var s = listaServicos.filter(function (x) { return x.id === id; })[0];
+    var acao = botao.getAttribute('data-acao');
+    if (acao === 'usar') { emitirCom('servico', id); }
+    if (acao === 'editar') { abrirFormServico(s); }
+    if (acao === 'remover') {
+      confirmarRemocao(cartao.querySelector('.servico__acoes'), 'Remover da lista?', function () {
+        api('DELETE', 'servicos.php?id=' + id).then(function () {
+          avisar('Serviço removido. As notas já emitidas não mudam.');
+          carregarListaServicos();
+        }).catch(function (erro) { avisar(escapar(erro.message), 'error_outline'); });
+      });
+    }
+  });
+
+  var formServico = el('form-servico');
+  var CAMPOS_SERVICO = {
+    nome: 'srvf-nome', descricao: 'srvf-descricao', codigo_tributacao_nacional: 'srvf-nacional',
+    item_lista_servico: 'srvf-item', aliquota_iss: 'srvf-aliquota', valor_padrao: 'srvf-valor',
+    codigo_tributacao_municipal: 'srvf-municipal', codigo_cnae: 'srvf-cnae'
+  };
+
+  function abrirFormServico(s) {
+    formServico.reset();
+    mostrarErrosForm(formServico, [], {}, 'servico-erro');
+    el('servico-titulo').textContent = s ? 'Editar serviço' : 'Novo serviço';
+    el('srvf-id').value = s ? s.id : '';
+    if (s) {
+      el('srvf-nome').value = s.nome || '';
+      el('srvf-descricao').value = s.descricao || '';
+      el('srvf-nacional').value = s.codigo_tributacao_nacional || '';
+      el('srvf-item').value = s.item_lista_servico || '';
+      el('srvf-aliquota').value = s.aliquota_iss !== null ? formatarValor(s.aliquota_iss) : '';
+      el('srvf-valor').value = s.valor_padrao ? formatarValor(s.valor_padrao) : '';
+      el('srvf-municipal').value = s.codigo_tributacao_municipal || '';
+      el('srvf-cnae').value = s.codigo_cnae || '';
+      formServico.querySelector('details').open = !!(s.codigo_tributacao_municipal || s.codigo_cnae);
+    }
+    abrirJanela('janela-servico');
+    el('srvf-nome').focus();
+  }
+
+  el('botao-novo-servico').addEventListener('click', function () { abrirFormServico(null); });
+  el('srvf-valor').addEventListener('blur', function () { if (this.value.trim()) { this.value = formatarValor(lerValor(this.value)); } });
+
+  formServico.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var botao = el('botao-salvar-servico');
+    botao.disabled = true;
+    var corpo = {
+      nome: el('srvf-nome').value.trim(),
+      descricao: el('srvf-descricao').value.trim(),
+      codigo_tributacao_nacional: soNumeros(el('srvf-nacional').value),
+      item_lista_servico: el('srvf-item').value.trim(),
+      aliquota_iss: el('srvf-aliquota').value.trim() === '' ? '' : lerValor(el('srvf-aliquota').value),
+      valor_padrao: el('srvf-valor').value.trim() === '' ? '' : lerValor(el('srvf-valor').value),
+      codigo_tributacao_municipal: el('srvf-municipal').value.trim(),
+      codigo_cnae: soNumeros(el('srvf-cnae').value)
+    };
+    if (el('srvf-id').value) { corpo.id = Number(el('srvf-id').value); }
+    api('POST', 'servicos.php', corpo).then(function () {
+      fecharJanela('janela-servico');
+      avisar(corpo.id ? 'Serviço atualizado.' : 'Serviço salvo. Ele já aparece na tela de emitir.');
+      carregarListaServicos();
+    }).catch(function (erro) {
+      mostrarErrosForm(formServico, erro.erros, CAMPOS_SERVICO, 'servico-erro');
+      if (!erro.erros || !erro.erros.length) { mostrarErro('servico-erro', erro.message); }
+    }).then(function () { botao.disabled = false; });
+  });
+
+  // ---- Tomadores ----
+  var listaTomadores = [];
+
+  function carregarListaTomadores() {
+    var busca = el('tomadores-busca').value.trim();
+    api('GET', 'tomadores.php?busca=' + encodeURIComponent(busca)).then(function (r) {
+      listaTomadores = r.tomadores || [];
+      desenharTomadores(busca);
+    }).catch(function (erro) {
+      if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
+    });
+  }
+
+  function desenharTomadores(busca) {
+    var corpo = el('tomadores-linhas');
+    if (!listaTomadores.length) {
+      corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="6">' + (busca
+        ? 'Nenhum tomador encontrado para “' + escapar(busca) + '”.'
+        : 'Nenhum tomador ainda. Eles são salvos sozinhos quando você emite uma nota.') + '</td></tr>';
+      return;
+    }
+    corpo.innerHTML = listaTomadores.map(function (t) {
+      return '<tr data-doc="' + escapar(t.cpf_cnpj) + '">'
+        + '<td><b>' + escapar(t.nome) + '</b></td>'
+        + '<td class="mono">' + escapar(formatarDoc(t.cpf_cnpj)) + '</td>'
+        + '<td>' + escapar(t.email || '—') + '</td>'
+        + '<td>' + escapar(t.cidade ? t.cidade + (t.uf ? ' / ' + t.uf : '') : '—') + '</td>'
+        + '<td class="num">' + escapar(dataCurta(t.ultima_emissao) || '—') + '</td>'
+        + '<td class="acoes">'
+        + '<button type="button" class="btn btn--secundario" data-acao="emitir"><i class="icone icone--p">send</i> Emitir nota</button> '
+        + '<button type="button" class="btn btn--icone" data-acao="editar" aria-label="Editar ' + escapar(t.nome) + '" title="Editar"><i class="icone">edit</i></button>'
+        + '<button type="button" class="btn btn--icone" data-acao="remover" aria-label="Remover ' + escapar(t.nome) + '" title="Remover"><i class="icone">delete_outline</i></button>'
+        + '</td></tr>';
+    }).join('');
+  }
+
+  el('tomadores-busca').addEventListener('input', depoisDeDigitar(carregarListaTomadores));
+
+  el('tomadores-linhas').addEventListener('click', function (evento) {
+    var botao = evento.target.closest('[data-acao]');
+    if (!botao) { return; }
+    var linha = botao.closest('tr');
+    var doc = linha.getAttribute('data-doc');
+    var t = listaTomadores.filter(function (x) { return x.cpf_cnpj === doc; })[0];
+    var acao = botao.getAttribute('data-acao');
+    if (acao === 'emitir') { emitirCom('tomador', doc); }
+    if (acao === 'editar') { abrirFormTomador(t); }
+    if (acao === 'remover') {
+      confirmarRemocao(botao.closest('td'), 'Tirar da lista?', function () {
+        api('DELETE', 'tomadores.php?cpf_cnpj=' + doc).then(function (r) {
+          avisar(escapar(r.mensagem || 'Tomador removido.'));
+          carregarListaTomadores();
+        }).catch(function (erro) { avisar(escapar(erro.message), 'error_outline'); });
+      });
+    }
+  });
+
+  var formTomador = el('form-tomador');
+  var dadosTomadorForm = {};   // UF e codigo IBGE vindos da consulta do CEP
+  var CAMPOS_TOMADOR = { cpf_cnpj: 'tomf-doc', nome: 'tomf-nome', email: 'tomf-email', cep: 'tomf-cep', uf: 'tomf-cidade' };
+
+  function preencherFormTomador(t, soVazios) {
+    var pares = { 'tomf-nome': t.nome, 'tomf-email': t.email, 'tomf-telefone': t.telefone, 'tomf-cep': formatarCep(t.cep || ''),
+      'tomf-logradouro': t.logradouro, 'tomf-numero': t.numero, 'tomf-complemento': t.complemento, 'tomf-bairro': t.bairro,
+      'tomf-cidade': t.cidade ? t.cidade + ' / ' + (t.uf || '') : '' };
+    Object.keys(pares).forEach(function (id) {
+      if (pares[id] && (!soVazios || !el(id).value)) { el(id).value = pares[id]; }
+    });
+    dadosTomadorForm = { uf: t.uf || '', codigo_municipio: t.codigo_municipio || '', cidade: t.cidade || '', cep: t.cep || '' };
+  }
+
+  function abrirFormTomador(t) {
+    formTomador.reset();
+    mostrarErrosForm(formTomador, [], {}, 'tomador-erro');
+    dadosTomadorForm = {};
+    el('tomador-titulo').textContent = t ? 'Editar tomador' : 'Novo tomador';
+    // O CPF/CNPJ e a chave do cadastro: na edicao ele nao muda.
+    el('tomf-doc').readOnly = !!t;
+    dica('tomf-doc-info', t ? 'Para outro CPF/CNPJ, cadastre um novo tomador.' : 'Com CNPJ, nome e endereço vêm sozinhos.');
+    if (t) {
+      el('tomf-doc').value = formatarDoc(t.cpf_cnpj);
+      preencherFormTomador(t, false);
+    }
+    abrirJanela('janela-tomador');
+    el(t ? 'tomf-nome' : 'tomf-doc').focus();
+  }
+
+  el('botao-novo-tomador').addEventListener('click', function () { abrirFormTomador(null); });
+
+  el('tomf-doc').addEventListener('blur', function () {
+    if (this.readOnly) { return; }
+    var numeros = soNumeros(this.value);
+    var campo = this.closest('.campo');
+    campo.classList.remove('invalido');
+    if (!numeros) { return; }
+    this.value = formatarDoc(numeros);
+    if ((numeros.length !== 11 && numeros.length !== 14) || !documentoValido(numeros)) {
+      campo.classList.add('invalido');
+      dica('tomf-doc-info', 'CPF ou CNPJ inválido. Confira os números.', 'erro');
+      return;
+    }
+    if (numeros.length === 11) { dica('tomf-doc-info', 'CPF válido. Digite o nome.', 'ok'); return; }
+    dica('tomf-doc-info', 'Buscando…');
+    api('GET', 'consulta.php?cnpj=' + numeros).then(function (t) {
+      preencherFormTomador(t, true);
+      dica('tomf-doc-info', t.tipo === 'SALVO' ? 'Este tomador já está na sua lista.' : 'Dados da Receita Federal preenchidos.', 'ok');
+    }).catch(function (erro) { dica('tomf-doc-info', erro.message); });
+  });
+
+  el('tomf-cep').addEventListener('blur', function () {
+    var cep = soNumeros(this.value);
+    if (cep.length !== 8 || cep === dadosTomadorForm.cep) { return; }
+    this.value = formatarCep(cep);
+    api('GET', 'consulta.php?cep=' + cep).then(function (end) {
+      dadosTomadorForm = { cep: cep, uf: end.uf, codigo_municipio: end.codigo_municipio, cidade: end.cidade };
+      el('tomf-logradouro').value = end.logradouro || el('tomf-logradouro').value;
+      el('tomf-bairro').value = end.bairro || el('tomf-bairro').value;
+      el('tomf-cidade').value = end.cidade + ' / ' + end.uf;
+      el('tomf-numero').focus();
+    }).catch(function (erro) { avisar(escapar(erro.message), 'error_outline'); });
+  });
+
+  formTomador.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var botao = el('botao-salvar-tomador');
+    botao.disabled = true;
+    var corpo = {
+      cpf_cnpj: soNumeros(el('tomf-doc').value),
+      nome: el('tomf-nome').value.trim(),
+      email: el('tomf-email').value.trim(),
+      telefone: el('tomf-telefone').value.trim(),
+      cep: soNumeros(el('tomf-cep').value),
+      logradouro: el('tomf-logradouro').value.trim(),
+      numero: el('tomf-numero').value.trim(),
+      complemento: el('tomf-complemento').value.trim(),
+      bairro: el('tomf-bairro').value.trim(),
+      cidade: dadosTomadorForm.cidade || '',
+      uf: dadosTomadorForm.uf || '',
+      codigo_municipio: dadosTomadorForm.codigo_municipio || ''
+    };
+    var editando = el('tomf-doc').readOnly;
+    api('POST', 'tomadores.php', corpo).then(function () {
+      fecharJanela('janela-tomador');
+      avisar(editando ? 'Cadastro do tomador atualizado.' : 'Tomador salvo.');
+      carregarListaTomadores();
+    }).catch(function (erro) {
+      mostrarErrosForm(formTomador, erro.erros, CAMPOS_TOMADOR, 'tomador-erro');
+      if (!erro.erros || !erro.erros.length) { mostrarErro('tomador-erro', erro.message); }
+    }).then(function () { botao.disabled = false; });
+  });
+
+  // ==================================================================
+  // 7. INICIO DO PORTAL
   // ==================================================================
   aplicarTema(lerPreferencia('portal_tema'));
   carregarSessao();

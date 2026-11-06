@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 /**
  * Testes do portal do cliente (script 0006): login, sessao, bloqueio por
- * tentativas, servicos salvos, consulta de CNPJ/CEP e emissao pelo formulario.
+ * tentativas, servicos salvos, consulta de CNPJ/CEP, emissao pelo formulario
+ * e as telas Minhas notas e Tomadores.
  * Incluido por tests/nfse/executar.php.
  */
 
@@ -16,6 +17,7 @@ use Xande\NfeIntegracao\Nfse\Servico\PortalAcesso;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmissao;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
 use Xande\NfeIntegracao\Nfse\Servico\PortalServicos;
+use Xande\NfeIntegracao\Nfse\Servico\PortalTomadores;
 use Xande\NfeIntegracao\Nfse\Servico\RecebimentoLote;
 
 /** Sem banco: digitos de CPF/CNPJ. */
@@ -173,4 +175,44 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     Apoio::igual(2, $inicio->resumo($cnpj)['notas_no_mes'], 'inicio: notas do mes');
     Apoio::igual('SEM_CERTIFICADO', $inicio->resumo($cnpj)['avisos'][0]['tipo'] ?? null, 'inicio: avisa que falta o certificado');
     Apoio::igual('HOMOLOGACAO', $inicio->empresa($cnpj)['ambiente'], 'inicio: mostra o ambiente');
+
+    // ---- Tela "Minhas notas" ----
+    $lista = $inicio->listarNotas($cnpj, []);
+    Apoio::igual([2, 1, 1], [$lista['total'], $lista['pagina'], $lista['paginas']], 'notas: lista todas com total e paginas');
+    Apoio::igual(0, $inicio->listarNotas($cnpj, ['status' => 'AUTORIZADAS'])['total'], 'notas: filtro "autorizadas"');
+    Apoio::igual(2, $inicio->listarNotas($cnpj, ['status' => 'EM_ANDAMENTO'])['total'], 'notas: filtro "na prefeitura"');
+    Apoio::igual(2, $inicio->listarNotas($cnpj, ['busca' => 'exemplo'])['total'], 'notas: busca pelo nome do tomador (sem maiusculas)');
+    Apoio::igual(2, $inicio->listarNotas($cnpj, ['busca' => '11222333'])['total'], 'notas: busca pelo CPF/CNPJ do tomador');
+    Apoio::igual(0, $inicio->listarNotas($cnpj, ['busca' => 'ninguem assim'])['total'], 'notas: busca sem resultado');
+    Apoio::igual(2, $inicio->listarNotas($cnpj, ['mes' => date('Y-m')])['total'], 'notas: filtro pelo mes atual');
+    Apoio::igual(0, $inicio->listarNotas($cnpj, ['mes' => '2020-01'])['total'], 'notas: outro mes nao mostra nada');
+    Apoio::igual(0, $inicio->listarNotas('99999999000191', [])['total'], 'notas: outra empresa nao ve as notas');
+    $pagina2 = $inicio->listarNotas($cnpj, ['pagina' => 2]);
+    Apoio::igual([[], 2], [$pagina2['notas'], $pagina2['pagina']], 'notas: pagina depois da ultima vem vazia');
+    $idNota = $lista['notas'][0]['id'];
+    $pdo->prepare("UPDATE nfse_documentos SET status = 'REJEITADO' WHERE id = :id")->execute([':id' => $idNota]);
+    Apoio::igual(1, $inicio->listarNotas($cnpj, ['status' => 'COM_PROBLEMA'])['total'], 'notas: filtro "com problema" pega a rejeitada');
+    $detalhe = $inicio->nota($cnpj, $idNota);
+    // A mais recente e a do servico digitado na hora (010101).
+    Apoio::igual(['Cliente Exemplo Ltda', '010101', 1500.0], [$detalhe['tomador_completo']['nome'] ?? null,
+        $detalhe['servico']['codigo_tributacao_nacional'] ?? null, (float)($detalhe['valores']['valor_servicos'] ?? 0)], 'nota: detalhe com tomador, servico e valores');
+    Apoio::igual(null, $inicio->nota('41986662000160', $idNota), 'nota: outra empresa nao abre o detalhe');
+    Apoio::igual(null, $inicio->nota($cnpj, 'nao-e-um-id'), 'nota: id invalido nem consulta');
+
+    // ---- Tela "Tomadores" ----
+    $tomadores = new PortalTomadores($pdo);
+    $r = $tomadores->salvar($cnpj, ['cpf_cnpj' => '123', 'nome' => 'X', 'email' => 'sem-arroba', 'cep' => '123']);
+    Apoio::igual(['cpf_cnpj', 'nome', 'email', 'cep'], array_column($r['erros'] ?? [], 'campo'), 'tomador: documento, nome, e-mail e CEP invalidos explicados');
+    $r = $tomadores->salvar($cnpj, ['cpf_cnpj' => '529.982.247-25', 'nome' => 'Joana Lima', 'email' => 'Joana@Mail.com', 'uf' => 'ba']);
+    Apoio::igual([true, 'joana@mail.com', 'BA', null], [$r['ok'], $r['tomador']['email'] ?? null, $r['tomador']['uf'] ?? null, array_key_exists('ultima_emissao', $r['tomador'] ?? []) ? $r['tomador']['ultima_emissao'] : 'x'],
+        'tomador: cadastro manual salvo (sem data de ultima nota)');
+    $antes = (new PortalRepositorio($pdo))->tomador($cnpj, '11222333000181')['ultima_emissao'];
+    $r = $tomadores->salvar($cnpj, ['cpf_cnpj' => '11222333000181', 'nome' => 'Cliente Exemplo Ltda ME', 'cep' => '41820020']);
+    $depois = (new PortalRepositorio($pdo))->tomador($cnpj, '11222333000181');
+    Apoio::igual(['Cliente Exemplo Ltda ME', $antes], [$depois['nome'], $depois['ultima_emissao']], 'tomador: editar corrige o nome e mantem a data da ultima nota');
+    Apoio::igual(2, count($tomadores->listar($cnpj, '')), 'tomador: lista da empresa');
+    Apoio::igual(['Joana Lima'], array_column($tomadores->listar($cnpj, 'joana'), 'nome'), 'tomador: busca pelo nome');
+    Apoio::igual([], $tomadores->listar('41986662000160', ''), 'tomador: outra empresa nao ve');
+    Apoio::verificar($tomadores->remover($cnpj, '529.982.247-25')['ok'], 'tomador: removido da lista');
+    Apoio::igual('TOMADOR_NAO_ENCONTRADO', $tomadores->remover($cnpj, '52998224725')['codigo'] ?? null, 'tomador: remover de novo explica que nao existe');
 }
