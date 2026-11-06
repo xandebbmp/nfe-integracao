@@ -729,6 +729,21 @@
   }
   el('srv-salvo').addEventListener('change', function () { aplicarServico(true); });
   el('srv-salvar').addEventListener('change', function () { el('srv-nome-campo').hidden = !this.checked; });
+  // Item da LC 116 = comeco do codigo nacional (141302 -> 14.13). Preenche sozinho,
+  // a menos que a pessoa tenha digitado outro item a mao.
+  function itemPeloNacional(idNacional, idItem) {
+    var item = el(idItem);
+    el(idNacional).addEventListener('input', function () {
+      var d = soNumeros(this.value);
+      if (d.length < 4 || (item.value && item.dataset.auto !== item.value)) { return; }
+      item.value = d.slice(0, 2) + '.' + d.slice(2, 4);
+      item.dataset.auto = item.value;
+      item.dispatchEvent(new Event('input'));
+    });
+  }
+  itemPeloNacional('srv-in-nacional', 'srv-in-item');
+  itemPeloNacional('srvf-nacional', 'srvf-item');
+
   ['srv-descricao', 'srv-in-nacional', 'srv-in-item', 'srv-in-aliquota', 'tom-nome'].forEach(function (id) {
     el(id).addEventListener('input', atualizar);
   });
