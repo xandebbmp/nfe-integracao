@@ -154,7 +154,7 @@ final class SistemaRepositorio
     {
         $stmt = $this->pdo->prepare(
             "SELECT acao, ip, criado_em FROM fiscal_admin_log
-              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%')
+              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%' OR acao LIKE 'CONFIG\\_%')
               ORDER BY id DESC LIMIT :limite"
         );
         $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
@@ -214,5 +214,36 @@ final class SistemaRepositorio
     public function liberarAtualizacao(): void
     {
         $this->pdo->query('SELECT pg_advisory_unlock(70080008)');
+    }
+
+    // ------------------------------------------------------------------
+    // Configuracoes alteradas pelo painel (script 0009)
+    // ------------------------------------------------------------------
+
+    /** @return array<string, mixed> chave => valor ([] se a tabela ainda nao existe) */
+    public function ajustes(): array
+    {
+        if (!$this->tabelaExiste('sistema_ajustes')) {
+            return [];
+        }
+        $saida = [];
+        foreach ($this->pdo->query('SELECT chave, valor FROM sistema_ajustes')->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $saida[(string)$l['chave']] = json_decode((string)$l['valor'], true);
+        }
+        return $saida;
+    }
+
+    public function salvarAjuste(string $chave, mixed $valor): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO sistema_ajustes (chave, valor) VALUES (:chave, :valor)
+             ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = CURRENT_TIMESTAMP'
+        )->execute([':chave' => $chave, ':valor' => json_encode($valor, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
+    }
+
+    /** Volta a valer o valor do arquivo. */
+    public function removerAjuste(string $chave): void
+    {
+        $this->pdo->prepare('DELETE FROM sistema_ajustes WHERE chave = :chave')->execute([':chave' => $chave]);
     }
 }

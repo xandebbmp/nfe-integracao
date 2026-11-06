@@ -232,6 +232,25 @@ certificado). São as mesmas regras do `bin/nfse_verificar.php` no terminal
 (`src/Nfse/Servico/Diagnostico.php`); o terminal confere, a mais, os
 arquivos de configuração e os serviços do systemd.
 
+### Configurações pelo painel
+
+Ainda na tela **Sistema**, a seção **Configurações** muda, sem mexer em
+arquivo: tempo de sessão, "lembrar de mim", senhas erradas antes de
+bloquear e tempo de bloqueio do portal; tipo de NFS-e do portal;
+tentativas e espera quando a prefeitura falha; tempo para devolver nota
+travada à fila; espera máxima e tamanho de lote da API; link de
+visualização de Salvador.
+
+- Cada campo mostra o **padrão do arquivo**. O valor do painel fica em
+  `sistema_ajustes` (script `0009`) e substitui o do arquivo. "Voltar ao
+  padrão" e salvar apaga o ajuste.
+- Valem na hora para o portal e a API. O worker relê em até 1 minuto.
+- **Ficam só no arquivo, de propósito:** ambiente (homologação/produção),
+  senhas e tokens (`admin_token`, `monitor_token`, `chave_certificados`,
+  credenciais do S3).
+- Para liberar uma configuração nova no painel, acrescente uma linha em
+  `src/Nfse/Dominio/AjustesPainel.php` (a tela e a validação usam essa lista).
+
 ### Quantos rodar
 
 Dois processos atendem bem até alguns milhares de notas por dia. Para mais
@@ -345,6 +364,7 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 | `0006` | Portal do cliente: usuários, sessões, serviços, tomadores, cache de CNPJ/CEP |
 | `0007` | Tela Sistema: sinal de vida e ordens do worker |
 | `0008` | Registro dos scripts aplicados (botão **Atualizar banco**) |
+| `0009` | Configurações alteradas pelo painel (`sistema_ajustes`) |
 
 - **Backup diário:** `deploy/backup_banco.sh`, no cron. Veja o manual de
   implantação, seção "Backup".
@@ -555,6 +575,8 @@ Para planilha, acrescente `&formato=csv`.
 | `GET /v1/admin/banco.php` | Scripts do banco aplicados e pendentes |
 | `POST /v1/admin/banco.php` | `{"acao": "aplicar"}`: roda os pendentes |
 | `GET /v1/admin/diagnostico.php[?rede=0]` | Diagnóstico (não altera nada; `rede=0` pula a internet) |
+| `GET /v1/admin/configuracoes.php` | Configurações editáveis, valor atual e padrão do arquivo |
+| `POST /v1/admin/configuracoes.php` | `{"valores": {"portal.tentativas_login": 5, ...}}` |
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
 exemplo, ao detectar fatura em atraso:

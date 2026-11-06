@@ -8,8 +8,11 @@ declare(strict_types=1);
  * Incluido por tests/nfse/executar.php.
  */
 
+use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
+use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\AtualizacaoBanco;
+use Xande\NfeIntegracao\Nfse\Servico\ConfiguracoesPainel;
 use Xande\NfeIntegracao\Nfse\Servico\ControleSistema;
 use Xande\NfeIntegracao\Nfse\Servico\Diagnostico;
 
@@ -23,6 +26,17 @@ function testesSistemaUnidade(array $cfg): void
     Apoio::verificar(str_contains($banco['itens'][0]['resolver'] ?? '', 'database.local.php'), 'diz onde conferir a conexao');
     Apoio::igual('ERRO', $d['resultado'], 'resultado geral ERRO');
     Apoio::verificar(!in_array('Internet: acesso ao fisco', array_column($d['grupos'], 'titulo'), true), 'internet pulada quando pedido');
+
+    echo "\n[12b] Configuracoes editaveis pelo painel\n";
+    Apoio::igual([7, null], AjustesPainel::validar('portal.tentativas_login', '7'), 'numero dentro do limite aceito');
+    Apoio::verificar(AjustesPainel::validar('portal.tentativas_login', '1')[1] !== null, 'numero fora do limite recusado');
+    Apoio::verificar(AjustesPainel::validar('admin_token', 'x')[1] !== null, 'senha/token nao pode ser alterado pelo painel');
+    Apoio::verificar(AjustesPainel::validar('salvador.url_visualizacao', 'http://site')[1] !== null, 'link sem https recusado');
+    Apoio::igual(['https://nfse.salvador.ba.gov.br/v?n={numero}', null], AjustesPainel::validar('salvador.url_visualizacao', 'https://nfse.salvador.ba.gov.br/v?n={numero}'), 'link com {numero} aceito');
+    $aplicado = AjustesPainel::aplicar($cfg, ['portal.tentativas_login' => 9, 'tpAmb' => 1, 'fila.max_tentativas' => 999]);
+    Apoio::igual(9, $aplicado['portal']['tentativas_login'], 'ajuste valido aplicado na config');
+    Apoio::igual($cfg['tpAmb'], $aplicado['tpAmb'], 'ambiente nunca muda pelo painel');
+    Apoio::igual($cfg['fila']['max_tentativas'], $aplicado['fila']['max_tentativas'], 'valor invalido salvo no banco e ignorado');
 }
 
 function testesSistemaIntegracao(PDO $pdo, array $cfg): void
@@ -136,4 +150,27 @@ function testesSistemaIntegracao(PDO $pdo, array $cfg): void
     Apoio::verificar(in_array('Conexão com o PostgreSQL', $textos, true), 'diagnostico confere a conexao');
     Apoio::verificar((bool)preg_grep('/^Banco em dia/', $textos), 'diagnostico ve o banco em dia');
     Apoio::igual(array_sum($d['total']), count($textos), 'total bate com os itens');
+
+    // ---- Configuracoes ----
+    $pdo->exec('DELETE FROM sistema_ajustes');
+    $config = new ConfiguracoesPainel($pdo, $cfg);
+    Apoio::verificar($config->instalado(), 'tabela do script 0009 existe');
+    $lista = array_column($config->listar()['campos'], null, 'chave');
+    Apoio::igual(count(AjustesPainel::CAMPOS), count($lista), 'lista mostra todas as configuracoes liberadas');
+    Apoio::igual($cfg['portal']['tentativas_login'], $lista['portal.tentativas_login']['valor'], 'sem ajuste: vale o arquivo');
+
+    $r = $config->salvar(['portal.tentativas_login' => '8', 'portal.padrao' => 'SALVADOR'], '10.0.0.1');
+    Apoio::verificar($r['ok'] && count($r['alteradas']) === 2, 'salvar grava as duas mudancas');
+    $comPainel = NfseConfig::comClientes($cfg, $pdo);
+    Apoio::igual([8, 'SALVADOR'], [$comPainel['portal']['tentativas_login'], $comPainel['portal']['padrao']], 'API e portal passam a usar o valor do painel');
+    Apoio::igual('CONFIG_ALTERADA', $controle->status()['acoes_recentes'][0]['acao'], 'mudanca fica no historico');
+
+    $r = $config->salvar(['portal.tentativas_login' => (string)$cfg['portal']['tentativas_login']], null);
+    Apoio::verificar(!array_key_exists('portal.tentativas_login', (new SistemaRepositorio($pdo))->ajustes()), 'voltar ao valor do arquivo apaga o ajuste');
+    Apoio::igual('Nada mudou.', $config->salvar(['portal.padrao' => 'SALVADOR'], null)['mensagem'], 'salvar sem mudanca nao grava nada');
+
+    $r = $config->salvar(['portal.bloqueio_minutos' => '0', 'tpAmb' => '1'], null);
+    Apoio::verificar(!$r['ok'] && $r['http'] === 422, 'valores invalidos recusados');
+    Apoio::igual(['portal.bloqueio_minutos', 'tpAmb'], array_column($r['erros'], 'campo'), 'erro aponta cada campo');
+    $pdo->exec('DELETE FROM sistema_ajustes');
 }

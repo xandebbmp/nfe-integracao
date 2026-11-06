@@ -181,8 +181,9 @@ Documentação:
    comandado no botão "Sistema" do painel admin (pausar, retomar,
    reiniciar; script 0007) e o banco é atualizado pelo botão "Atualizar
    banco" (script 0008) e o botão "Rodar diagnóstico" usa as mesmas regras
-   do `bin/nfse_verificar.php` (`Servico/Diagnostico.php`). Próximo item da
-   mesma tela: configurações editáveis.
+   do `bin/nfse_verificar.php` (`Servico/Diagnostico.php`). Configurações
+   editáveis na mesma tela (script 0009, lista em `Dominio/AjustesPainel.php`).
+   Ambiente, senhas e tokens continuam só no arquivo, de propósito.
 10. **Não testados em ambiente real:** `deploy/apache/nfe-integracao.conf` e
    `deploy/pm2/ecosystem.config.js`.
 
@@ -197,7 +198,7 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 271/271 com banco e 84/84 sem.
+  - Situação atual: 289/289 com banco e 92/92 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
   `node --check public/admin/admin.js public/monitor/monitor.js public/portal/portal.js` e
   `shellcheck -S warning deploy/*.sh`.

@@ -12,6 +12,7 @@
      sistema.php      tela Sistema: worker ligado? fila; pausar/retomar/reiniciar
      banco.php        tela Sistema: scripts do banco pendentes; botao Atualizar banco
      diagnostico.php  tela Sistema: botao Diagnostico (confere tudo, nao altera nada)
+     configuracoes.php tela Sistema: configuracoes editaveis (portal, envio, API)
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -40,7 +41,7 @@ const ACOES_HISTORICO = {
 
 const ACOES_SISTEMA = {
   WORKER_PAUSADO: 'Envios pausados', WORKER_RETOMADO: 'Envios retomados', WORKER_REINICIADO: 'Worker reiniciado',
-  BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco',
+  BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco', CONFIG_ALTERADA: 'Configurações alteradas',
 };
 
 const ESTADOS_WORKER = { TRABALHANDO: 'Enviando notas', AGUARDANDO: 'Esperando notas', PAUSADO: 'Pausado' };
@@ -717,6 +718,7 @@ function abrirSistema() {
   const diagArea = el('div', {}, el('p', { class: 'suave' },
     'Confere servidor, configuração, banco, worker, certificados das empresas e acesso à internet da prefeitura. Não altera nada e não envia nota.'));
   const diagBotao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Rodar diagnóstico');
+  const configArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   const acoesArea = el('div', { class: 'acoes' });
   const retorno = el('div', {});
 
@@ -830,6 +832,78 @@ function abrirSistema() {
   }
   diagBotao.addEventListener('click', rodarDiagnostico);
 
+  // ---- Configuracoes ----
+  // A lista de campos vem da API (src/Nfse/Dominio/AjustesPainel.php):
+  // para liberar uma configuracao nova, mexa so la.
+  function textoValor(c, v) {
+    if (c.tipo === 'opcao') return c.opcoes[v] ?? v;
+    if (v === '' || v === null) return 'vazio';
+    return String(v);
+  }
+
+  function desenharConfiguracoes(dados, mensagem) {
+    const entradas = {};
+    const erros = {};
+    const grupos = {};
+    for (const c of dados.campos) (grupos[c.grupo] ||= []).push(c);
+
+    const blocos = Object.entries(grupos).map(([grupo, campos]) => el('fieldset', { class: 'config-grupo' },
+      el('legend', {}, grupo),
+      el('div', { class: 'campos' }, ...campos.map((c) => {
+        const id = 'cfg-' + c.chave.replace('.', '-');
+        let entrada;
+        if (c.tipo === 'opcao') {
+          entrada = el('select', { id }, ...Object.entries(c.opcoes).map(([v, nome]) => el('option', { value: v, selected: String(c.valor) === v }, nome)));
+        } else if (c.tipo === 'inteiro') {
+          entrada = el('input', { id, type: 'number', min: c.min, max: c.max, step: 1, value: c.valor });
+        } else {
+          entrada = el('input', { id, type: 'url', value: c.valor ?? '', placeholder: 'https://...' });
+        }
+        entradas[c.chave] = entrada;
+        erros[c.chave] = el('span', { class: 'erro' });
+        const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
+        return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
+          el('span', { class: 'config-rotulo' }, c.rotulo),
+          entrada,
+          el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
+            c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
+          erros[c.chave]);
+      }))));
+
+    const retorno = el('div', {}, mensagem ? el('p', { class: 'ok-texto' }, mensagem) : '');
+    const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Salvar configurações');
+    salvar.addEventListener('click', async () => {
+      Object.values(erros).forEach((e) => { e.textContent = ''; });
+      const valores = {};
+      for (const [chave, entrada] of Object.entries(entradas)) valores[chave] = entrada.value;
+      salvar.disabled = true;
+      try {
+        const r = await api('configuracoes.php', { metodo: 'POST', corpo: { valores } });
+        desenharConfiguracoes(r.configuracoes, r.mensagem);
+        recarregar();
+      } catch (e) {
+        for (const d of e.detalhes || []) if (erros[d.campo]) erros[d.campo].textContent = d.mensagem;
+        retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+        salvar.disabled = false;
+      }
+    });
+
+    configArea.replaceChildren(
+      el('p', { class: 'suave' }, `Ambiente: ${dados.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'}. `,
+        'O ambiente, as senhas e os tokens só mudam no arquivo config/nfse.local.php, por segurança.'),
+      ...blocos,
+      el('div', { class: 'acoes' }, salvar),
+      retorno);
+  }
+
+  async function carregarConfiguracoes() {
+    try {
+      desenharConfiguracoes(await api('configuracoes.php'));
+    } catch (e) {
+      configArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
   // ---- Banco de dados ----
   function desenharBanco(b) {
     const nomes = { APLICADO: 'aplicado', PENDENTE: 'pendente', ALTERADO: 'arquivo mudou: aplicar de novo' };
@@ -871,6 +945,7 @@ function abrirSistema() {
       const r = await api('banco.php', { metodo: 'POST', corpo: { acao: 'aplicar' } });
       bancoRetorno.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
       desenharBanco(r.banco);
+      carregarConfiguracoes();
     } catch (e) {
       bancoRetorno.replaceChildren(el('p', { class: 'erro' }, e.message));
       carregarBanco();
@@ -878,16 +953,18 @@ function abrirSistema() {
     recarregar();
   }
 
-  abrirModal('Sistema', 'Worker (o programa que envia as notas), fila, banco de dados e diagnóstico', [
+  abrirModal('Sistema', 'Worker (o programa que envia as notas), banco de dados, diagnóstico e configurações', [
     el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
+    el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
   ]);
   recarregar();
   carregarBanco();
+  carregarConfiguracoes();
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }

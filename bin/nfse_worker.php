@@ -81,12 +81,13 @@ $entregador = null;
 $assinaturaCadastro = '';
 $recarregar = static function () use ($pdo, $cfgArquivos, $workerId, &$cfg, &$processador, &$entregador, &$assinaturaCadastro): void {
     $novo = NfseConfig::comClientes($cfgArquivos, $pdo);
-    $assinatura = md5(serialize([$novo['emitentes'], $novo['consumidores']]));
+    // Empresas e configuracoes mudadas no painel (fila, salvador...).
+    $assinatura = md5(serialize([$novo['emitentes'], $novo['consumidores'], $novo['fila'], $novo['salvador']]));
     if ($assinatura === $assinaturaCadastro) {
         return;
     }
     if ($assinaturaCadastro !== '') {
-        registrar('Cadastro de empresas mudou: configuracao recarregada.');
+        registrar('Empresas ou configuracoes mudaram no painel: configuracao recarregada.');
     }
     $cfg = $novo;
     $processador = new ProcessadorJobs($pdo, $cfg, new ProvedorFactory($cfg), $workerId);

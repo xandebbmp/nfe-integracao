@@ -67,3 +67,9 @@ pre.exemplo { background: var(--fundo); padding: 10px; border-radius: 8px; overf
 .diag-item .ponto-sistema { margin-top: 6px; }
 .diag-resolver { font-size: 13px; color: var(--suave); margin-top: 2px; }
 details summary { cursor: pointer; margin-top: 10px; }
+.config-grupo { border: 1px solid var(--borda); border-radius: 8px; padding: 10px 14px 14px; margin: 12px 0 0; }
+.config-grupo legend { font-weight: 600; padding: 0 6px; }
+.config-rotulo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--texto); font-weight: 600; }
+.config-alterado { font-size: 11px; font-weight: 600; color: var(--destaque); border: 1px solid var(--destaque); border-radius: 99px; padding: 0 7px; }
+.config-ajuda { font-size: 12px; color: var(--suave); }
+.link-botao { background: none; border: 0; padding: 0; color: var(--destaque); cursor: pointer; font: inherit; text-decoration: underline; }
