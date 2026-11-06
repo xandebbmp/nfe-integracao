@@ -210,3 +210,5 @@ details summary { cursor: pointer; margin-top: 10px; }
 .envio-aviso { display: grid; gap: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid color-mix(in srgb, #d97706 45%, transparent); background: color-mix(in srgb, #d97706 10%, transparent); }
 .envio-aviso p { margin: 0; }
 .envio-aviso .botao { justify-self: start; }
+.opcao-linha { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; margin-top: 10px; font-weight: 400; }
+.opcao-linha input { width: auto; margin: 0; }

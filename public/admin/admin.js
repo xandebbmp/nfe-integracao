@@ -715,6 +715,40 @@ function secaoPortal(c) {
   const mensagem = el('span', {});
   const linkPortal = new URL('../portal/', window.location.href).href;
 
+  // Aviso quando o e-mail do sistema ainda nao foi configurado.
+  const semEmail = (detalhe, comSenha = true) => el('div', { class: 'envio-aviso' },
+    el('strong', {}, 'O envio de e-mail ainda não foi configurado neste sistema.'),
+    el('p', {}, detalhe || 'É preciso configurar uma vez só, em Sistema > E-mail.'),
+    el('p', {}, comSenha ? 'Por enquanto, clique em "Copiar dados de acesso" e mande pelo WhatsApp ou pelo seu e-mail.'
+      : 'Por enquanto, use "Nova senha" e copie os dados para mandar pelo WhatsApp ou pelo seu e-mail.'),
+    el('button', { class: 'botao', type: 'button', onclick: () => {
+      if (!comSenha || confirm('A senha desta tela some quando você sair dela. Depois de configurar o e-mail, volte aqui e clique em "✉ Enviar acesso por e-mail" na linha da pessoa. Abrir a configuração agora?')) abrirSistema({ focar: 'email' });
+    } }, 'Configurar e-mail agora'));
+
+  // Botao da linha: gera senha provisoria nova e ja manda por e-mail (um clique so).
+  async function enviarAcessoDaLinha(u) {
+    area.replaceChildren(el('p', { class: 'suave' }, 'Verificando o e-mail do sistema...'));
+    area.scrollIntoView({ block: 'nearest' });
+    try {
+      const m = await api('email.php');
+      if (!m.configurado) {
+        area.replaceChildren(semEmail(`Falta preencher: ${m.faltam.join(', ')}.`, false));
+        return;
+      }
+    } catch { /* segue: o servidor confere de novo no envio */ }
+    if (!confirm(`Enviar o acesso ao portal para ${u.email}?\n\nO sistema gera uma senha provisória nova e manda por e-mail. A senha atual dessa pessoa para de funcionar.`)) {
+      area.replaceChildren();
+      return;
+    }
+    try {
+      const r = await api('portal_usuarios.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, acao: 'redefinir_senha', id: u.id } });
+      mostrarSenha(r).click();
+      await recarregar();
+    } catch (e) {
+      area.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
   // Senha provisoria aparece uma vez so. Dois caminhos para a pessoa receber:
   // 1) "Enviar por e-mail" (o sistema manda na hora) ou 2) "Copiar" (manda voce mesmo).
   function mostrarSenha(r) {
@@ -724,14 +758,6 @@ function secaoPortal(c) {
     const copiar = el('button', { class: 'botao', type: 'button', onclick: async () => {
       try { await navigator.clipboard.writeText(texto); copiar.textContent = '✓ Copiado'; } catch { copiar.textContent = 'Selecione o texto e copie'; }
     } }, 'Copiar dados de acesso');
-
-    const semEmail = (detalhe) => el('div', { class: 'envio-aviso' },
-      el('strong', {}, 'O envio de e-mail ainda não foi configurado neste sistema.'),
-      el('p', {}, detalhe || 'É preciso configurar uma vez só, em Sistema > E-mail.'),
-      el('p', {}, 'Por enquanto, clique em "Copiar dados de acesso" e mande pelo WhatsApp ou pelo seu e-mail.'),
-      el('button', { class: 'botao', type: 'button', onclick: () => {
-        if (confirm('A senha desta tela some quando você sair dela. Depois de configurar o e-mail, volte aqui e clique em "Nova senha" para enviar. Abrir a configuração agora?')) abrirSistema({ focar: 'email' });
-      } }, 'Configurar e-mail agora'));
 
     enviar.addEventListener('click', async () => {
       enviar.disabled = true;
@@ -765,15 +791,19 @@ function secaoPortal(c) {
       copiar.classList.add('botao--forte');
       resultado.replaceChildren(semEmail(`Falta preencher: ${m.faltam.join(', ')}.`));
     }).catch(() => {});
+    area.scrollIntoView({ block: 'nearest' });
+    return enviar;
   }
 
   async function acao(corpo, confirmar) {
     if (confirmar && !confirm(confirmar)) return;
     try {
       const r = await api('portal_usuarios.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, ...corpo } });
-      if (r.senha_provisoria) mostrarSenha(r); else area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      const enviar = r.senha_provisoria ? mostrarSenha(r) : null;
+      if (!enviar) area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
       await recarregar();
       atualizarProntidao(c.cnpj);
+      return enviar;
     } catch (e) {
       area.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
@@ -796,6 +826,8 @@ function secaoPortal(c) {
           el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
           el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
           el('td', {},
+            u.ativo ? el('button', { class: 'botao botao--forte', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail para a pessoa',
+              onclick: () => enviarAcessoDaLinha(u) }, '✉ Enviar acesso por e-mail') : null, ' ',
             el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
             el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id }) },
               u.administrador ? 'Tirar administrador' : 'Tornar administrador'), ' ',
@@ -808,7 +840,8 @@ function secaoPortal(c) {
     }
   }
 
-  const botao = el('button', { class: 'botao', type: 'button' }, 'Dar acesso ao portal');
+  const porEmail = el('input', { type: 'checkbox', checked: true });
+  const botao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Dar acesso ao portal');
   botao.addEventListener('click', async () => {
     mensagem.textContent = '';
     if (nome.value.trim().length < 2 || !email.checkValidity() || !email.value) {
@@ -817,7 +850,8 @@ function secaoPortal(c) {
       return;
     }
     botao.disabled = true;
-    await acao({ acao: 'criar', nome: nome.value, email: email.value });
+    const enviar = await acao({ acao: 'criar', nome: nome.value, email: email.value });
+    if (enviar && porEmail.checked) enviar.click();
     if (area.querySelector('.token-box')) { nome.value = ''; email.value = ''; }
     botao.disabled = false;
   });
@@ -828,6 +862,7 @@ function secaoPortal(c) {
     el('p', { class: 'suave' }, `Pessoas desta empresa que emitem NFS-e pelo formulário em ${linkPortal}`),
     lista,
     el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
+    el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
     el('div', { class: 'acoes' }, botao, mensagem),
     area,
   );

@@ -739,7 +739,10 @@ fila. Bloqueios, franquia, cobrança, monitor e webhooks valem igual.
 **Dar acesso a uma pessoa:**
 1. No painel admin, abra a empresa e vá até **Portal do cliente**.
 2. Informe nome e e-mail e clique em **Dar acesso ao portal**.
-3. Clique em **Enviar por e-mail** (o sistema manda na hora o endereço do portal,
+3. A caixa **Enviar os dados de acesso por e-mail** já vem marcada: o sistema manda
+   tudo sozinho. Para quem já tem acesso, use **✉ Enviar acesso por e-mail** na linha
+   da pessoa (gera senha provisória nova e envia num clique).
+   Ou clique em **Enviar por e-mail** (o sistema manda na hora o endereço do portal,
    o e-mail e a **senha provisória**) ou em **Copiar dados de acesso** para mandar
    você mesmo (WhatsApp, etc.). A senha aparece uma vez só; se perder, use **Nova senha**.
    O envio por e-mail precisa do e-mail configurado em **Sistema > E-mail**; sem isso
