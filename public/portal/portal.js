@@ -1134,7 +1134,21 @@
       caixa.querySelector('[data-novo]').addEventListener('click', function () { abrirFormServico(null); });
       return;
     }
-    caixa.innerHTML = listaServicos.map(function (s) {
+    // Busca na propria tela (a lista de servicos e pequena, nao precisa ir ao servidor).
+    var termo = el('servicos-busca').value.trim().toLowerCase();
+    var termoNumeros = soNumeros(termo);
+    var visiveis = listaServicos.filter(function (s) {
+      if (!termo) { return true; }
+      var texto = [s.nome, s.descricao, s.item_lista_servico, s.codigo_tributacao_municipal].join(' ').toLowerCase();
+      return texto.indexOf(termo) >= 0
+        || (termoNumeros !== '' && (String(s.codigo_tributacao_nacional || '') + ' ' + String(s.codigo_cnae || '')).indexOf(termoNumeros) >= 0);
+    });
+    if (!visiveis.length) {
+      caixa.innerHTML = '<div class="cartao vazio" style="grid-column:1/-1"><i class="icone">search_off</i>'
+        + '<p class="secundario">Nenhum serviço encontrado para “' + escapar(termo) + '”.</p></div>';
+      return;
+    }
+    caixa.innerHTML = visiveis.map(function (s) {
       var codigos = [
         s.codigo_tributacao_nacional ? 'Nacional ' + s.codigo_tributacao_nacional : '',
         s.item_lista_servico ? 'LC 116 ' + s.item_lista_servico : '',
@@ -1200,6 +1214,7 @@
   }
 
   el('botao-novo-servico').addEventListener('click', function () { abrirFormServico(null); });
+  el('servicos-busca').addEventListener('input', depoisDeDigitar(desenharServicos, 150));
   el('srvf-valor').addEventListener('blur', function () { if (this.value.trim()) { this.value = formatarValor(lerValor(this.value)); } });
 
   formServico.addEventListener('submit', function (evento) {
