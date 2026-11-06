@@ -152,6 +152,8 @@ senha nem chave privada nos arquivos.
 | `Sem resposta do servidor` | Rede/firewall bloqueando o domínio do fisco, ou serviço fora do ar. Teste `curl -I https://sefin.producaorestrita.nfse.gov.br` no servidor. |
 | Rejeição `E...` no Nacional | Regra do Sefin: leia a mensagem e a "correcao" no resumo. Códigos de serviço e alíquota são os erros mais comuns. |
 | Lote de Salvador parado em `PROCESSANDO` | Normal por alguns minutos. Se passar das 20 consultas, rode de novo mais tarde. |
+| `E1235 Falha no esquema XML`, mas o passo 1 passou | O Sefin mudou o leiaute. Baixe o pacote de esquemas atual em gov.br/nfse (Documentação técnica → Produção Restrita), troque os arquivos de `schemas/nfse/nacional/1.01/` e ajuste o `DpsXmlBuilder.php`. Último ajuste: XSD de 20/10/2026, que tornou `finNFSe` obrigatório. |
+| `E0312 código de tributação nacional não administrado pelo município` | O código do serviço (`codigo_tributacao_nacional`) não vale no município. Confirme o código com o contador. |
 | Erro `XSD` no passo 1 | Algum campo da nota de teste fora do formato oficial: a mensagem diz qual. |
 
 ---
