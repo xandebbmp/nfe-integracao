@@ -357,62 +357,166 @@ function desenharCliente(c) {
 
 // ---- Pronta para emitir ----
 // Lista que o servidor monta (Servico/ProntidaoEmissao.php): o que falta para
-// a empresa emitir cada tipo de nota contratado. Primeiro o que falta, depois
-// os avisos; os itens ok ficam recolhidos.
+// a empresa emitir cada tipo de nota contratado. No topo, o resultado geral e
+// um selo por grupo; depois o que falta (e os avisos) com "Como resolver";
+// os itens ok ficam recolhidos. Nivel sempre com icone + texto (nao so cor).
 const NIVEIS_PRONTIDAO = {
-  FALTA: { nome: 'Falta', ponto: 'PARADO' },
-  ATENCAO: { nome: 'Atenção', ponto: 'PAUSADO' },
-  OK: { nome: 'OK', ponto: 'LIGADO' },
+  FALTA: { nome: 'Falta', icone: '✕' },
+  ATENCAO: { nome: 'Atenção', icone: '!' },
+  OK: { nome: 'OK', icone: '✓' },
 };
+
+// Secoes da ficha citadas nos textos de "Como resolver" (o botao "Ir para"
+// leva ate elas). Campos entre aspas no texto sao procurados pelo rotulo.
+const DESTINOS_PRONTIDAO = [
+  ['Controle de emissão', /controle de emiss/i],
+  ['Dados da empresa', /dados da empresa/i],
+  ['Certificado digital', /certificado|\.pfx/i],
+  ['Acesso à API', /token da api/i],
+  ['Portal do cliente', /portal do cliente/i],
+  ['Numeração', /numera[cç][aã]o/i],
+];
+const CAMPOS_PRONTIDAO = [['E-mail', /\be-mail\b/i], ['Código IBGE do município', /7 números|confira o código/i]];
+
+function iconeProntidao(nivel) {
+  const n = NIVEIS_PRONTIDAO[nivel] || NIVEIS_PRONTIDAO.ATENCAO;
+  return el('span', { class: 'pront-icone', 'data-nivel': nivel, 'aria-hidden': 'true' }, n.icone);
+}
+
+/** Onde o "Ir para" deve levar: campo citado (entre aspas ou conhecido) ou a secao da ficha. */
+function destinoProntidao(texto) {
+  const campos = [...texto.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  for (const [rotulo, padrao] of CAMPOS_PRONTIDAO) if (padrao.test(texto)) campos.push(rotulo);
+  // Secao citada entre aspas tem preferencia ("Portal do cliente" ou token da API -> Portal).
+  const secao = DESTINOS_PRONTIDAO.find(([nome]) => campos.includes(nome)) || DESTINOS_PRONTIDAO.find(([, padrao]) => padrao.test(texto));
+  if (!campos.length && !secao) return null;
+  return { campos, secao: secao ? secao[0] : null, nome: campos[0] || secao[0] };
+}
+
+function irParaProntidao(destino) {
+  const corpo = $('modal-corpo');
+  const simples = (s) => s.toLowerCase().replace(/\s*\(.*$/, '').replace(/\b(de|da|do)\b/g, '').replace(/\s+/g, ' ').trim();
+  let alvo = null;
+  for (const nome of destino.campos) {
+    const label = [...corpo.querySelectorAll('label')].find((l) => simples(l.textContent).startsWith(simples(nome)));
+    alvo = label?.querySelector('input, select, textarea') || null;
+    if (alvo) break;
+  }
+  if (!alvo && destino.secao) {
+    alvo = [...corpo.querySelectorAll('h3')].find((h) => !h.closest('.prontidao') && simples(h.textContent).startsWith(simples(destino.secao))) || null;
+    if (alvo) alvo.setAttribute('tabindex', '-1');
+  }
+  if (!alvo) return;
+  const suave = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  alvo.scrollIntoView({ block: 'center', behavior: suave ? 'smooth' : 'auto' });
+  alvo.focus({ preventScroll: true });
+}
 
 function itemProntidao(i, grupo) {
   const n = NIVEIS_PRONTIDAO[i.nivel] || NIVEIS_PRONTIDAO.ATENCAO;
-  return el('li', { class: 'diag-item' },
-    el('span', { class: `ponto-sistema ponto-sistema--${n.ponto}`, title: n.nome }),
-    el('div', {},
-      el('div', {}, el('span', { class: 'suave' }, `${grupo} · `), i.texto),
-      i.resolver ? el('div', { class: 'diag-resolver' }, el('strong', {}, i.nivel === 'OK' ? 'Dica: ' : 'Como resolver: '), i.resolver) : null));
+  const ok = i.nivel === 'OK';
+  const destino = !ok && i.resolver ? destinoProntidao(i.resolver) : null;
+  return el('li', { class: 'pront-item', 'data-nivel': i.nivel },
+    iconeProntidao(i.nivel),
+    el('div', { class: 'pront-item__corpo' },
+      el('p', { class: 'pront-item__texto' },
+        el('span', { class: 'visualmente-oculto' }, `${n.nome}: `),
+        i.texto,
+        grupo ? el('span', { class: 'pront-tag' }, grupo) : null),
+      i.resolver ? el('div', { class: ok ? 'pront-dica' : 'pront-resolver' },
+        el('strong', {}, ok ? 'Dica' : 'Como resolver'),
+        el('p', {}, i.resolver),
+        destino ? el('button', { type: 'button', class: 'link-botao pront-ir', onclick: () => irParaProntidao(destino) },
+          `Ir para ${destino.campos.length ? `“${destino.nome}”` : destino.nome}`) : null) : null));
+}
+
+/** Resumo de um grupo: "Pronto", "Falta 1", "2 avisos", "Falta 1 · 1 aviso". */
+function resumoGrupoProntidao(g) {
+  const faltam = g.itens.filter((i) => i.nivel === 'FALTA').length;
+  const avisos = g.itens.filter((i) => i.nivel === 'ATENCAO').length;
+  const partes = [];
+  if (faltam) partes.push(faltam === 1 ? 'falta 1' : `faltam ${faltam}`);
+  if (avisos) partes.push(avisos === 1 ? '1 aviso' : `${avisos} avisos`);
+  const nivel = faltam ? 'FALTA' : avisos ? 'ATENCAO' : 'OK';
+  const texto = partes.length ? partes.join(' · ') : 'pronto';
+  return { nivel, texto: texto[0].toUpperCase() + texto.slice(1) };
 }
 
 function secaoProntidao(p) {
-  const itens = p.grupos.flatMap((g) => g.itens.map((i) => [i, g.titulo]));
+  const grupos = (p.grupos || []).filter((g) => (g.itens || []).length);
+  const itens = grupos.flatMap((g) => g.itens.map((i) => [i, g.titulo]));
   const de = (nivel) => itens.filter(([i]) => i.nivel === nivel);
   const problemas = [...de('FALTA'), ...de('ATENCAO')];
   const certos = de('OK');
 
   let titulo;
-  let ponto;
+  let nivel;
   if (!p.pronta) {
     titulo = p.faltam === 1 ? 'Falta 1 item para emitir' : `Faltam ${p.faltam} itens para emitir`;
-    ponto = 'PARADO';
+    if (p.atencao > 0) titulo += ` (e ${p.atencao === 1 ? '1 aviso' : `${p.atencao} avisos`})`;
+    nivel = 'FALTA';
   } else if (p.atencao > 0) {
     titulo = `Pronta para emitir, com ${p.atencao === 1 ? '1 aviso' : `${p.atencao} avisos`}`;
-    ponto = 'PAUSADO';
+    nivel = 'ATENCAO';
   } else {
     titulo = 'Pronta para emitir';
-    ponto = 'LIGADO';
+    nivel = 'OK';
   }
 
-  return el('section', { class: 'secao prontidao', 'data-pronta': String(p.pronta) },
-    el('h3', {}, 'Pronta para emitir?'),
-    el('div', { class: 'sistema-estado' },
-      el('span', { class: `ponto-sistema ponto-sistema--${ponto}` }),
-      el('strong', {}, titulo),
-      el('span', { class: 'suave' }, p.ambiente)),
-    problemas.length ? el('ul', { class: 'diag-lista' }, ...problemas.map(([i, g]) => itemProntidao(i, g))) : null,
-    certos.length ? el('details', {}, el('summary', { class: 'suave' }, `Ver os ${certos.length} itens ok`),
-      el('ul', { class: 'diag-lista' }, ...certos.map(([i, g]) => itemProntidao(i, g)))) : null,
-    el('p', { class: 'suave' }, 'Corrigiu um item nos dados da empresa? Clique em "Salvar alterações" e a lista é conferida de novo.'));
+  const idTitulo = 'prontidao-titulo';
+  const secao = el('section', { class: 'secao prontidao', 'data-nivel': nivel, 'data-pronta': String(p.pronta), 'aria-labelledby': idTitulo },
+    el('h3', { id: idTitulo }, 'Pronta para emitir?'),
+    el('div', { class: 'pront-resumo' },
+      iconeProntidao(nivel),
+      el('div', {},
+        el('p', { class: 'pront-resumo__titulo' }, titulo),
+        el('p', { class: 'pront-resumo__ambiente' }, p.ambiente))),
+    grupos.length
+      ? el('ul', { class: 'pront-grupos', 'aria-label': 'Situação por tipo de nota' },
+        ...grupos.map((g) => {
+          const r = resumoGrupoProntidao(g);
+          return el('li', { class: 'pront-grupo', 'data-nivel': r.nivel },
+            iconeProntidao(r.nivel),
+            el('span', { class: 'pront-grupo__nome' }, g.titulo === 'Geral' ? 'Geral (todos os tipos)' : g.titulo),
+            el('span', { class: 'pront-grupo__estado' }, r.texto));
+        }))
+      : el('p', { class: 'suave' }, 'Nenhuma conferência para mostrar: confira os tipos de nota contratados em Controle de emissão.'),
+    problemas.length ? [
+      el('h4', { class: 'pront-subtitulo' }, `O que resolver (${problemas.length})`),
+      el('ul', { class: 'pront-lista' }, ...problemas.map(([i, g]) => itemProntidao(i, g))),
+    ] : null,
+    certos.length ? el('details', { class: 'pront-oks' },
+      el('summary', {}, certos.length === 1 ? 'Ver o item ok' : `Ver os ${certos.length} itens ok`),
+      ...grupos.filter((g) => g.itens.some((i) => i.nivel === 'OK')).map((g) => el('div', { class: 'pront-oks__grupo' },
+        el('h4', {}, g.titulo),
+        el('ul', { class: 'pront-lista pront-lista--compacta' },
+          ...g.itens.filter((i) => i.nivel === 'OK').map((i) => itemProntidao(i, null)))))) : null,
+    el('p', { class: 'pront-rodape suave' }, 'Corrigiu um item nos dados da empresa? Clique em "Salvar alterações" e a lista é conferida de novo.'),
+    el('p', { class: 'pront-retorno', role: 'status' }));
+  return secao;
 }
 
 /** Confere de novo so a lista (depois de gerar token ou mexer no portal), sem redesenhar a ficha. */
 async function atualizarProntidao(numeroCnpj) {
   const atual = $('modal-corpo').querySelector('.prontidao');
   if (!atual) return;
+  const retorno = atual.querySelector('.pront-retorno');
+  atual.setAttribute('aria-busy', 'true');
+  if (retorno) { retorno.className = 'pront-retorno suave'; retorno.textContent = 'Conferindo a lista de novo…'; }
   try {
     const { cliente } = await api(`cliente.php?cnpj=${encodeURIComponent(numeroCnpj)}`);
-    if (cliente.prontidao) atual.replaceWith(secaoProntidao(cliente.prontidao));
-  } catch { /* a lista antiga continua; ao reabrir a ficha ela e conferida de novo */ }
+    if (!cliente.prontidao) throw new Error('sem lista');
+    const nova = secaoProntidao(cliente.prontidao);
+    // Mantem aberto o "Ver os itens ok" se a pessoa tinha aberto.
+    if (atual.querySelector('.pront-oks')?.open) nova.querySelector('.pront-oks')?.setAttribute('open', '');
+    atual.replaceWith(nova);
+    const novoRetorno = nova.querySelector('.pront-retorno');
+    if (novoRetorno) { novoRetorno.className = 'pront-retorno suave'; novoRetorno.textContent = 'Lista conferida de novo.'; }
+  } catch {
+    // A lista antiga continua; ao reabrir a ficha ela e conferida de novo.
+    atual.removeAttribute('aria-busy');
+    if (retorno) { retorno.className = 'pront-retorno erro'; retorno.textContent = 'Não foi possível conferir a lista agora. Ela pode estar desatualizada: feche e abra a ficha de novo.'; }
+  }
 }
 
 function lerFormulario(formDados, formControle) {
