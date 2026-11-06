@@ -208,6 +208,7 @@ $http->responder(201, respostaSefinAutorizada($chave));
 provedorNacional($cfgMeEpp, $http)->emitir(Apoio::documentoNacional());
 $dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
 Apoio::verificar(str_contains($dps, '<pTotTribSN>2.00</pTotTribSN>') && !str_contains($dps, '<indTotTrib>'), 'ME/EPP: DPS usa o percentual do cadastro (pTotTribSN 2.00)');
+Apoio::verificar(!str_contains($dps, '<pAliq>'), 'ME/EPP com ISS no Simples e sem retencao: DPS sem pAliq (o Sefin recusa)');
 Apoio::igual([], ValidadorXsd::validar($dps, "{$raiz}/schemas/nfse/nacional/1.01/DPS_v1.01.xsd"), 'ME/EPP: DPS com pTotTribSN passa no XSD');
 
 // Producao e Producao Restrita em leiautes diferentes (E1235 em producao com finNFSe).

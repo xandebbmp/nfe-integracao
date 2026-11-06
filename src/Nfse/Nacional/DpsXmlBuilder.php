@@ -93,7 +93,7 @@ final class DpsXmlBuilder
         $this->montarPrestador($dom, $inf, $emitente);
         $this->montarTomador($dom, $inf, $p['tomador'] ?? null);
         $this->montarServico($dom, $inf, $p['servico'], (string)$emitente['codigo_municipio']);
-        $this->montarValores($dom, $inf, self::valoresComPadraoDoEmitente($p['valores'], $emitente));
+        $this->montarValores($dom, $inf, self::valoresComPadraoDoEmitente($p['valores'], $emitente), $emitente);
 
         return ['xml' => $dom->saveXML($dom->documentElement), 'id_dps' => $idDps];
     }
@@ -107,6 +107,18 @@ final class DpsXmlBuilder
         $tpAmb = (int)$cfg['tpAmb'];
         $padrao = ['xsd' => (string)$cfg['nacional']['versao_leiaute'], 'finNFSe' => true];
         return ($cfg['nacional']['leiaute_por_ambiente'][$tpAmb] ?? []) + $padrao;
+    }
+
+    /**
+     * ME/EPP (opSimpNac 3) com o ISS apurado no Simples (regApTribSN 1) e sem
+     * retencao: o Sefin recusa pAliq (o ISS vai no DAS). A aliquota fica so
+     * nos dados da nota, para mostrar na tela.
+     */
+    public static function issPeloSimplesSemRetencao(array $valores, array $emitente): bool
+    {
+        return (int)($emitente['opcao_simples_nacional'] ?? 1) === 3
+            && (int)($emitente['regime_apuracao_simples'] ?? 0) === 1
+            && empty($valores['iss_retido']);
     }
 
     /**
@@ -195,7 +207,7 @@ final class DpsXmlBuilder
         Xml::filhoOpcional($dom, $cServ, 'cNBS', $servico['codigo_nbs'] ?? null);
     }
 
-    private function montarValores(DOMDocument $dom, DOMElement $inf, array $valores): void
+    private function montarValores(DOMDocument $dom, DOMElement $inf, array $valores, array $emitente = []): void
     {
         $val = Xml::filho($dom, $inf, 'valores');
 
@@ -222,7 +234,8 @@ final class DpsXmlBuilder
         Xml::filho($dom, $tribMun, 'tribISSQN', (string)(int)($valores['tributacao_issqn'] ?? 1));
         // 1=Nao retido, 2=Retido pelo tomador, 3=Retido pelo intermediario
         Xml::filho($dom, $tribMun, 'tpRetISSQN', !empty($valores['iss_retido']) ? '2' : '1');
-        if (isset($valores['aliquota_iss']) && $valores['aliquota_iss'] !== null && $valores['aliquota_iss'] !== '') {
+        if (isset($valores['aliquota_iss']) && $valores['aliquota_iss'] !== null && $valores['aliquota_iss'] !== ''
+            && !self::issPeloSimplesSemRetencao($valores, $emitente)) {
             Xml::filho($dom, $tribMun, 'pAliq', Xml::decimal($valores['aliquota_iss']));
         }
 
