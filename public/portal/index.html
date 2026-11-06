@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="claude:viewport-fit-sides" content="cover">
+  <title>Portal Gestão Fiscal NFS-e</title>
+  <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+
+  <!-- =====================================================================
+       TELA DE LOGIN
+       ===================================================================== -->
+  <section id="tela-login" class="login">
+
+    <!-- Lado esquerdo: apresentacao -->
+    <div class="login__marca">
+      <div class="logo">
+        <div class="logo__icone"><i class="icone">receipt_long</i></div>
+        <div>
+          <span class="logo__nome" style="color:#fff">Gestão Fiscal</span>
+          <span class="logo__sub">NFS-e Nacional · Salvador-BA</span>
+        </div>
+      </div>
+
+      <div>
+        <h1>Sua nota de serviço em <em>3 campos</em>.</h1>
+        <p class="login__texto">Os dados da sua empresa, endereço do cliente e impostos são preenchidos sozinhos. Você informa só o que muda.</p>
+      </div>
+
+      <!-- Ilustracao: o que o cliente digita x o que o sistema preenche -->
+      <div class="login__nota" aria-hidden="true">
+        <div class="login__nota-topo"><span>Nova NFS-e</span><span class="mono">DPS nº 000124</span></div>
+        <div class="login__nota-linha"><span class="login__nota-num">1</span><span>Tomador <b>12.345.678/0001-90</b></span><span class="login__nota-auto">endereço automático</span></div>
+        <div class="login__nota-linha"><span class="login__nota-num">2</span><span>Serviço <b>01.01 Desenvolvimento</b></span><span class="login__nota-auto">ISS 5%</span></div>
+        <div class="login__nota-linha"><span class="login__nota-num">3</span><span>Valor <b class="num">R$ 1.500,00</b></span><span class="login__nota-auto">líquido calculado</span></div>
+      </div>
+
+      <p class="login__rodape">Ambiente de homologação · notas sem valor fiscal</p>
+    </div>
+
+    <!-- Lado direito: formulario -->
+    <div class="login__form-area">
+      <form id="form-login" class="login__form" novalidate>
+        <div>
+          <h1>Entrar</h1>
+          <p class="secundario">Use o e-mail cadastrado pela sua empresa.</p>
+        </div>
+
+        <div class="campo">
+          <label for="login-email">E-mail</label>
+          <div class="campo__caixa">
+            <i class="icone">mail</i>
+            <input id="login-email" type="email" autocomplete="username" placeholder="voce@empresa.com.br" required>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="login-senha">Senha</label>
+          <div class="campo__caixa">
+            <i class="icone">lock</i>
+            <input id="login-senha" type="password" autocomplete="current-password" placeholder="Sua senha" required>
+          </div>
+        </div>
+
+        <div class="login__linha">
+          <label><input id="login-lembrar" type="checkbox"> Manter conectado</label>
+          <a href="#esqueci" id="link-esqueci">Esqueci minha senha</a>
+        </div>
+
+        <p id="login-erro" class="erro" hidden></p>
+
+        <button type="submit" class="btn btn--primario btn--largo">
+          Entrar <i class="icone icone--p">arrow_forward</i>
+        </button>
+
+        <p class="login__ajuda">Modelo de layout: qualquer e-mail e senha entram.</p>
+      </form>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       SISTEMA (depois do login)
+       ===================================================================== -->
+  <div id="tela-sistema" class="sistema" hidden>
+
+    <!-- Barra superior -->
+    <header class="topo">
+      <div class="topo__esquerda">
+        <button id="botao-menu" type="button" class="btn btn--icone topo__abrir-menu" aria-label="Abrir menu">
+          <i class="icone">menu</i>
+        </button>
+        <div class="logo">
+          <div class="logo__icone"><i class="icone">receipt_long</i></div>
+          <div>
+            <span class="logo__nome">Gestão Fiscal</span>
+            <span class="logo__sub">NFS-e Nacional · Salvador-BA</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topo__direita">
+        <span class="pilula pilula--alerta" title="As notas emitidas aqui não têm valor fiscal">Homologação</span>
+
+        <div class="empresa-atual">
+          <i class="icone">storefront</i>
+          <div>
+            <b id="empresa-nome">Studio Bela Forma Ltda</b>
+            <span id="empresa-cnpj" class="mono">41.986.662/0001-60</span>
+          </div>
+        </div>
+
+        <button id="botao-tema" type="button" class="btn btn--icone" aria-label="Trocar tema claro/escuro">
+          <i class="icone" id="icone-tema">dark_mode</i>
+        </button>
+
+        <button type="button" class="usuario" title="Minha conta">
+          <span class="avatar" id="usuario-iniciais">MS</span>
+          <span class="usuario__nome" id="usuario-nome">Mariana</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="corpo">
+      <!-- Menu lateral. Para incluir uma tela: um <a> aqui + um <section data-pagina> no conteudo. -->
+      <aside id="menu" class="menu">
+        <div class="menu__topo">
+          <a href="#emitir" class="btn btn--acento btn--largo"><i class="icone icone--p">add</i> Emitir nota</a>
+
+          <nav class="menu__grupo" aria-label="Notas">
+            <div class="menu__titulo">Notas fiscais</div>
+            <a class="menu__item" href="#inicio"><i class="icone">space_dashboard</i><span>Início</span></a>
+            <a class="menu__item" href="#emitir"><i class="icone">post_add</i><span>Emitir nota</span></a>
+            <a class="menu__item" href="#notas"><i class="icone">receipt_long</i><span>Minhas notas</span><span class="menu__marca menu__marca--qtd" title="Notas rejeitadas">1</span></a>
+            <a class="menu__item" href="#recorrencias"><i class="icone">event_repeat</i><span>Recorrências</span><span class="menu__marca menu__marca--breve">em breve</span></a>
+          </nav>
+
+          <nav class="menu__grupo" aria-label="Cadastros">
+            <div class="menu__titulo">Cadastros</div>
+            <a class="menu__item" href="#tomadores"><i class="icone">groups</i><span>Tomadores</span></a>
+            <a class="menu__item" href="#servicos"><i class="icone">design_services</i><span>Serviços</span></a>
+          </nav>
+
+          <nav class="menu__grupo" aria-label="Conta">
+            <div class="menu__titulo">Conta</div>
+            <a class="menu__item" href="#empresa"><i class="icone">business</i><span>Minha empresa</span></a>
+            <a class="menu__item" href="#usuarios"><i class="icone">manage_accounts</i><span>Usuários</span></a>
+            <a class="menu__item" href="#sair" id="link-sair"><i class="icone">logout</i><span>Sair</span></a>
+          </nav>
+        </div>
+
+        <div class="menu__rodape">
+          <div class="selo-certificado">
+            <i class="icone">verified_user</i>
+            <div><b>Certificado A1 válido</b>até 12/03/2027</div>
+          </div>
+        </div>
+      </aside>
+      <div id="cortina" class="cortina"></div>
+
+      <!-- Conteudo: cada tela e um <section data-pagina="...">; o JS mostra so a do menu. -->
+      <main class="conteudo">
+        <div class="conteudo__largura">
+
+          <!-- ===== Inicio ===== -->
+          <section data-pagina="inicio" data-titulo="Início">
+            <div style="display:grid;gap:20px">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Olá, <span id="saudacao-nome">Mariana</span></h1>
+                  <p class="secundario">Resumo de novembro/2026 da sua empresa.</p>
+                </div>
+                <a href="#emitir" class="btn btn--primario"><i class="icone icone--p">add</i> Nova NFS-e</a>
+              </div>
+
+              <div class="aviso-exemplo"><i class="icone icone--p">info</i> Dados de exemplo para visualizar o layout.</div>
+
+              <div class="kpis">
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Notas no mês <i class="icone">receipt</i></div>
+                  <div class="kpi__valor">37</div>
+                  <div class="kpi__rodape">35 autorizadas · 1 rejeitada · 1 cancelada</div>
+                </div>
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Faturado no mês <i class="icone">payments</i></div>
+                  <div class="kpi__valor">R$ 48.320</div>
+                  <div class="kpi__rodape">ISS devido R$ 1.932,80</div>
+                </div>
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Aguardando prefeitura <i class="icone">hourglass_top</i></div>
+                  <div class="kpi__valor">2</div>
+                  <div class="kpi__rodape">atualiza sozinho</div>
+                </div>
+                <div class="cartao kpi">
+                  <div class="kpi__topo">Franquia do plano <i class="icone">data_usage</i></div>
+                  <div class="kpi__valor">37 <span class="apagado" style="font-size:15px;font-weight:600">/ 100</span></div>
+                  <div class="barra" aria-label="37 de 100 notas usadas"><div class="barra__cheio" style="width:37%"></div></div>
+                </div>
+              </div>
+
+              <div class="duas-colunas">
+                <div class="cartao bloco">
+                  <div class="bloco__cabeca">
+                    <h2>Últimas notas</h2>
+                    <a href="#notas" class="btn btn--secundario">Ver todas</a>
+                  </div>
+                  <div class="tabela-rolagem">
+                    <table class="tabela">
+                      <thead>
+                        <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th>Status</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td class="mono">000124</td><td>Clínica Vida Plena</td><td class="num">05/11/2026</td><td class="direita num">R$ 1.500,00</td><td><span class="pilula pilula--info">Processando</span></td></tr>
+                        <tr><td class="mono">000123</td><td>Ana Paula Souza</td><td class="num">05/11/2026</td><td class="direita num">R$ 320,00</td><td><span class="pilula pilula--ok">Autorizada</span></td></tr>
+                        <tr><td class="mono">000122</td><td>Construtora Atlântico</td><td class="num">04/11/2026</td><td class="direita num">R$ 7.800,00</td><td><span class="pilula pilula--erro">Rejeitada</span></td></tr>
+                        <tr><td class="mono">000121</td><td>Escola Pequeno Saber</td><td class="num">03/11/2026</td><td class="direita num">R$ 2.150,00</td><td><span class="pilula pilula--ok">Autorizada</span></td></tr>
+                        <tr><td class="mono">000120</td><td>Mercado Bom Preço</td><td class="num">01/11/2026</td><td class="direita num">R$ 980,00</td><td><span class="pilula pilula--neutro">Cancelada</span></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="cartao bloco">
+                  <div class="bloco__cabeca"><h2>Precisa da sua atenção</h2></div>
+                  <div class="bloco__corpo">
+                    <a class="atalho" href="#notas">
+                      <i class="icone">error_outline</i>
+                      <div><b>Nota 000122 rejeitada</b><small>CEP do tomador não encontrado. Corrigir e reenviar.</small></div>
+                    </a>
+                    <a class="atalho" href="#recorrencias">
+                      <i class="icone">event_repeat</i>
+                      <div><b>3 mensalidades dia 10</b><small>Saem sozinhas quando a recorrência estiver ativa.</small></div>
+                    </a>
+                    <a class="atalho" href="#empresa">
+                      <i class="icone">verified_user</i>
+                      <div><b>Certificado vence em 126 dias</b><small>Avisaremos 30 dias antes.</small></div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== Demais telas: por enquanto so o espaco reservado ===== -->
+          <section data-pagina="emitir" data-titulo="Emitir nota" hidden>
+            <div class="cartao vazio"><i class="icone">post_add</i><h2>Emitir nota</h2><p class="secundario">Formulário de emissão (próximo passo da fase 1).</p></div>
+          </section>
+          <section data-pagina="notas" data-titulo="Minhas notas" hidden>
+            <div class="cartao vazio"><i class="icone">receipt_long</i><h2>Minhas notas</h2><p class="secundario">Lista com status em tempo real, PDF, XML e cancelamento (fase 1).</p></div>
+          </section>
+          <section data-pagina="recorrencias" data-titulo="Recorrências" hidden>
+            <div class="cartao vazio"><i class="icone">event_repeat</i><h2>Recorrências</h2><p class="secundario">Notas mensais automáticas (fase 3).</p></div>
+          </section>
+          <section data-pagina="tomadores" data-titulo="Tomadores" hidden>
+            <div class="cartao vazio"><i class="icone">groups</i><h2>Tomadores</h2><p class="secundario">Clientes salvos para não redigitar (fase 2).</p></div>
+          </section>
+          <section data-pagina="servicos" data-titulo="Serviços" hidden>
+            <div class="cartao vazio"><i class="icone">design_services</i><h2>Serviços</h2><p class="secundario">Serviços com código fiscal e alíquota salvos (fase 2).</p></div>
+          </section>
+          <section data-pagina="empresa" data-titulo="Minha empresa" hidden>
+            <div class="cartao vazio"><i class="icone">business</i><h2>Minha empresa</h2><p class="secundario">Dados fiscais, certificado e plano (somente leitura).</p></div>
+          </section>
+          <section data-pagina="usuarios" data-titulo="Usuários" hidden>
+            <div class="cartao vazio"><i class="icone">manage_accounts</i><h2>Usuários</h2><p class="secundario">Quem da empresa pode emitir.</p></div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="portal.js"></script>
+</body>
+</html>
