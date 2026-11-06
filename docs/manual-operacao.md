@@ -822,20 +822,14 @@ sessões abertas.
   resposta é sempre a mesma, exista ou não o e-mail. Criada a senha nova,
   as sessões abertas em outros navegadores saem. Quem envia o e-mail é o
   **worker**. Para ligar:
-  1. No painel, **Sistema > Configurações > E-mail**: servidor, porta,
-     criptografia, usuário, remetente e o **endereço do portal** (vai no
-     link do e-mail).
-  2. A **senha** do e-mail vai no arquivo **`.env`** da raiz do projeto
-     (fora do Git):
-     ```bash
-     cp .env.example .env     # uma vez só
-     nano .env                # preencha SMTP_PASSWORD (e o resto, se quiser)
-     chmod 600 .env
-     ```
-     O `.env` também aceita `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
-     `SMTP_USER`, `SMTP_FROM` e `PORTAL_URL`. O que estiver no painel ou no
-     `config/nfse.local.php` vale mais; o `.env` preenche o que falta.
-     Depois, "Reiniciar worker" no painel para ele ler o arquivo.
+  1. No painel, **Sistema > E-mail**: servidor, porta, criptografia,
+     usuário, **senha**, remetente e o **endereço do portal** (vai no link do
+     e-mail). Clique em **Salvar e-mail**. A senha fica guardada
+     criptografada no banco (mesma chave dos certificados, `chave_certificados`)
+     e nunca volta para a tela; para trocar, digite outra.
+  2. Opcional (servidor): a senha também pode ir no **`.env`** da raiz
+     (`SMTP_PASSWORD`, modelo em `.env.example`). A senha salva no painel
+     vale mais.
   3. No bloco **Sistema > E-mail**, use "Enviar e-mail de teste". Ali
      também aparecem os últimos e-mails e o erro do servidor, se falhar
      (tenta de novo em 1, 2, 4 e 8 minutos e desiste na 5ª vez).

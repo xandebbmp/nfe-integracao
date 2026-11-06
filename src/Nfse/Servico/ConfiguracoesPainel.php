@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace Xande\NfeIntegracao\Nfse\Servico;
 
 use PDO;
+use Throwable;
 use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
+use Xande\NfeIntegracao\Nfse\Infra\CofreCertificado;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 
@@ -16,11 +18,17 @@ use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
  *   salvar()  confere e grava. Valor igual ao do arquivo apaga o ajuste
  *             (volta a valer o arquivo).
  *
+ *   salvarSenhaEmail()  senha do SMTP digitada no painel: vai CRIPTOGRAFADA
+ *             para sistema_ajustes ('email.senha_cifrada'), com a mesma chave
+ *             dos certificados. Nunca volta para a tela.
+ *
  * Os valores passam a valer na proxima requisicao da API/portal. O worker
  * rele a cada minuto.
  */
 final class ConfiguracoesPainel
 {
+    public const CHAVE_SENHA_EMAIL = 'email.senha_cifrada';
+
     private SistemaRepositorio $sistema;
 
     /** @param array $cfgArquivo config SO dos arquivos (NfseConfig::carregar()), sem os ajustes */
@@ -96,5 +104,50 @@ final class ConfiguracoesPainel
             'alteradas' => array_keys($mudancas),
             'configuracoes' => $this->listar(),
         ];
+    }
+
+    /** Senha do e-mail salva pelo painel? */
+    public function senhaEmailNoPainel(): bool
+    {
+        return array_key_exists(self::CHAVE_SENHA_EMAIL, $this->sistema->ajustes());
+    }
+
+    /** Grava (criptografada) ou apaga (texto vazio) a senha do e-mail. */
+    public function salvarSenhaEmail(string $senha, ?string $ip): array
+    {
+        if (strlen($senha) > 200 || preg_match('/[\x00-\x1F]/', $senha)) {
+            return ['ok' => false, 'http' => 422, 'codigo' => 'SENHA_INVALIDA', 'mensagem' => 'Senha com mais de 200 letras ou com quebra de linha.'];
+        }
+        $log = new ClienteRepositorio($this->pdo);
+        if ($senha === '') {
+            $this->sistema->removerAjuste(self::CHAVE_SENHA_EMAIL);
+            $log->registrarLog(null, 'CONFIG_ALTERADA', ['email.senha' => 'apagada no painel'], $ip);
+            return ['ok' => true, 'mensagem' => 'Senha do e-mail apagada do painel.'];
+        }
+        try {
+            $cofre = new CofreCertificado((string)($this->cfgArquivo['chave_certificados'] ?? ''));
+        } catch (Throwable) {
+            return ['ok' => false, 'http' => 503, 'codigo' => 'CHAVE_AUSENTE',
+                'mensagem' => 'Falta a chave de segurança do servidor (a mesma dos certificados). Rode o Diagnóstico para ver como resolver.'];
+        }
+        $this->sistema->salvarAjuste(self::CHAVE_SENHA_EMAIL, $cofre->cifrarTexto($senha));
+        // Nunca grava a senha no historico, so que mudou.
+        $log->registrarLog(null, 'CONFIG_ALTERADA', ['email.senha' => 'alterada no painel'], $ip);
+        return ['ok' => true, 'mensagem' => 'Senha do e-mail salva (guardada criptografada).'];
+    }
+
+    /** Usa na config a senha do e-mail salva pelo painel (se abrir com a chave). */
+    public static function aplicarSenhaEmail(array $cfg, array $ajustes): array
+    {
+        $cifrada = $ajustes[self::CHAVE_SENHA_EMAIL] ?? null;
+        if (!is_string($cifrada) || $cifrada === '') {
+            return $cfg;
+        }
+        try {
+            $cfg['email']['senha'] = (new CofreCertificado((string)($cfg['chave_certificados'] ?? '')))->decifrarTexto($cifrada);
+        } catch (Throwable) {
+            // Chave mudou ou sumiu: vale a senha do arquivo (se houver).
+        }
+        return $cfg;
     }
 }

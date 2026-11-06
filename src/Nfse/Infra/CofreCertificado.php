@@ -40,6 +40,26 @@ final class CofreCertificado
         return $nonce . sodium_crypto_secretbox($claro, $nonce, $this->chave);
     }
 
+    /** Cifra um texto curto (ex.: senha do e-mail). Devolve base64, pronto para guardar. */
+    public function cifrarTexto(string $texto): string
+    {
+        $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        return base64_encode($nonce . sodium_crypto_secretbox($texto, $nonce, $this->chave));
+    }
+
+    public function decifrarTexto(string $base64): string
+    {
+        $cifrado = (string)base64_decode($base64, true);
+        $nonce = substr($cifrado, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $claro = strlen($nonce) === SODIUM_CRYPTO_SECRETBOX_NONCEBYTES
+            ? sodium_crypto_secretbox_open(substr($cifrado, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), $nonce, $this->chave)
+            : false;
+        if ($claro === false) {
+            throw new RuntimeException('A senha guardada nao abriu: a chave dos certificados mudou. Digite a senha de novo no painel.');
+        }
+        return $claro;
+    }
+
     /** @return array{pfx: string, senha: string} */
     public function decifrar(string $cifrado): array
     {

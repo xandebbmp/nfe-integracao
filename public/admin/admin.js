@@ -1183,36 +1183,40 @@ function abrirSistema(opcoes = {}) {
     return String(v);
   }
 
+  // Um campo de configuracao (lista de Dominio/AjustesPainel.php).
+  function campoConfig(c, entradas, erros) {
+    const id = 'cfg-' + c.chave.replace('.', '-');
+    let entrada;
+    if (c.tipo === 'opcao') {
+      entrada = el('select', { id }, ...Object.entries(c.opcoes).map(([v, nome]) => el('option', { value: v, selected: String(c.valor) === v }, nome)));
+    } else if (c.tipo === 'inteiro') {
+      entrada = el('input', { id, type: 'number', min: c.min, max: c.max, step: 1, value: c.valor });
+    } else if (c.tipo === 'texto' || c.tipo === 'email') {
+      entrada = el('input', { id, type: c.tipo === 'email' ? 'email' : 'text', value: c.valor ?? '', maxlength: 200 });
+    } else {
+      entrada = el('input', { id, type: 'url', value: c.valor ?? '', placeholder: 'https://...' });
+    }
+    entradas[c.chave] = entrada;
+    erros[c.chave] = el('span', { class: 'erro' });
+    const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
+    return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
+      el('span', { class: 'config-rotulo' }, c.rotulo),
+      entrada,
+      el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
+        c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
+      erros[c.chave]);
+  }
+
   function desenharConfiguracoes(dados, mensagem) {
     const entradas = {};
     const erros = {};
     const grupos = {};
-    for (const c of dados.campos) (grupos[c.grupo] ||= []).push(c);
+    // O grupo E-mail aparece no bloco "E-mail" (junto com a senha), nao aqui.
+    for (const c of dados.campos) if (c.grupo !== 'E-mail') (grupos[c.grupo] ||= []).push(c);
 
     const blocos = Object.entries(grupos).map(([grupo, campos]) => el('fieldset', { class: 'config-grupo' },
       el('legend', {}, grupo),
-      el('div', { class: 'campos' }, ...campos.map((c) => {
-        const id = 'cfg-' + c.chave.replace('.', '-');
-        let entrada;
-        if (c.tipo === 'opcao') {
-          entrada = el('select', { id }, ...Object.entries(c.opcoes).map(([v, nome]) => el('option', { value: v, selected: String(c.valor) === v }, nome)));
-        } else if (c.tipo === 'inteiro') {
-          entrada = el('input', { id, type: 'number', min: c.min, max: c.max, step: 1, value: c.valor });
-        } else if (c.tipo === 'texto' || c.tipo === 'email') {
-          entrada = el('input', { id, type: c.tipo === 'email' ? 'email' : 'text', value: c.valor ?? '', maxlength: 200 });
-        } else {
-          entrada = el('input', { id, type: 'url', value: c.valor ?? '', placeholder: 'https://...' });
-        }
-        entradas[c.chave] = entrada;
-        erros[c.chave] = el('span', { class: 'erro' });
-        const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
-        return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
-          el('span', { class: 'config-rotulo' }, c.rotulo),
-          entrada,
-          el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
-            c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
-          erros[c.chave]);
-      }))));
+      el('div', { class: 'campos' }, ...campos.map((c) => campoConfig(c, entradas, erros)))));
 
     const retorno = el('div', {}, mensagem ? el('p', { class: 'ok-texto' }, mensagem) : '');
     const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Salvar configurações');
@@ -1225,7 +1229,6 @@ function abrirSistema(opcoes = {}) {
         const r = await api('configuracoes.php', { metodo: 'POST', corpo: { valores } });
         desenharConfiguracoes(r.configuracoes, r.mensagem);
         recarregar();
-        carregarEmail();
       } catch (e) {
         for (const d of e.detalhes || []) if (erros[d.campo]) erros[d.campo].textContent = d.mensagem;
         retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
@@ -1235,7 +1238,7 @@ function abrirSistema(opcoes = {}) {
 
     configArea.replaceChildren(
       el('p', { class: 'suave' }, `Ambiente: ${dados.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'}. `,
-        'O ambiente, as senhas e os tokens só mudam no arquivo config/nfse.local.php, por segurança.'),
+        'O ambiente e os tokens só mudam no arquivo config/nfse.local.php, por segurança. O e-mail fica no bloco "E-mail", acima.'),
       ...blocos,
       el('div', { class: 'acoes' }, salvar),
       retorno);
@@ -1301,11 +1304,59 @@ function abrirSistema(opcoes = {}) {
 
   // ---- E-mail (Esqueci a senha do portal) ----
   const NOMES_EMAIL = { PENDENTE: 'na fila', ENVIADO: 'enviado', ERRO: 'falhou' };
-  function desenharEmail(m) {
+  // Bloco completo: servidor, usuario, SENHA (criptografada), remetente,
+  // endereco do portal, um botao "Salvar e-mail" e o e-mail de teste.
+  function desenharEmail(m, cfg) {
     if (!m.instalado) {
-      emailArea.replaceChildren(el('p', { class: 'aviso' }, 'Falta atualizar o banco (script 0012) para ligar o "Esqueci a senha".'));
+      emailArea.replaceChildren(el('p', { class: 'aviso' }, 'Falta atualizar o banco (script 0012) para ligar o e-mail.'));
       return;
     }
+    const situacao = !m.configurado
+      ? ['PAUSADO', 'E-mail não configurado', `Falta: ${m.faltam.join(', ')}. Preencha abaixo e clique em "Salvar e-mail".`]
+      : (!m.esqueci_ligado
+        ? ['LIGADO', 'E-mail pronto', 'Já envia o acesso ao portal. Para ligar o "Esqueci a senha", preencha o "Endereço do portal".']
+        : ['LIGADO', 'E-mail pronto', `Os e-mails saem por ${m.remetente}. O "Esqueci a senha" está ligado (quem envia é o worker).`]);
+
+    const entradas = {};
+    const erros = {};
+    const campos = (cfg?.campos || []).filter((c) => c.grupo === 'E-mail');
+    const porChave = Object.fromEntries(campos.map((c) => [c.chave, c]));
+    const campo = (chave) => (porChave[chave] ? campoConfig(porChave[chave], entradas, erros) : null);
+
+    const senha = el('input', { id: 'cfg-email-senha', type: 'password', autocomplete: 'new-password', maxlength: 200,
+      placeholder: m.senha_definida ? '•••••••• (já salva: digite só para trocar)' : 'Senha da conta de e-mail' });
+    const verSenha = el('button', { class: 'link-botao', type: 'button', onclick: () => {
+      senha.type = senha.type === 'password' ? 'text' : 'password';
+      verSenha.textContent = senha.type === 'password' ? 'mostrar' : 'esconder';
+    } }, 'mostrar');
+    const erroSenha = el('span', { class: 'erro' });
+    const campoSenha = el('label', { for: 'cfg-email-senha' },
+      el('span', { class: 'config-rotulo' }, 'Senha ', m.senha_definida ? el('span', { class: 'ok-texto' }, '✓ salva') : el('span', { class: 'aviso' }, 'falta')),
+      senha,
+      el('span', { class: 'config-ajuda' }, 'Fica guardada criptografada: ninguém consegue ver depois, nem aqui. Gmail: use uma "senha de app". ', verSenha),
+      erroSenha);
+
+    const retorno = el('div', {});
+    const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Salvar e-mail');
+    salvar.addEventListener('click', async () => {
+      Object.values(erros).forEach((e) => { e.textContent = ''; });
+      erroSenha.textContent = '';
+      salvar.disabled = true;
+      retorno.replaceChildren(el('p', { class: 'suave' }, 'Salvando...'));
+      try {
+        const valores = {};
+        for (const [chave, entrada] of Object.entries(entradas)) valores[chave] = entrada.value;
+        if (Object.keys(valores).length) await api('configuracoes.php', { metodo: 'POST', corpo: { valores } });
+        if (senha.value !== '') await api('email.php', { metodo: 'POST', corpo: { acao: 'salvar_senha', senha: senha.value } });
+        await carregarEmail('✓ E-mail salvo. Agora envie um e-mail de teste para conferir.');
+        carregarConfiguracoes();
+      } catch (e) {
+        for (const d of e.detalhes || []) if (erros[d.campo]) erros[d.campo].textContent = d.mensagem;
+        retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+        salvar.disabled = false;
+      }
+    });
+
     const para = el('input', { type: 'email', value: m.remetente, placeholder: 'voce@empresa.com.br', 'aria-label': 'E-mail para receber o teste' });
     const resultado = el('div', {});
     const testar = el('button', { class: 'botao', type: 'button', disabled: !m.configurado }, 'Enviar e-mail de teste');
@@ -1314,21 +1365,24 @@ function abrirSistema(opcoes = {}) {
       resultado.replaceChildren(el('p', { class: 'suave' }, 'Enviando... (até 20 s)'));
       try {
         const r = await api('email.php', { metodo: 'POST', corpo: { para: para.value } });
-        resultado.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+        resultado.replaceChildren(el('p', { class: 'envio-ok' }, '✓ ' + r.mensagem));
       } catch (e) {
         resultado.replaceChildren(el('p', { class: 'erro' }, e.message));
       }
       testar.disabled = false;
     });
-    const situacao = !m.configurado
-      ? ['PAUSADO', 'E-mail não configurado', `Falta: ${m.faltam.join(', ')}. Preencha em Configurações abaixo; a senha vai no arquivo config/nfse.local.php.`]
-      : (!m.esqueci_ligado
-        ? ['PAUSADO', 'E-mail pronto, mas o "Esqueci a senha" está desligado', 'Preencha o "Endereço do portal" em Configurações (vai no link do e-mail).']
-        : ['LIGADO', '"Esqueci a senha" ligado', `Os e-mails saem por ${m.remetente}. Quem envia é o worker: ele precisa estar ligado.`]);
+
     emailArea.replaceChildren(...[
       el('div', { class: 'sistema-estado' },
         el('span', { class: `ponto-sistema ponto-sistema--${situacao[0]}` }), el('strong', {}, situacao[1]), el('span', { class: 'suave' }, situacao[2])),
+      el('p', { class: 'suave' }, 'Usado para mandar o acesso ao portal e o "Esqueci a senha". Os dados você pega com quem cuida do e-mail da empresa.'),
+      el('div', { class: 'campos' }, campo('email.host'), campo('email.porta'), campo('email.seguranca'),
+        campo('email.usuario'), campoSenha, campo('email.remetente'), campo('email.nome_remetente'), campo('email.url_portal')),
+      el('div', { class: 'acoes' }, salvar),
+      retorno,
+      el('h4', { class: 'pront-subtitulo' }, 'Testar'),
       el('div', { class: 'acoes' }, para, testar),
+      m.configurado ? null : el('p', { class: 'suave' }, 'O teste libera depois de salvar o e-mail completo.'),
       resultado,
       m.ultimos.length ? el('details', {}, el('summary', { class: 'suave' }, 'Últimos e-mails'),
         el('table', { class: 'mini' }, el('tbody', {}, ...m.ultimos.map((x) => el('tr', {},
@@ -1338,11 +1392,16 @@ function abrirSistema(opcoes = {}) {
             : el('span', { class: x.status === 'ERRO' ? 'erro' : 'aviso', title: x.ultimo_erro || '' }, NOMES_EMAIL[x.status] + (x.ultimo_erro ? `: ${x.ultimo_erro}` : ''))),
           el('td', { class: 'suave' }, dataHora(x.enviado_em || x.criado_em))))))) : null,
     ].filter(Boolean));
+    if (retornoInicial) retorno.replaceChildren(el('p', { class: 'envio-ok' }, retornoInicial));
   }
 
-  async function carregarEmail() {
+  let retornoInicial = '';
+  async function carregarEmail(mensagem = '') {
     try {
-      desenharEmail(await api('email.php'));
+      const [m, cfg] = await Promise.all([api('email.php'), api('configuracoes.php').catch(() => null)]);
+      retornoInicial = mensagem;
+      desenharEmail(m, cfg);
+      retornoInicial = '';
     } catch (e) {
       emailArea.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
