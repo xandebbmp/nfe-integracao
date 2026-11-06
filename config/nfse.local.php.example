@@ -56,6 +56,16 @@ return [
     // php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'
     'chave_certificados' => 'CHAVE_GERADA',
 
+    // E-mail do "Esqueci a senha" (o resto pode ser preenchido no painel):
+    // 'email' => [
+    //     'host' => 'mail.suaempresa.com.br',
+    //     'porta' => 465,
+    //     'usuario' => 'contato@suaempresa.com.br',
+    //     'senha' => 'SENHA_DA_CONTA_DE_EMAIL',
+    //     'remetente' => 'contato@suaempresa.com.br',
+    //     'url_portal' => 'https://fiscal.suaempresa.com.br/portal/',
+    // ],
+
     // Arquivamento dos XMLs em nuvem (exemplo S3):
     // 'armazenamento' => [
     //     'tipo' => 's3',

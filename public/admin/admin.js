@@ -5,9 +5,15 @@
    cabecalho X-ADMIN-TOKEN:
      clientes.php     lista (GET) e cadastro/alteracao (POST)
      cliente.php      detalhe: uso 12 meses, status do mes, historico
+     portal_usuarios.php  quem da empresa entra no portal do cliente
      certificado.php  envio do .pfx (multipart)
      token.php        gera token novo (aparece uma unica vez)
      uso.php          relatorio de cobranca do mes (JSON ou CSV)
+     sistema.php      tela Sistema: worker ligado? fila; pausar/retomar/reiniciar
+     banco.php        tela Sistema: scripts do banco pendentes; botao Atualizar banco
+     diagnostico.php  tela Sistema: botao Diagnostico (confere tudo, nao altera nada)
+     email.php        tela Sistema: bloco E-mail (situacao e e-mail de teste)
+     configuracoes.php tela Sistema: configuracoes editaveis (portal, envio, API)
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -33,6 +39,13 @@ const ACOES_HISTORICO = {
   CADASTRO: 'Cadastro', ALTERACAO: 'Alteração', CERTIFICADO: 'Certificado enviado', TOKEN: 'Token gerado',
   NUMERACAO: 'Numeração ajustada',
 };
+
+const ACOES_SISTEMA = {
+  WORKER_PAUSADO: 'Envios pausados', WORKER_RETOMADO: 'Envios retomados', WORKER_REINICIADO: 'Worker reiniciado',
+  BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco', CONFIG_ALTERADA: 'Configurações alteradas',
+};
+
+const ESTADOS_WORKER = { TRABALHANDO: 'Enviando notas', AGUARDANDO: 'Esperando notas', PAUSADO: 'Pausado' };
 
 const estado = { token: '', clientes: [], ambiente: '', mes: '', filtroSituacao: '' };
 
@@ -137,7 +150,11 @@ async function entrar(token) {
   await carregar();
   $('tela-acesso').hidden = true;
   $('tela-painel').hidden = false;
+  atualizarPontoSistema().catch(() => {});
 }
+
+// Bolinha do botao "Sistema" sempre atualizada.
+setInterval(() => { if (estado.token) atualizarPontoSistema().catch(() => {}); }, 15000);
 
 // ==========================================================================
 // Lista de empresas
@@ -324,7 +341,7 @@ function desenharCliente(c) {
   partes.push(formControle, formDados, el('div', { class: 'acoes' }, botaoSalvar, mensagemSalvar));
 
   if (!novo) {
-    partes.push(secaoCertificado(c), secaoToken(c), secaoNumeracao(c), secaoUso(c), secaoHistorico(c));
+    partes.push(secaoCertificado(c), secaoToken(c), secaoPortal(c), secaoNumeracao(c), secaoUso(c), secaoHistorico(c));
   } else {
     partes.push(el('p', { class: 'suave' }, 'Depois de cadastrar, envie o certificado e gere o token de acesso.'));
   }
@@ -428,6 +445,93 @@ function secaoToken(c) {
     area,
     el('p', { class: 'suave' }, 'O sistema do cliente envia o token em todas as chamadas. Ele só consegue emitir pelo CNPJ desta empresa:'),
     el('pre', { class: 'exemplo mono' }, exemplo),
+  );
+}
+
+// ---- Portal do cliente (usuarios que entram com e-mail e senha) ----
+function secaoPortal(c) {
+  const lista = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const area = el('div', {});
+  const nome = el('input', { type: 'text', placeholder: 'Nome da pessoa', autocomplete: 'off' });
+  const email = el('input', { type: 'email', placeholder: 'email@empresa.com.br', autocomplete: 'off' });
+  const mensagem = el('span', {});
+  const linkPortal = new URL('../portal/', window.location.href).href;
+
+  // Senha provisoria aparece uma vez so, com botao de copiar.
+  function mostrarSenha(r) {
+    const texto = `Portal: ${linkPortal}\nE-mail: ${r.email}\nSenha provisória: ${r.senha_provisoria}`;
+    const copiar = el('button', { class: 'botao', type: 'button', onclick: async () => {
+      try { await navigator.clipboard.writeText(texto); copiar.textContent = 'Copiado!'; } catch { copiar.textContent = 'Selecione e copie'; }
+    } }, 'Copiar dados de acesso');
+    area.replaceChildren(el('div', { class: 'token-box' },
+      el('strong', {}, 'Envie para a pessoa (a senha não será mostrada de novo):'),
+      el('pre', { class: 'exemplo mono' }, texto),
+      el('div', { class: 'acoes' }, copiar),
+      el('p', { class: 'suave' }, 'No primeiro acesso o portal pede para ela criar a própria senha.')));
+  }
+
+  async function acao(corpo, confirmar) {
+    if (confirmar && !confirm(confirmar)) return;
+    try {
+      const r = await api('portal_usuarios.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, ...corpo } });
+      if (r.senha_provisoria) mostrarSenha(r); else area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      await recarregar();
+    } catch (e) {
+      area.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  async function recarregar() {
+    try {
+      const r = await api('portal_usuarios.php?cnpj=' + encodeURIComponent(c.cnpj));
+      if (!r.usuarios.length) {
+        lista.replaceChildren(el('p', { class: 'suave' }, 'Ninguém desta empresa tem acesso ao portal ainda.'));
+        return;
+      }
+      lista.replaceChildren(el('table', { class: 'mini' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Papel'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
+        el('tbody', {}, ...r.usuarios.map((u) => el('tr', {},
+          el('td', {}, u.nome),
+          el('td', {}, u.email),
+          // Administrador convida e desativa colegas pela tela Usuarios do portal.
+          el('td', {}, u.administrador ? 'Administrador' : 'Emissor'),
+          el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
+          el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
+          el('td', {},
+            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
+            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id }) },
+              u.administrador ? 'Tirar administrador' : 'Tornar administrador'), ' ',
+            el('button', { class: 'botao' + (u.ativo ? ' botao--perigo' : ''), type: 'button',
+              onclick: () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null) },
+            u.ativo ? 'Desativar' : 'Reativar'))))),
+      ));
+    } catch (e) {
+      lista.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  const botao = el('button', { class: 'botao', type: 'button' }, 'Dar acesso ao portal');
+  botao.addEventListener('click', async () => {
+    mensagem.textContent = '';
+    if (nome.value.trim().length < 2 || !email.checkValidity() || !email.value) {
+      mensagem.className = 'erro';
+      mensagem.textContent = 'Informe o nome e um e-mail válido.';
+      return;
+    }
+    botao.disabled = true;
+    await acao({ acao: 'criar', nome: nome.value, email: email.value });
+    if (area.querySelector('.token-box')) { nome.value = ''; email.value = ''; }
+    botao.disabled = false;
+  });
+
+  recarregar();
+  return el('section', { class: 'secao' },
+    el('h3', {}, 'Portal do cliente'),
+    el('p', { class: 'suave' }, `Pessoas desta empresa que emitem NFS-e pelo formulário em ${linkPortal}`),
+    lista,
+    el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
+    el('div', { class: 'acoes' }, botao, mensagem),
+    area,
   );
 }
 
@@ -586,6 +690,347 @@ async function abrirRelatorio(mes) {
 }
 
 // ==========================================================================
+// Sistema: worker e fila (sem terminal)
+//
+// O botao "Sistema" no topo tem uma bolinha: verde = worker ligado,
+// laranja = pausado/reiniciando, vermelha = parado. Ela se atualiza a cada
+// 15 s. A janela se atualiza a cada 5 s enquanto estiver aberta.
+// ==========================================================================
+
+let relogioSistema = null;
+
+async function atualizarPontoSistema() {
+  const ponto = $('sistema-ponto');
+  try {
+    const s = await api('sistema.php');
+    ponto.className = `ponto-sistema ponto-sistema--${s.situacao}`;
+    $('botao-sistema').title = `${s.titulo}. ${s.fila.esperando} na fila.`;
+    return s;
+  } catch (e) {
+    ponto.className = 'ponto-sistema';
+    $('botao-sistema').title = e.message;
+    throw e;
+  }
+}
+
+function abrirSistema() {
+  const estadoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const filaArea = el('div', {});
+  const workersArea = el('div', {});
+  const historicoArea = el('div', {});
+  const bancoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const bancoRetorno = el('div', {});
+  const diagArea = el('div', {}, el('p', { class: 'suave' },
+    'Confere servidor, configuração, banco, worker, certificados das empresas e acesso à internet da prefeitura. Não altera nada e não envia nota.'));
+  const diagBotao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Rodar diagnóstico');
+  const configArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const emailArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const acoesArea = el('div', { class: 'acoes' });
+  const retorno = el('div', {});
+
+  async function comandar(acao) {
+    retorno.replaceChildren();
+    try {
+      const r = await api('sistema.php', { metodo: 'POST', corpo: { acao } });
+      retorno.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      desenhar(r.status);
+      atualizarPontoSistema().catch(() => {});
+    } catch (e) {
+      retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  // Confirmacao dentro da propria tela (sem janela do navegador).
+  function pedirConfirmacao(pergunta, rotulo, acao) {
+    retorno.replaceChildren(el('div', { class: 'confirmar' },
+      el('span', {}, pergunta),
+      el('button', { class: 'botao botao--forte', type: 'button', onclick: () => comandar(acao) }, rotulo),
+      el('button', { class: 'botao', type: 'button', onclick: () => retorno.replaceChildren() }, 'Cancelar')));
+  }
+
+  function desenhar(s) {
+    estadoArea.replaceChildren(el('div', { class: 'sistema-estado' },
+      el('span', { class: `ponto-sistema ponto-sistema--${s.situacao}` }),
+      el('strong', {}, s.titulo),
+      el('span', { class: 'suave' }, s.texto)));
+
+    acoesArea.replaceChildren(
+      s.pausado
+        ? el('button', { class: 'botao botao--forte', type: 'button', onclick: () => comandar('retomar') }, 'Retomar envios')
+        : el('button', { class: 'botao', type: 'button',
+          onclick: () => pedirConfirmacao('Pausar o envio de notas? As notas novas ficam esperando na fila.', 'Pausar envios', 'pausar') }, 'Pausar envios'),
+      el('button', { class: 'botao', type: 'button', disabled: s.situacao === 'PARADO' || s.situacao === 'REINICIANDO',
+        onclick: () => pedirConfirmacao('Reiniciar o worker? Ele termina a nota atual e volta sozinho em alguns segundos. Use depois de atualizar o sistema.', 'Reiniciar', 'reiniciar') }, 'Reiniciar worker'));
+
+    const f = s.fila;
+    filaArea.replaceChildren(...[el('div', { class: 'numeros' },
+      el('div', { class: 'numero' + (f.esperando > 0 && s.situacao !== 'LIGADO' ? ' numero--alerta' : '') }, el('b', {}, f.esperando), el('span', {}, 'esperando envio')),
+      el('div', { class: 'numero' }, el('b', {}, f.executando), el('span', {}, 'enviando agora')),
+      el('div', { class: 'numero' }, el('b', {}, f.agendados), el('span', {}, 'agendados (consultas)')),
+      el('div', { class: 'numero' + (f.falhas_24h > 0 ? ' numero--alerta' : '') }, el('b', {}, f.falhas_24h), el('span', {}, 'falharam nas últimas 24 h'))),
+    f.mais_antigo ? el('p', { class: 'suave' }, `A mais antiga esperando entrou em ${dataHora(f.mais_antigo)}.`) : null].filter(Boolean));
+
+    workersArea.replaceChildren(s.workers.length
+      ? el('div', { style: 'overflow-x:auto' }, el('table', { class: 'mini' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Servidor'), el('th', {}, 'Situação'), el('th', { class: 'num' }, 'Trabalhos feitos'), el('th', {}, 'Ligado desde'), el('th', {}, 'Último sinal'))),
+        el('tbody', {}, ...s.workers.map((w) => el('tr', {},
+          el('td', { class: 'mono' }, `${w.servidor} · ${w.pid}`),
+          el('td', {}, ESTADOS_WORKER[w.estado] || w.estado),
+          el('td', { class: 'num' }, w.jobs_feitos),
+          el('td', {}, dataHora(w.iniciado_em)),
+          el('td', {}, dataHora(w.batimento_em)))))))
+      : el('p', { class: 'suave' }, 'Nenhum worker dando sinal agora.'));
+
+    historicoArea.replaceChildren(s.acoes_recentes.length
+      ? el('ul', { class: 'linha-tempo' }, ...s.acoes_recentes.map((a) => el('li', {},
+        el('time', { class: 'suave' }, dataHora(a.criado_em)), ' · ', el('strong', {}, ACOES_SISTEMA[a.acao] || a.acao),
+        a.ip ? el('span', { class: 'suave' }, ` (IP ${a.ip})`) : null)))
+      : el('p', { class: 'suave' }, 'Nenhuma ação ainda.'));
+  }
+
+  async function recarregar() {
+    try {
+      desenhar(await atualizarPontoSistema());
+    } catch (e) {
+      estadoArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  // ---- Diagnostico ----
+  const NIVEIS = { ERRO: { nome: 'Erro', ponto: 'PARADO' }, ATENCAO: { nome: 'Atenção', ponto: 'PAUSADO' }, OK: { nome: 'OK', ponto: 'LIGADO' } };
+
+  function itemDiagnostico(i, grupo) {
+    return el('li', { class: 'diag-item' },
+      el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[i.nivel].ponto}`, title: NIVEIS[i.nivel].nome }),
+      el('div', {},
+        el('div', {}, grupo ? el('span', { class: 'suave' }, `${grupo} · `) : null, i.texto),
+        i.resolver ? el('div', { class: 'diag-resolver' }, el('strong', {}, 'Como resolver: '), i.resolver) : null));
+  }
+
+  async function rodarDiagnostico() {
+    diagBotao.disabled = true;
+    diagBotao.textContent = 'Conferindo... (até 10 s)';
+    try {
+      const d = await api('diagnostico.php');
+      const problemas = [];
+      const certos = [];
+      for (const g of d.grupos) {
+        for (const i of g.itens) (i.nivel === 'OK' ? certos : problemas).push([i, g.titulo]);
+      }
+      problemas.sort((a, b) => (a[0].nivel === 'ERRO' ? 0 : 1) - (b[0].nivel === 'ERRO' ? 0 : 1));
+      const t = d.total;
+      const resumo = d.resultado === 'OK' ? 'Tudo certo'
+        : [t.ERRO ? `${t.ERRO} erro(s)` : null, t.ATENCAO ? `${t.ATENCAO} aviso(s)` : null].filter(Boolean).join(' e ');
+      diagArea.replaceChildren(...[
+        el('div', { class: 'sistema-estado' },
+          el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[d.resultado].ponto}` }),
+          el('strong', {}, resumo),
+          el('span', { class: 'suave' }, `${t.OK} item(ns) ok · conferido em ${dataHora(d.feito_em)}`)),
+        problemas.length ? el('ul', { class: 'diag-lista' }, ...problemas.map(([i, g]) => itemDiagnostico(i, g))) : null,
+        el('details', {}, el('summary', { class: 'suave' }, `Ver os ${certos.length} itens ok`),
+          el('ul', { class: 'diag-lista' }, ...certos.map(([i, g]) => itemDiagnostico(i, g)))),
+      ].filter(Boolean));
+    } catch (e) {
+      diagArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+    diagBotao.disabled = false;
+    diagBotao.textContent = 'Rodar de novo';
+  }
+  diagBotao.addEventListener('click', rodarDiagnostico);
+
+  // ---- Configuracoes ----
+  // A lista de campos vem da API (src/Nfse/Dominio/AjustesPainel.php):
+  // para liberar uma configuracao nova, mexa so la.
+  function textoValor(c, v) {
+    if (c.tipo === 'opcao') return c.opcoes[v] ?? v;
+    if (v === '' || v === null) return 'vazio';
+    return String(v);
+  }
+
+  function desenharConfiguracoes(dados, mensagem) {
+    const entradas = {};
+    const erros = {};
+    const grupos = {};
+    for (const c of dados.campos) (grupos[c.grupo] ||= []).push(c);
+
+    const blocos = Object.entries(grupos).map(([grupo, campos]) => el('fieldset', { class: 'config-grupo' },
+      el('legend', {}, grupo),
+      el('div', { class: 'campos' }, ...campos.map((c) => {
+        const id = 'cfg-' + c.chave.replace('.', '-');
+        let entrada;
+        if (c.tipo === 'opcao') {
+          entrada = el('select', { id }, ...Object.entries(c.opcoes).map(([v, nome]) => el('option', { value: v, selected: String(c.valor) === v }, nome)));
+        } else if (c.tipo === 'inteiro') {
+          entrada = el('input', { id, type: 'number', min: c.min, max: c.max, step: 1, value: c.valor });
+        } else if (c.tipo === 'texto' || c.tipo === 'email') {
+          entrada = el('input', { id, type: c.tipo === 'email' ? 'email' : 'text', value: c.valor ?? '', maxlength: 200 });
+        } else {
+          entrada = el('input', { id, type: 'url', value: c.valor ?? '', placeholder: 'https://...' });
+        }
+        entradas[c.chave] = entrada;
+        erros[c.chave] = el('span', { class: 'erro' });
+        const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
+        return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
+          el('span', { class: 'config-rotulo' }, c.rotulo),
+          entrada,
+          el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
+            c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
+          erros[c.chave]);
+      }))));
+
+    const retorno = el('div', {}, mensagem ? el('p', { class: 'ok-texto' }, mensagem) : '');
+    const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Salvar configurações');
+    salvar.addEventListener('click', async () => {
+      Object.values(erros).forEach((e) => { e.textContent = ''; });
+      const valores = {};
+      for (const [chave, entrada] of Object.entries(entradas)) valores[chave] = entrada.value;
+      salvar.disabled = true;
+      try {
+        const r = await api('configuracoes.php', { metodo: 'POST', corpo: { valores } });
+        desenharConfiguracoes(r.configuracoes, r.mensagem);
+        recarregar();
+        carregarEmail();
+      } catch (e) {
+        for (const d of e.detalhes || []) if (erros[d.campo]) erros[d.campo].textContent = d.mensagem;
+        retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+        salvar.disabled = false;
+      }
+    });
+
+    configArea.replaceChildren(
+      el('p', { class: 'suave' }, `Ambiente: ${dados.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'}. `,
+        'O ambiente, as senhas e os tokens só mudam no arquivo config/nfse.local.php, por segurança.'),
+      ...blocos,
+      el('div', { class: 'acoes' }, salvar),
+      retorno);
+  }
+
+  async function carregarConfiguracoes() {
+    try {
+      desenharConfiguracoes(await api('configuracoes.php'));
+    } catch (e) {
+      configArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  // ---- Banco de dados ----
+  function desenharBanco(b) {
+    const nomes = { APLICADO: 'aplicado', PENDENTE: 'pendente', ALTERADO: 'arquivo mudou: aplicar de novo' };
+    const pendentes = b.scripts.filter((x) => x.situacao !== 'APLICADO');
+    bancoArea.replaceChildren(...[
+      el('div', { class: 'sistema-estado' },
+        el('span', { class: `ponto-sistema ponto-sistema--${b.em_dia ? 'LIGADO' : 'PAUSADO'}` }),
+        el('strong', {}, b.em_dia ? 'Banco em dia' : `${b.pendentes} atualização(ões) pendente(s)`),
+        el('span', { class: 'suave' }, b.em_dia
+          ? `Todos os ${b.scripts.length} scripts de database/scripts/ já foram aplicados.`
+          : 'Aparece depois de atualizar o sistema. Os scripts só criam o que falta, sem apagar dados.')),
+      pendentes.length ? el('ul', {}, ...pendentes.map((x) => el('li', {}, el('span', { class: 'mono' }, x.nome), ` (${nomes[x.situacao]})`))) : null,
+      el('div', { class: 'acoes' },
+        el('button', { class: 'botao' + (b.em_dia ? '' : ' botao--forte'), type: 'button', disabled: b.em_dia,
+          onclick: () => bancoRetorno.replaceChildren(el('div', { class: 'confirmar' },
+            el('span', {}, `Aplicar ${b.pendentes} script(s) no banco agora? Leva poucos segundos.`),
+            el('button', { class: 'botao botao--forte', type: 'button', onclick: aplicarBanco }, 'Atualizar banco'),
+            el('button', { class: 'botao', type: 'button', onclick: () => bancoRetorno.replaceChildren() }, 'Cancelar'))) },
+        'Atualizar banco')),
+      el('details', {}, el('summary', { class: 'suave' }, 'Ver todos os scripts'),
+        el('table', { class: 'mini' }, el('tbody', {}, ...b.scripts.map((x) => el('tr', {},
+          el('td', { class: 'mono' }, x.nome),
+          el('td', {}, x.situacao === 'APLICADO' ? el('span', { class: 'ok-texto' }, 'aplicado') : el('span', { class: 'aviso' }, nomes[x.situacao])),
+          el('td', { class: 'suave' }, x.aplicado_em ? dataHora(x.aplicado_em) : '')))))),
+    ].filter(Boolean));
+  }
+
+  async function carregarBanco() {
+    try {
+      desenharBanco(await api('banco.php'));
+    } catch (e) {
+      bancoArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  async function aplicarBanco() {
+    bancoRetorno.replaceChildren(el('p', { class: 'suave' }, 'Atualizando o banco...'));
+    try {
+      const r = await api('banco.php', { metodo: 'POST', corpo: { acao: 'aplicar' } });
+      bancoRetorno.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      desenharBanco(r.banco);
+      carregarConfiguracoes();
+      carregarEmail();
+    } catch (e) {
+      bancoRetorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+      carregarBanco();
+    }
+    recarregar();
+  }
+
+  // ---- E-mail (Esqueci a senha do portal) ----
+  const NOMES_EMAIL = { PENDENTE: 'na fila', ENVIADO: 'enviado', ERRO: 'falhou' };
+  function desenharEmail(m) {
+    if (!m.instalado) {
+      emailArea.replaceChildren(el('p', { class: 'aviso' }, 'Falta atualizar o banco (script 0012) para ligar o "Esqueci a senha".'));
+      return;
+    }
+    const para = el('input', { type: 'email', value: m.remetente, placeholder: 'voce@empresa.com.br', 'aria-label': 'E-mail para receber o teste' });
+    const resultado = el('div', {});
+    const testar = el('button', { class: 'botao', type: 'button', disabled: !m.configurado }, 'Enviar e-mail de teste');
+    testar.addEventListener('click', async () => {
+      testar.disabled = true;
+      resultado.replaceChildren(el('p', { class: 'suave' }, 'Enviando... (até 20 s)'));
+      try {
+        const r = await api('email.php', { metodo: 'POST', corpo: { para: para.value } });
+        resultado.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      } catch (e) {
+        resultado.replaceChildren(el('p', { class: 'erro' }, e.message));
+      }
+      testar.disabled = false;
+    });
+    const situacao = !m.configurado
+      ? ['PAUSADO', 'E-mail não configurado', `Falta: ${m.faltam.join(', ')}. Preencha em Configurações abaixo; a senha vai no arquivo config/nfse.local.php.`]
+      : (!m.esqueci_ligado
+        ? ['PAUSADO', 'E-mail pronto, mas o "Esqueci a senha" está desligado', 'Preencha o "Endereço do portal" em Configurações (vai no link do e-mail).']
+        : ['LIGADO', '"Esqueci a senha" ligado', `Os e-mails saem por ${m.remetente}. Quem envia é o worker: ele precisa estar ligado.`]);
+    emailArea.replaceChildren(...[
+      el('div', { class: 'sistema-estado' },
+        el('span', { class: `ponto-sistema ponto-sistema--${situacao[0]}` }), el('strong', {}, situacao[1]), el('span', { class: 'suave' }, situacao[2])),
+      el('div', { class: 'acoes' }, para, testar),
+      resultado,
+      m.ultimos.length ? el('details', {}, el('summary', { class: 'suave' }, 'Últimos e-mails'),
+        el('table', { class: 'mini' }, el('tbody', {}, ...m.ultimos.map((x) => el('tr', {},
+          el('td', {}, x.para),
+          el('td', { class: 'suave' }, x.assunto),
+          el('td', {}, x.status === 'ENVIADO' ? el('span', { class: 'ok-texto' }, NOMES_EMAIL[x.status])
+            : el('span', { class: x.status === 'ERRO' ? 'erro' : 'aviso', title: x.ultimo_erro || '' }, NOMES_EMAIL[x.status] + (x.ultimo_erro ? `: ${x.ultimo_erro}` : ''))),
+          el('td', { class: 'suave' }, dataHora(x.enviado_em || x.criado_em))))))) : null,
+    ].filter(Boolean));
+  }
+
+  async function carregarEmail() {
+    try {
+      desenharEmail(await api('email.php'));
+    } catch (e) {
+      emailArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  abrirModal('Sistema', 'Worker (o programa que envia as notas), banco de dados, diagnóstico e configurações', [
+    el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
+    el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
+    el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
+    el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
+    el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
+    el('section', { class: 'secao' }, el('h3', {}, 'E-mail'), emailArea),
+    el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
+    el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
+  ]);
+  recarregar();
+  carregarBanco();
+  carregarConfiguracoes();
+  carregarEmail();
+  clearInterval(relogioSistema);
+  relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
+}
+
+// ==========================================================================
 // Inicio
 // ==========================================================================
 
@@ -602,6 +1047,7 @@ $('form-acesso').addEventListener('submit', async (evento) => {
 $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
+$('botao-sistema').addEventListener('click', abrirSistema);
 $('modal-fechar').addEventListener('click', () => $('modal').close());
 $('filtro-busca').addEventListener('input', desenhar);
 $('filtro-situacao').addEventListener('change', (e) => { estado.filtroSituacao = e.target.value; desenhar(); });

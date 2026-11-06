@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Xande\NfeIntegracao\Nfse;
 
 use PDO;
+use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
+use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use RuntimeException;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 
@@ -53,6 +55,10 @@ final class NfseConfig
     public static function carregar(?string $diretorioConfig = null): array
     {
         $dir = $diretorioConfig ?? dirname(__DIR__, 2) . '/config';
+        // Segredos do arquivo .env (ex.: SMTP_PASSWORD). So o que o servidor nao definiu.
+        if ($diretorioConfig === null) {
+            ArquivoEnv::carregar();
+        }
 
         $nfe = is_file($dir . '/nfe.php') ? require $dir . '/nfe.php' : [];
         $nfse = is_file($dir . '/nfse.php') ? require $dir . '/nfse.php' : [];
@@ -82,6 +88,8 @@ final class NfseConfig
         $cfg['admin_token'] = (string)($nfse['admin_token'] ?? '');
         $cfg['chave_certificados'] = (string)($nfse['chave_certificados'] ?? '') ?: (string)getenv('NFSE_CHAVE_CERTIFICADOS');
 
+        $cfg['email'] = self::montarEmail((array)($nfse['email'] ?? []));
+
         // NF-e (modelo 55): parametros tecnicos vem do config/nfe.php.
         $cfg['nfe'] = array_replace([
             'serie' => 1,
@@ -104,11 +112,55 @@ final class NfseConfig
     }
 
     /**
-     * Acrescenta as empresas clientes do banco (painel admin).
-     * Sem o script 0005 aplicado, devolve a config como veio.
+     * Bloco 'email' (SMTP). Campo vazio no arquivo usa a variavel de ambiente
+     * ou o arquivo .env (SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER,
+     * SMTP_PASSWORD, SMTP_FROM, PORTAL_URL). Ver ArquivoEnv.
+     */
+    private static function montarEmail(array $email): array
+    {
+        $ambiente = [
+            'host' => 'SMTP_HOST', 'porta' => 'SMTP_PORT', 'seguranca' => 'SMTP_SECURE', 'usuario' => 'SMTP_USER',
+            'senha' => 'SMTP_PASSWORD', 'remetente' => 'SMTP_FROM', 'url_portal' => 'PORTAL_URL',
+        ];
+        foreach ($ambiente as $chave => $variavel) {
+            $valor = getenv($variavel);
+            $vazio = !isset($email[$chave]) || ($chave !== 'seguranca' && trim((string)$email[$chave]) === '');
+            if ($vazio && $valor !== false && $valor !== '') {
+                $email[$chave] = $chave === 'porta' ? (int)$valor : $valor;
+            }
+        }
+        $padroes = [
+            'host' => '', 'porta' => 465, 'seguranca' => 'ssl', 'usuario' => '', 'senha' => '',
+            'remetente' => '', 'nome_remetente' => 'Gestão Fiscal', 'url_portal' => '', 'timeout_segundos' => 20,
+        ];
+        foreach ($padroes as $chave => $padrao) {
+            if (!isset($email[$chave]) || ($chave === 'porta' && (int)$email[$chave] <= 0)) {
+                // Criptografia nao informada: a porta 587 usa STARTTLS; as outras, TLS direto.
+                $email[$chave] = $chave === 'seguranca' && (int)$email['porta'] === 587 ? 'tls' : $padrao;
+            }
+        }
+        $email['porta'] = (int)$email['porta'];
+        // SMTP_SECURE costuma vir como true/false: true = ssl.
+        $email['seguranca'] = match (strtolower((string)$email['seguranca'])) {
+            'true', '1', 'ssl', 'smtps' => 'ssl',
+            'tls', 'starttls' => 'tls',
+            'false', '0', '', 'nenhuma' => (int)$email['porta'] === 587 ? 'tls' : '',
+            default => 'ssl',
+        };
+        return $email;
+    }
+
+    /**
+     * Acrescenta o que foi cadastrado no painel admin:
+     *   - configuracoes alteradas na tela Sistema (sistema_ajustes, script 0009),
+     *     que substituem o valor do arquivo (lista em Dominio/AjustesPainel.php);
+     *   - empresas clientes (script 0005).
+     * Sem os scripts aplicados, devolve a config como veio.
      */
     public static function comClientes(array $cfg, PDO $pdo): array
     {
+        $cfg = AjustesPainel::aplicar($cfg, (new SistemaRepositorio($pdo))->ajustes());
+
         $repositorio = new ClienteRepositorio($pdo);
         if (!$repositorio->existe()) {
             return $cfg;

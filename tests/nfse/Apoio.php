@@ -67,6 +67,7 @@ final class Apoio
         $nfse['armazenamento']['tipo'] = 'nenhum';
         $nfse['emitente']['inscricao_municipal'] = '12345678';
         $nfse['consumidores'] = ['TESTE' => ['token' => 'token-teste']];
+        $nfse['email'] = [];   // nunca usa o SMTP de verdade nos testes
         return NfseConfig::montar(
             ['tpAmb' => 2, 'cnpj' => '41986662000160', 'razao' => 'EMPRESA TESTE LTDA', 'siglaUF' => 'BA', 'ie' => '31638351'],
             $nfse

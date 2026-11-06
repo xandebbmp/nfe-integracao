@@ -24,7 +24,7 @@ Este manual explica **cada peça que roda no servidor**:
 10. [Como outra aplicação chama a API (autenticação e validação)](#10-como-outra-aplicação-chama-a-api)
 11. [Webhooks: avisos para o sistema do cliente](#11-webhooks)
 12. [Painel admin: empresas, bloqueios, limites e cobrança](#12-painel-admin)
-13. [Como rodar cada front (painel admin e monitor)](#13-como-rodar-cada-front)
+13. [Como rodar cada front (painel admin, monitor e portal do cliente)](#13-como-rodar-cada-front)
 14. [Checklist: está tudo funcionando?](#14-checklist-está-tudo-funcionando)
 15. [Operação do dia a dia e problemas comuns](#15-operação-do-dia-a-dia)
 16. [Segurança](#16-segurança)
@@ -185,13 +185,75 @@ php bin/nfse_verificar.php
 3. Entrega os **webhooks** pendentes (seção 11).
 4. A cada minuto, devolve à fila os trabalhos de um worker que morreu no
    meio e relê o cadastro de empresas do painel admin.
-5. Sem trabalho, **dorme** até o banco avisar (`LISTEN/NOTIFY`) ou 5 s
+5. A cada 5 minutos, emite as **notas recorrentes automáticas** do dia
+   (seção 13, "Recorrências"). Pausado no painel, não emite.
+   A cada volta também envia os **e-mails da fila** ("Esqueci a senha"),
+   mesmo pausado: a pausa vale para as notas, não para o login.
+6. Sem trabalho, **dorme** até o banco avisar (`LISTEN/NOTIFY`) ou 5 s
    passarem. Nota nova é atendida na hora, sem ficar consultando o banco.
 
 **Proteção contra nota em dobro:** antes de reenviar algo que pode ter
 chegado ao fisco (um timeout, por exemplo), o worker **consulta primeiro**,
 pela chave (NF-e) ou pela DPS/RPS (NFS-e). Só reenvia se o fisco disser que
 não existe.
+
+### No dia a dia: pelo painel (sem terminal)
+
+Depois de instalado (opção A ou B abaixo, **uma vez só**), o worker é
+acompanhado e comandado pelo botão **Sistema** no topo do painel admin.
+A bolinha do botão mostra a situação: verde = ligado, laranja = pausado ou
+reiniciando, vermelha = parado.
+
+| Botão | O que acontece |
+|---|---|
+| **Pausar envios** | Os workers param de enviar. Notas novas continuam entrando na fila e esperam. Use quando a prefeitura estiver fora do ar ou antes de uma manutenção. |
+| **Retomar envios** | Voltam a enviar, começando pelas que esperaram. |
+| **Reiniciar worker** | Cada worker termina a nota atual e sai; o systemd (ou o pm2) liga de novo em segundos, já com o código e a configuração novos. Use depois de atualizar o sistema. |
+
+A tela também mostra quantas notas esperam na fila, quantas falharam nas
+últimas 24 h, cada worker ligado (último sinal de vida) e quem deu cada
+ordem (IP e horário).
+
+Como funciona: o painel **não** liga processos no servidor (isso daria ao
+site poder de administrador). Ele grava a ordem na tabela `sistema_controle`
+e avisa no canal `nfse_controle`; o worker obedece na hora. A cada 10 s o
+worker grava um sinal de vida em `sistema_workers`; sem sinal por 30 s, o
+painel mostra "parado". Precisa do script `0007_sistema_criar_controle_worker.sql`
+(o `deploy/aplicar_banco.sh` aplica). Sem ele, o worker funciona normalmente,
+só não aparece no painel.
+
+> "Reiniciar" só religa o worker se ele estiver no systemd ou no pm2. Um
+> worker iniciado à mão no terminal apenas para.
+
+### Diagnóstico pelo painel
+
+Na mesma tela **Sistema**, o botão **Rodar diagnóstico** confere servidor,
+configuração, banco, worker, certificados de cada empresa e se o servidor
+alcança a Sefin, Salvador e a SEFAZ. Mostra primeiro os erros, depois os
+avisos, cada um com **Como resolver**. Não altera nada, não assina e não
+envia nota (a conferência da internet só pergunta "você responde?", sem
+certificado). São as mesmas regras do `bin/nfse_verificar.php` no terminal
+(`src/Nfse/Servico/Diagnostico.php`); o terminal confere, a mais, os
+arquivos de configuração e os serviços do systemd.
+
+### Configurações pelo painel
+
+Ainda na tela **Sistema**, a seção **Configurações** muda, sem mexer em
+arquivo: tempo de sessão, "lembrar de mim", senhas erradas antes de
+bloquear e tempo de bloqueio do portal; tipo de NFS-e do portal;
+tentativas e espera quando a prefeitura falha; tempo para devolver nota
+travada à fila; espera máxima e tamanho de lote da API; link de
+visualização de Salvador.
+
+- Cada campo mostra o **padrão do arquivo**. O valor do painel fica em
+  `sistema_ajustes` (script `0009`) e substitui o do arquivo. "Voltar ao
+  padrão" e salvar apaga o ajuste.
+- Valem na hora para o portal e a API. O worker relê em até 1 minuto.
+- **Ficam só no arquivo, de propósito:** ambiente (homologação/produção),
+  senhas e tokens (`admin_token`, `monitor_token`, `chave_certificados`,
+  credenciais do S3).
+- Para liberar uma configuração nova no painel, acrescente uma linha em
+  `src/Nfse/Dominio/AjustesPainel.php` (a tela e a validação usam essa lista).
 
 ### Quantos rodar
 
@@ -282,13 +344,20 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 ## 8. Banco de dados
 
 - **PostgreSQL 16.** Os scripts ficam em `database/scripts/`, numerados.
-  Aplicar ou atualizar:
+- **Atualizar pelo painel (sem terminal):** botão **Sistema** → seção
+  **Banco de dados**. Ela lista os scripts que ainda não rodaram neste banco
+  e o botão **Atualizar banco** aplica todos, em ordem. Se um der erro, ele
+  para ali, nada daquele script é gravado e a mensagem mostra qual foi.
+  Depois, clique em **Reiniciar worker**.
+- **Pelo terminal** (na instalação, antes de o painel existir):
 
   ```bash
   bash deploy/aplicar_banco.sh
   ```
 
-  Pode rodar de novo sem estragar nada.
+  Os dois caminhos podem rodar de novo sem estragar nada e anotam o que
+  rodou em `sistema_scripts` (script `0008`). Um script cujo arquivo mudou
+  depois de aplicado aparece de novo como pendente.
 
 | Script | Cria |
 |---|---|
@@ -296,6 +365,13 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 | `0003` | Multiempresa, rejeição na entrada, arquivamento |
 | `0004` | NF-e (padrão `NFE`, `DENEGADO`, protocolo, CC-e) |
 | `0005` | Empresas clientes, **uso para cobrança** e histórico do painel admin |
+| `0006` | Portal do cliente: usuários, sessões, serviços, tomadores, cache de CNPJ/CEP |
+| `0007` | Tela Sistema: sinal de vida e ordens do worker |
+| `0008` | Registro dos scripts aplicados (botão **Atualizar banco**) |
+| `0009` | Configurações alteradas pelo painel (`sistema_ajustes`) |
+| `0010` | Portal: papel de administrador dos usuários (`portal_usuarios.administrador`) |
+| `0011` | Portal: notas recorrentes (`portal_recorrencias`) |
+| `0012` | Portal: "Esqueci a senha" e fila de e-mails (`portal_redefinicoes`, `sistema_emails`) |
 
 - **Backup diário:** `deploy/backup_banco.sh`, no cron. Veja o manual de
   implantação, seção "Backup".
@@ -501,6 +577,13 @@ Para planilha, acrescente `&formato=csv`.
 | `POST /v1/admin/token.php` | Gerar um token novo |
 | `POST /v1/admin/numeracao.php` | Último número já usado numa série: `{"cnpj","padrao","serie","ultimo_numero"}` |
 | `GET /v1/admin/uso.php?mes=AAAA-MM[&formato=csv]` | Relatório de cobrança |
+| `GET /v1/admin/sistema.php` | Tela Sistema: worker ligado, fila e últimas ordens |
+| `POST /v1/admin/sistema.php` | `{"acao": "pausar" \| "retomar" \| "reiniciar"}` |
+| `GET /v1/admin/banco.php` | Scripts do banco aplicados e pendentes |
+| `POST /v1/admin/banco.php` | `{"acao": "aplicar"}`: roda os pendentes |
+| `GET /v1/admin/diagnostico.php[?rede=0]` | Diagnóstico (não altera nada; `rede=0` pula a internet) |
+| `GET /v1/admin/configuracoes.php` | Configurações editáveis, valor atual e padrão do arquivo |
+| `POST /v1/admin/configuracoes.php` | `{"valores": {"portal.tentativas_login": 5, ...}}` |
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
 exemplo, ao detectar fatura em atraso:
@@ -515,7 +598,7 @@ curl -X POST https://SEU_DOMINIO/v1/admin/clientes.php -H "X-ADMIN-TOKEN: <admin
 
 ## 13. Como rodar cada front
 
-O projeto tem **dois fronts**. Os dois são páginas HTML/CSS/JS puras:
+O projeto tem **três fronts**. Todos são páginas HTML/CSS/JS puras:
 - **sem build**: não tem `npm install`, `npm run build` nem Node;
 - **sem servidor próprio**: o mesmo nginx/Apache que serve a API entrega as
   páginas.
@@ -526,6 +609,7 @@ o endereço no navegador.
 | Front | Endereço | Arquivos | Senha pedida na tela | Para quem |
 |---|---|---|---|---|
 | **Painel admin** | `https://SEU_DOMINIO/admin/` | `public/admin/` (`index.html`, `admin.css`, `admin.js`) | `admin_token` do `config/nfse.local.php` | Você: empresas, certificados, tokens, bloqueios, numeração e cobrança |
+| **Portal do cliente** | `https://SEU_DOMINIO/portal/` | `public/portal/` (`index.html`, `portal.css`, `portal.js`) | E-mail e senha da pessoa (criados no painel admin) | A empresa cliente: emite a própria NFS-e num formulário |
 | **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
 
 ### Passo a passo (servidor)
@@ -563,7 +647,8 @@ precisa entrar de novo.
 
 As páginas chamam a API **no mesmo domínio**, por caminho relativo:
 - o painel usa `../v1/admin/`;
-- o monitor usa `../v1/nfse/`.
+- o monitor usa `../v1/nfse/`;
+- o portal usa `../v1/portal/`.
 
 Por isso:
 - **Front e API ficam juntos no mesmo servidor e domínio.** Não é preciso
@@ -577,8 +662,10 @@ Por isso:
 
 ### Restringir quem acessa (recomendado)
 
-Os dois fronts mostram dados de todas as empresas. Além do token, limite
-por IP ou VPN. No nginx, dentro do `server { ... }`:
+O painel e o monitor mostram dados de todas as empresas. Além do token,
+limite por IP ou VPN. **O portal do cliente fica aberto** (é usado pelas
+empresas de qualquer lugar): não coloque `/portal/` nem `/v1/portal/` nessa
+lista. No nginx, dentro do `server { ... }`:
 
 ```nginx
 location ^~ /admin/      { allow 200.100.50.0/24; deny all; }
@@ -589,11 +676,148 @@ location ^~ /monitor/    { allow 200.100.50.0/24; deny all; }
 Troque pelo IP ou faixa do seu escritório ou VPN e rode
 `sudo nginx -t && sudo systemctl reload nginx`.
 
+### Portal do cliente
+
+A empresa cliente entra com **e-mail e senha** e emite a NFS-e num
+formulário de 3 blocos (tomador, serviço, valor). O portal **não tem
+emissão própria**: monta o mesmo JSON de `/v1/nfse/emitir.php` e usa a mesma
+fila. Bloqueios, franquia, cobrança, monitor e webhooks valem igual.
+
+**Instalar:** aplique o script `database/scripts/0006_portal_criar_usuarios.sql`
+(o `deploy/aplicar_banco.sh` já aplica todos). Sem ele, as rotas respondem
+`PORTAL_NAO_INSTALADO`.
+
+**Dar acesso a uma pessoa:**
+1. No painel admin, abra a empresa e vá até **Portal do cliente**.
+2. Informe nome e e-mail e clique em **Dar acesso ao portal**.
+3. Copie os dados de acesso (endereço, e-mail e **senha provisória**) e envie
+   para a pessoa. A senha aparece uma vez só.
+4. No primeiro acesso o portal pede para ela criar a própria senha
+   (mínimo 8 caracteres, com letras e números).
+
+**Esqueceu a senha ou bloqueou:** depois de 5 senhas erradas seguidas o
+acesso fica bloqueado por 15 minutos. No painel, **Nova senha** gera outra
+senha provisória e libera na hora. **Desativar** tira o acesso e encerra as
+sessões abertas.
+
+**O que é automático no formulário:**
+- dados da empresa (prestador), padrão (Nacional ou Salvador) e numeração;
+- tomador pelo CNPJ (consulta pública da Receita via BrasilAPI) e endereço
+  pelo CEP (ViaCEP, com o código IBGE). A consulta é feita pelo servidor e
+  guardada por 30 dias (CNPJ) e 180 dias (CEP) em `portal_consultas`. Se a
+  consulta estiver fora do ar, a pessoa preenche à mão;
+- tomadores ficam salvos na primeira nota (`portal_tomadores`);
+- serviços salvos com códigos e alíquota (`portal_servicos`): escolhidos numa
+  lista. Um serviço novo pode ser salvo na própria emissão;
+- clique duplo não gera nota em dobro (referência `PORTAL-<id do envio>`).
+
+**Outras telas do portal:**
+- **Minhas notas:** todas as NFS-e da empresa (do portal ou da API), 20 por
+  página. Filtros por situação (autorizadas, na prefeitura, com problema,
+  canceladas), por mês e busca por tomador, CPF/CNPJ ou número. Clicar na
+  nota mostra o detalhe: o motivo da prefeitura e como corrigir, valores,
+  PDF e XML. Enquanto houver nota na prefeitura, a lista se atualiza sozinha.
+- **Serviços:** cadastrar, editar e remover os serviços salvos. "Usar na
+  nota" abre a emissão com o serviço já escolhido. Remover só esconde da
+  lista: as notas emitidas não mudam.
+- **Tomadores:** lista com busca, editar o cadastro (o CPF/CNPJ não muda),
+  cadastrar um novo (com CNPJ e CEP preenchidos sozinhos) e remover.
+  "Emitir nota" abre a emissão com o tomador preenchido. Editar não muda a
+  ordem da lista (os mais usados ficam em cima).
+- **Minha empresa:** só para ver. Mostra o cadastro, os dados fiscais (em
+  texto: Simples, regime especial, tipos de nota contratados), o certificado
+  (titular e validade) e o plano (limite do mês, uso e se a emissão está
+  liberada). Para mudar algo, o suporte altera no painel admin. Nunca mostra
+  token, certificado, segredo do webhook ou a observação interna.
+- **Usuários:** todos veem quem da empresa tem acesso. Cada pessoa é
+  **administrador** ou **emissor**. Só administradores convidam (a senha
+  provisória aparece uma vez, numa mensagem pronta para copiar), geram nova
+  senha, desativam e escolhem quem também é administrador. Ninguém mexe no
+  próprio acesso, então a empresa nunca fica sem administrador ativo. Cada um
+  troca a própria senha em "Minha senha". O primeiro usuário criado no painel
+  para uma empresa sem administrador ativo vira administrador sozinho; no
+  painel também há o botão "Tornar administrador" (script `0010`).
+- **Recorrências** (script `0011`): a mensalidade de um cliente cadastrada
+  uma vez (tomador, serviço, valor, dia do mês até 28, mês de competência
+  atual ou anterior, último mês opcional). `{mes}` na descrição vira o mês
+  da nota. Cada uma escolhe o modo:
+  - **Me avisar para confirmar** (padrão): no dia, aparece "Esperando você"
+    no menu e na tela inicial; a nota só sai no clique "Emitir agora" (ou
+    "Pular mês").
+  - **Emitir sozinha:** o worker emite no dia. Se der erro (empresa
+    bloqueada, limite do plano), tenta uma vez por dia e o motivo aparece
+    no cartão, que fica esperando o cliente.
+  Cada mês tem a referência `PORTAL-rec-<id>-<AAAAMM>`, então a mesma nota
+  nunca sai duas vezes. Pausar e retomar não gera notas atrasadas: segue do
+  próximo dia marcado. Apagar não mexe nas notas já emitidas.
+- **Cancelar nota** (botão no detalhe de uma nota autorizada, em "Minhas
+  notas"): qualquer usuário da empresa pode cancelar. Pede o motivo (erro na
+  emissão, serviço não prestado ou outro), uma explicação de 15 a 255 letras
+  e a marcação "Entendi que não pode ser desfeito". O pedido guarda quem fez.
+  - **Padrão Nacional:** o pedido vai para a fila e o worker envia ao fisco.
+    A nota continua "Autorizada" até a confirmação; se o fisco recusar (fora
+    do prazo, por exemplo), o motivo aparece no detalhe e dá para tentar de
+    novo.
+  - **Salvador:** não cancela por webservice. A tela explica como pedir no
+    site da prefeitura; depois de aceito, o cliente informa o protocolo e a
+    nota vira "Cancelada" na hora (nada é enviado).
+- **Esqueci a senha** (script `0012`): no login, a pessoa digita o e-mail e
+  recebe um link (vale 1 hora, uma vez; no máximo 3 pedidos por hora). A
+  resposta é sempre a mesma, exista ou não o e-mail. Criada a senha nova,
+  as sessões abertas em outros navegadores saem. Quem envia o e-mail é o
+  **worker**. Para ligar:
+  1. No painel, **Sistema > Configurações > E-mail**: servidor, porta,
+     criptografia, usuário, remetente e o **endereço do portal** (vai no
+     link do e-mail).
+  2. A **senha** do e-mail vai no arquivo **`.env`** da raiz do projeto
+     (fora do Git):
+     ```bash
+     cp .env.example .env     # uma vez só
+     nano .env                # preencha SMTP_PASSWORD (e o resto, se quiser)
+     chmod 600 .env
+     ```
+     O `.env` também aceita `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
+     `SMTP_USER`, `SMTP_FROM` e `PORTAL_URL`. O que estiver no painel ou no
+     `config/nfse.local.php` vale mais; o `.env` preenche o que falta.
+     Depois, "Reiniciar worker" no painel para ele ler o arquivo.
+  3. No bloco **Sistema > E-mail**, use "Enviar e-mail de teste". Ali
+     também aparecem os últimos e-mails e o erro do servidor, se falhar
+     (tenta de novo em 1, 2, 4 e 8 minutos e desiste na 5ª vez).
+  Enquanto faltar algo, o link "Esqueci minha senha" mostra "peça ao
+  administrador da sua empresa" (o administrador gera senha provisória em
+  Usuários).
+
+**Configuração** (`portal` no `config/nfse.php`, troque no
+`config/nfse.local.php`):
+
+| Chave | Padrão | Para que serve |
+|---|---|---|
+| `sessao_minutos` | `720` | Duração da sessão sem "Manter conectado" (12 h) |
+| `sessao_lembrar_dias` | `30` | Duração com "Manter conectado" |
+| `tentativas_login` | `5` | Senhas erradas seguidas antes do bloqueio |
+| `bloqueio_minutos` | `15` | Tempo de bloqueio |
+| `padrao` | vazio | Vazio: Nacional (ou Salvador, se for o único contratado). `NACIONAL`/`SALVADOR` força para todas |
+| `url_cnpj`, `url_cep` | BrasilAPI e ViaCEP | Endereços das consultas públicas |
+
+**Segurança da sessão:** cookie `HttpOnly` e `SameSite=Strict` (e `Secure`
+no HTTPS). O banco guarda só o sha256 do cookie e o hash da senha. Toda
+chamada que altera algo exige o cabeçalho `X-Portal: 1` (o próprio portal
+envia), o que impede outro site de emitir usando a sessão de alguém.
+
+**Rotas** (`public/v1/portal/`): `entrar`, `sair`, `sessao`, `senha`,
+`inicio`, `notas`, `servicos`, `tomadores`, `empresa`, `usuarios`, `consulta`, `emitir` e `arquivo` (PDF/XML).
+No painel: `public/v1/admin/portal_usuarios.php`.
+
 ### Alterar o visual ou os textos
 
 - **Cores:** ficam no bloco `:root` do `public/monitor/monitor.css`, que vale
   para os dois fronts. O que é só do painel está em `public/admin/admin.css`.
-- **Textos e telas:** `public/admin/admin.js` e `public/monitor/monitor.js`,
+- **Portal do cliente:** tem cores próprias no `:root` do
+  `public/portal/portal.css` (azul-marinho e cobre, com tema escuro).
+  O `portal-demo.js` é só para a prévia sem servidor: o `index.html` não o
+  carrega.
+- **Textos e telas:** `public/admin/admin.js`, `public/monitor/monitor.js` e
+  `public/portal/portal.js`,
   com comentários em português. Nomes de status e de tipos de nota ficam
   nas constantes do início de cada arquivo.
 - **Depois de alterar:** não há build. Atualize o servidor
@@ -611,7 +835,7 @@ PHP:
 php -S 127.0.0.1:8080 -t public
 ```
 
-Abra `http://127.0.0.1:8080/admin/` ou `/monitor/`. Isso serve só para
+Abra `http://127.0.0.1:8080/admin/`, `/monitor/` ou `/portal/`. Isso serve só para
 conferir a tela: o tempo real e os envios ao fisco precisam do worker e da
 configuração completa do servidor.
 

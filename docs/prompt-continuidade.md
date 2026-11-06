@@ -171,7 +171,26 @@ Documentação:
 6. **GitHub:** ativar a proteção da `main` exigindo o check
    "Testes NFS-e (PHP 8.3 + PostgreSQL 16)" (`docs/ci.md`).
 7. **Produção:** `tpAmb = 1` só depois da homologação aprovada.
-8. **Não testados em ambiente real:** `deploy/apache/nfe-integracao.conf` e
+8. **Portal do cliente** (`public/portal/`, rotas `public/v1/portal/`,
+   banco `0006_portal_criar_usuarios.sql`): login, início, "Emitir nota",
+   "Minhas notas", "Serviços", "Tomadores", "Minha empresa", "Usuários"
+   (administrador/emissor, script 0010) e "Recorrências" (script 0011,
+   automática ou com confirmação; o worker confere a cada 5 min) e
+   "Cancelar nota" (qualquer usuário; Nacional envia, Salvador registra o
+   protocolo da prefeitura) e "Esqueci a senha" (script 0012, e-mail pelo
+   worker via PHPMailer; SMTP no painel, senha no .env da raiz, modelo .env.example, lido por Nfse/ArquivoEnv.php) já ligados na
+   API. Falta: preencher a senha do SMTP na VPS, testar o envio pelo painel
+   e testar a
+   consulta de CNPJ/CEP com rede na VPS. Ver `docs/manual-operacao.md`
+   seção 13.
+9. **Tudo pelo painel (pedido do xande):** o worker já é acompanhado e
+   comandado no botão "Sistema" do painel admin (pausar, retomar,
+   reiniciar; script 0007) e o banco é atualizado pelo botão "Atualizar
+   banco" (script 0008) e o botão "Rodar diagnóstico" usa as mesmas regras
+   do `bin/nfse_verificar.php` (`Servico/Diagnostico.php`). Configurações
+   editáveis na mesma tela (script 0009, lista em `Dominio/AjustesPainel.php`).
+   Ambiente, senhas e tokens continuam só no arquivo, de propósito.
+10. **Não testados em ambiente real:** `deploy/apache/nfe-integracao.conf` e
    `deploy/pm2/ecosystem.config.js`.
 
 Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
@@ -185,9 +204,9 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 163/163 com banco e 73/73 sem.
+  - Situação atual: 398/398 com banco e 102/102 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
-  `node --check public/admin/admin.js public/monitor/monitor.js` e
+  `node --check public/admin/admin.js public/monitor/monitor.js public/portal/portal.js` e
   `shellcheck -S warning deploy/*.sh`.
 - **Banco:** toda mudança é um script novo `database/scripts/NNNN_*.sql`
   que pode rodar mais de uma vez. Ele entra sozinho nos testes e no
