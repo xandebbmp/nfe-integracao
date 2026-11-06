@@ -209,6 +209,18 @@ $dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->req
 Apoio::verificar(str_contains($dps, '<pTotTribSN>2.00</pTotTribSN>') && !str_contains($dps, '<indTotTrib>'), 'ME/EPP: DPS usa o percentual do cadastro (pTotTribSN 2.00)');
 Apoio::igual([], ValidadorXsd::validar($dps, "{$raiz}/schemas/nfse/nacional/1.01/DPS_v1.01.xsd"), 'ME/EPP: DPS com pTotTribSN passa no XSD');
 
+// Producao e Producao Restrita em leiautes diferentes (E1235 em producao com finNFSe).
+Apoio::verificar(str_contains($dps, '<finNFSe>0</finNFSe>'), 'homologacao: DPS envia finNFSe (XSD de 20/10/2026)');
+$cfgProducao = $cfgMeEpp;
+$cfgProducao['tpAmb'] = 1;
+$http = new TransporteFalso();
+$http->responder(201, respostaSefinAutorizada($chave));
+provedorNacional($cfgProducao, $http)->emitir(Apoio::documentoNacional());
+$dpsProducao = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
+Apoio::verificar(!str_contains($dpsProducao, 'finNFSe') && str_contains($dpsProducao, '<tpAmb>1</tpAmb>'), 'producao: DPS sem finNFSe (a producao ainda recusa o campo)');
+Apoio::igual([], ValidadorXsd::validar($dpsProducao, "{$raiz}/schemas/nfse/nacional/1.01-producao/DPS_v1.01.xsd"), 'producao: DPS passa no XSD da producao');
+Apoio::verificar(ValidadorXsd::validar($dps, "{$raiz}/schemas/nfse/nacional/1.01-producao/DPS_v1.01.xsd") !== [], 'XSD da producao recusa finNFSe (mesmo erro da Receita)');
+
 $docComPercentual = Apoio::documentoNacional();
 $docComPercentual['payload']['valores']['percentual_tributos_simples'] = 6.5;
 $http = new TransporteFalso();

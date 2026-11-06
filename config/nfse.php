@@ -62,6 +62,15 @@ $cfg = [
     // ---------------------------------------------------------------
     'nacional' => [
         'versao_leiaute' => '1.01',
+        // Producao e Producao Restrita (homologacao) estao em leiautes
+        // DIFERENTES: o XSD de 20/10/2026 (com finNFSe obrigatorio) so vale
+        // na Producao Restrita. Pasta do XSD em schemas/nfse/nacional/ e se
+        // envia finNFSe. Quando a Receita virar a producao, troque o 1 para
+        // ['xsd' => '1.01', 'finNFSe' => true].
+        'leiaute_por_ambiente' => [
+            1 => ['xsd' => '1.01-producao', 'finNFSe' => false],
+            2 => ['xsd' => '1.01', 'finNFSe' => true],
+        ],
         'serie_dps' => '1',
         'algoritmo_assinatura' => 'sha256',
         'timeout_segundos' => 30,

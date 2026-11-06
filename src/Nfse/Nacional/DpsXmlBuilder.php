@@ -82,8 +82,11 @@ final class DpsXmlBuilder
         Xml::filho($dom, $inf, 'nDPS', (string)$numero);
         Xml::filho($dom, $inf, 'dCompet', (string)($p['competencia'] ?? $agora->format('Y-m-d')));
         Xml::filho($dom, $inf, 'tpEmit', '1'); // 1 = prestador
-        // Finalidade da NFS-e: obrigatoria desde o XSD de 20/10/2026. Hoje so existe 0 = NFS-e regular.
-        Xml::filho($dom, $inf, 'finNFSe', '0');
+        // Finalidade da NFS-e: obrigatoria no XSD de 20/10/2026 (hoje so na
+        // Producao Restrita; a producao ainda recusa o campo). 0 = NFS-e regular.
+        if (self::leiaute($this->cfg)['finNFSe']) {
+            Xml::filho($dom, $inf, 'finNFSe', '0');
+        }
         Xml::filho($dom, $inf, 'cLocEmi', (string)$emitente['codigo_municipio']);
 
         $this->montarSubstituicao($dom, $inf, $p);
@@ -93,6 +96,17 @@ final class DpsXmlBuilder
         $this->montarValores($dom, $inf, self::valoresComPadraoDoEmitente($p['valores'], $emitente));
 
         return ['xml' => $dom->saveXML($dom->documentElement), 'id_dps' => $idDps];
+    }
+
+    /**
+     * Leiaute do ambiente (config nacional.leiaute_por_ambiente):
+     * ['xsd' => pasta em schemas/nfse/nacional, 'finNFSe' => envia o campo?].
+     */
+    public static function leiaute(array $cfg): array
+    {
+        $tpAmb = (int)$cfg['tpAmb'];
+        $padrao = ['xsd' => (string)$cfg['nacional']['versao_leiaute'], 'finNFSe' => true];
+        return ($cfg['nacional']['leiaute_por_ambiente'][$tpAmb] ?? []) + $padrao;
     }
 
     /**
