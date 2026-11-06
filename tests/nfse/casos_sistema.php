@@ -10,6 +10,8 @@ declare(strict_types=1);
 
 use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
+use Xande\NfeIntegracao\Nfse\ArquivoEnv;
+use Xande\NfeIntegracao\Nfse\Servico\EnvioEmail;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\AtualizacaoBanco;
 use Xande\NfeIntegracao\Nfse\Servico\ConfiguracoesPainel;
@@ -37,6 +39,39 @@ function testesSistemaUnidade(array $cfg): void
     Apoio::igual(9, $aplicado['portal']['tentativas_login'], 'ajuste valido aplicado na config');
     Apoio::igual($cfg['tpAmb'], $aplicado['tpAmb'], 'ambiente nunca muda pelo painel');
     Apoio::igual($cfg['fila']['max_tentativas'], $aplicado['fila']['max_tentativas'], 'valor invalido salvo no banco e ignorado');
+
+    echo "\n[12c] E-mail (SMTP) do Esqueci a senha\n";
+    Apoio::verificar(AjustesPainel::validar('email.remetente', 'Nome <a@b.com>')[1] !== null, 'remetente com nome e <> recusado');
+    Apoio::igual(['a@b.com.br', null], AjustesPainel::validar('email.remetente', ' a@b.com.br '), 'remetente valido aceito');
+    Apoio::verificar(AjustesPainel::validar('email.host', "mail\nx")[1] !== null, 'texto com quebra de linha recusado');
+    Apoio::verificar(AjustesPainel::validar('email.senha', 'x')[1] !== null, 'senha do e-mail nao muda pelo painel');
+    putenv('SMTP_HOST=mail.exemplo.com.br');
+    putenv('SMTP_PORT=587');
+    putenv('SMTP_SECURE=false');
+    putenv('SMTP_PASSWORD=segredo');
+    $comAmbiente = NfseConfig::montar(['tpAmb' => 2, 'cnpj' => '41986662000160', 'razao' => 'EMPRESA TESTE LTDA', 'siglaUF' => 'BA', 'ie' => '31638351'], ['email' => ['usuario' => 'contato@exemplo.com.br', 'remetente' => 'contato@exemplo.com.br']]);
+    putenv('SMTP_HOST');
+    putenv('SMTP_PORT');
+    putenv('SMTP_SECURE');
+    putenv('SMTP_PASSWORD');
+    Apoio::igual(['mail.exemplo.com.br', 587, 'tls', 'segredo'], [$comAmbiente['email']['host'], $comAmbiente['email']['porta'], $comAmbiente['email']['seguranca'], $comAmbiente['email']['senha']],
+        'variaveis SMTP_* do servidor preenchem o que falta (587 sem SSL = STARTTLS)');
+    $lido = ArquivoEnv::ler("# comentario\nSMTP_HOST=mail.exemplo.com.br\nSMTP_PASSWORD=\"s#nha com espaco\"\nexport SMTP_PORT=587 # porta\nlinha estranha\nSMTP_FROM='a@b.com'\n");
+    Apoio::igual(['SMTP_HOST' => 'mail.exemplo.com.br', 'SMTP_PASSWORD' => 's#nha com espaco', 'SMTP_PORT' => '587', 'SMTP_FROM' => 'a@b.com'], $lido,
+        '.env: le chave=valor, aspas, export e comentarios; ignora linha estranha');
+    $arquivoEnv = tempnam(sys_get_temp_dir(), 'env');
+    file_put_contents($arquivoEnv, "TESTE_ENV_NOVA=do-arquivo\nTESTE_ENV_SERVIDOR=do-arquivo\n");
+    putenv('TESTE_ENV_SERVIDOR=do-servidor');
+    $carregadas = ArquivoEnv::carregar($arquivoEnv);
+    Apoio::igual([['TESTE_ENV_NOVA'], 'do-arquivo', 'do-servidor'], [$carregadas, getenv('TESTE_ENV_NOVA'), getenv('TESTE_ENV_SERVIDOR')],
+        '.env: preenche o que falta; variavel do servidor vale mais');
+    putenv('TESTE_ENV_NOVA');
+    putenv('TESTE_ENV_SERVIDOR');
+    unlink($arquivoEnv);
+    Apoio::igual([], ArquivoEnv::carregar('/nao/existe/.env'), '.env: sem arquivo, segue normal');
+    $envio = new EnvioEmail($cfg);
+    Apoio::igual(['servidor (host)', 'usuário', 'senha', 'remetente'], $envio->pendencias(), 'sem config, diz o que falta');
+    Apoio::verificar((new EnvioEmail($comAmbiente))->configurado(), 'com tudo preenchido, pronto para enviar');
 }
 
 function testesSistemaIntegracao(PDO $pdo, array $cfg): void

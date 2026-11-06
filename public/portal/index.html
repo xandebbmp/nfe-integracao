@@ -103,6 +103,56 @@
         <p id="senha-erro" class="erro" hidden></p>
         <button type="submit" class="btn btn--primario btn--largo">Salvar e entrar <i class="icone icone--p">arrow_forward</i></button>
       </form>
+
+      <!-- Esqueci a senha: 1) pede o link por e-mail -->
+      <form id="form-esqueci" class="login__form" novalidate hidden>
+        <div>
+          <h1>Esqueci a senha</h1>
+          <p class="secundario">Digite o e-mail que você usa para entrar. Enviamos um link para criar uma senha nova.</p>
+        </div>
+        <div class="campo">
+          <label for="esqueci-email">E-mail</label>
+          <div class="campo__caixa"><i class="icone">mail</i><input id="esqueci-email" type="email" autocomplete="username" placeholder="voce@empresa.com.br" required></div>
+        </div>
+        <p id="esqueci-erro" class="erro" hidden></p>
+        <button type="submit" class="btn btn--primario btn--largo">Enviar link <i class="icone icone--p">send</i></button>
+        <button type="button" class="btn btn--secundario btn--largo" data-voltar-login><i class="icone icone--p">arrow_back</i> Voltar para o login</button>
+      </form>
+
+      <!-- Esqueci a senha: 2) confirmacao (igual para quem existe ou nao) -->
+      <div id="esqueci-enviado" class="login__form" hidden>
+        <div class="login__selo"><i class="icone">mark_email_read</i></div>
+        <div>
+          <h1>Confira o seu e-mail</h1>
+          <p class="secundario" id="esqueci-enviado-texto"></p>
+        </div>
+        <ul class="login__passos">
+          <li>Abra o e-mail "Criar uma senha nova no portal".</li>
+          <li>Clique em <b>Criar senha nova</b> (vale 1 hora).</li>
+          <li>Não chegou em alguns minutos? Olhe o spam ou peça de novo.</li>
+        </ul>
+        <button type="button" class="btn btn--primario btn--largo" data-voltar-login>Voltar para o login</button>
+      </div>
+
+      <!-- Esqueci a senha: 3) link do e-mail aberto: cria a senha nova -->
+      <form id="form-redefinir" class="login__form" novalidate hidden>
+        <div>
+          <h1>Crie uma senha nova</h1>
+          <p class="secundario" id="redefinir-para">Conferindo o link…</p>
+        </div>
+        <div class="campo">
+          <label for="redefinir-senha">Nova senha</label>
+          <div class="campo__caixa"><i class="icone">lock</i><input id="redefinir-senha" type="password" autocomplete="new-password" minlength="8" required></div>
+          <small class="dica">Mínimo de 8 caracteres, com letras e números.</small>
+        </div>
+        <div class="campo">
+          <label for="redefinir-confirma">Repita a nova senha</label>
+          <div class="campo__caixa"><i class="icone">lock</i><input id="redefinir-confirma" type="password" autocomplete="new-password" required></div>
+        </div>
+        <p id="redefinir-erro" class="erro" hidden></p>
+        <button type="submit" class="btn btn--primario btn--largo">Salvar senha nova</button>
+        <button type="button" class="btn btn--secundario btn--largo" hidden id="redefinir-voltar">Pedir outro link</button>
+      </form>
     </div>
   </section>
 

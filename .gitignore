@@ -7,6 +7,9 @@ storage/certs/*.p12
 storage/certs/*.pem
 
 # Dados sensíveis
+.env
+.env.*
+!.env.example
 config/nfe.local.php
 config/*.local.php
 
