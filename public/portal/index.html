@@ -730,6 +730,42 @@
     </form>
   </dialog>
 
+  <dialog id="janela-cancelar" class="janela" aria-labelledby="cancelar-titulo">
+    <form id="form-cancelar" class="emitir" novalidate>
+      <div class="janela__cabeca">
+        <div><h2 id="cancelar-titulo">Cancelar nota</h2><p class="secundario" id="cancelar-subtitulo"></p></div>
+        <button type="button" class="btn btn--icone" data-fechar aria-label="Fechar"><i class="icone">close</i></button>
+      </div>
+      <div class="janela__corpo">
+        <input type="hidden" id="canc-id">
+        <div class="resultado resultado--alerta"><b>Não dá para desfazer</b>
+          <span>A nota deixa de valer para você e para o tomador. Se só precisa corrigir algo, cancele e depois emita uma nova.</span></div>
+        <div class="resultado resultado--andamento" id="canc-prefeitura" hidden><b>Em Salvador, o pedido é feito no site da prefeitura</b>
+          <span>1. Peça o cancelamento no site da NFS-e de Salvador (Cancelamento › Gerar pedido).<br>2. Quando a prefeitura aceitar, informe aqui o número do protocolo. A nota passa a aparecer como cancelada.</span></div>
+        <div class="campo"><fieldset class="modos modos--tres" id="canc-motivo-codigo">
+          <legend>Motivo</legend>
+          <label class="modo"><input type="radio" name="canc-motivo" value="1"><span><b>Erro na emissão</b><small>Valor, tomador ou descrição errados.</small></span></label>
+          <label class="modo"><input type="radio" name="canc-motivo" value="2"><span><b>Serviço não prestado</b><small>O serviço não aconteceu.</small></span></label>
+          <label class="modo"><input type="radio" name="canc-motivo" value="9"><span><b>Outro motivo</b><small>Explique abaixo.</small></span></label>
+        </fieldset></div>
+        <div class="campo"><label for="canc-motivo">Explique em poucas palavras</label>
+          <textarea id="canc-motivo" maxlength="255" rows="3" placeholder="Ex.: Valor errado, será emitida outra nota com o valor certo."></textarea>
+          <small class="dica" id="canc-contador">Mínimo 15 letras.</small></div>
+        <div class="campo" id="canc-processo-campo" hidden><label for="canc-processo">Número do protocolo na prefeitura</label>
+          <input id="canc-processo" maxlength="60" placeholder="Ex.: 2026/000123"></div>
+        <label class="interruptor">
+          <input type="checkbox" id="canc-entendi">
+          <span>Entendi que o cancelamento não pode ser desfeito</span>
+        </label>
+        <p id="cancelar-erro" class="erro" role="alert" hidden></p>
+      </div>
+      <div class="janela__rodape">
+        <button type="button" class="btn btn--secundario" data-fechar>Voltar</button>
+        <button type="submit" class="btn btn--perigo" id="botao-cancelar-nota" disabled><i class="icone icone--p">block</i> Cancelar nota</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="portal.js"></script>
 </body>
 </html>

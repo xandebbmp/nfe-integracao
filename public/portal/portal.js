@@ -1069,6 +1069,8 @@
       html += '<div class="resultado resultado--andamento"><b>Na prefeitura</b><span>A nota ainda está sendo processada. Esta lista se atualiza sozinha.</span></div>';
     }
 
+    html += blocoCancelamento(n);
+
     var acoes = '';
     if (n.links && n.links.pdf) {
       acoes += '<a class="btn btn--primario" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener"><i class="icone icone--p">picture_as_pdf</i> Baixar PDF</a>'
@@ -1076,6 +1078,10 @@
     }
     if (t.cpf_cnpj) {
       acoes += '<button type="button" class="btn btn--secundario" data-emitir-para="' + escapar(t.cpf_cnpj) + '"><i class="icone icone--p">add</i> Nova nota para este tomador</button>';
+    }
+    var canc = n.cancelamento || {};
+    if (canc.pode) {
+      acoes += '<button type="button" class="btn btn--secundario btn--perigo-leve" data-cancelar><i class="icone icone--p">block</i> Cancelar nota</button>';
     }
     if (acoes) { html += '<div class="detalhe__acoes">' + acoes + '</div>'; }
 
@@ -1107,6 +1113,9 @@
     html += '</div>';
     el('nota-corpo').innerHTML = html;
 
+    var botaoCancelar = el('nota-corpo').querySelector('[data-cancelar]');
+    if (botaoCancelar) { botaoCancelar.addEventListener('click', function () { abrirCancelamento(n); }); }
+
     var botaoNova = el('nota-corpo').querySelector('[data-emitir-para]');
     if (botaoNova) {
       botaoNova.addEventListener('click', function () {
@@ -1115,6 +1124,84 @@
       });
     }
   }
+
+  // ---- Cancelar nota ----
+  // Padrao Nacional: o pedido vai para a fila e a prefeitura confirma depois.
+  // Salvador: a pessoa pede no site da prefeitura e registra aqui o protocolo.
+  function cancelamentoEmAndamento(canc) {
+    return !!canc.evento && (canc.evento.status === 'RECEBIDO' || canc.evento.status === 'PROCESSANDO');
+  }
+
+  /** Quadro do detalhe: pedido em andamento, recusado ou ja cancelado. */
+  function blocoCancelamento(n) {
+    var ev = (n.cancelamento || {}).evento;
+    if (!ev) { return ''; }
+    var motivo = (ev.motivo ? ev.motivo + ': ' : '') + (ev.texto || '') + (ev.por ? ' · pedido por ' + ev.por : '');
+    if (cancelamentoEmAndamento(n.cancelamento)) {
+      return '<div class="resultado resultado--andamento"><b>Cancelamento pedido em ' + escapar(dataCurta(ev.criado_em)) + '</b>'
+        + '<span>Esperando a prefeitura confirmar. A nota continua valendo até lá.</span><span class="apagado">' + escapar(motivo) + '</span></div>';
+    }
+    if (ev.status === 'REJEITADO' || ev.status === 'ERRO') {
+      return '<div class="resultado resultado--erro"><b>A prefeitura não aceitou o cancelamento</b>'
+        + (ev.mensagens || []).map(function (m) {
+          return '<span>' + escapar(m.mensagem || '') + (m.correcao ? ' <b>Como resolver:</b> ' + escapar(m.correcao) : '') + '</span>';
+        }).join('')
+        + '<span class="apagado">A nota continua autorizada. Corrija o que foi pedido e tente de novo.</span></div>';
+    }
+    if (n.status === 'CANCELADO') {
+      return '<div class="resultado"><b>Cancelada em ' + escapar(dataCurta(ev.criado_em)) + '</b><span>' + escapar(motivo) + '</span>'
+        + (ev.numero_processo ? '<span class="apagado">Protocolo na prefeitura: ' + escapar(ev.numero_processo) + '</span>' : '') + '</div>';
+    }
+    return '';
+  }
+
+  var formCancelar = el('form-cancelar');
+  var notaCancelando = null;
+  var CAMPOS_CANC = { motivo_codigo: 'canc-motivo-codigo', motivo: 'canc-motivo', numero_processo: 'canc-processo' };
+
+  function abrirCancelamento(n) {
+    notaCancelando = n;
+    var prefeitura = n.cancelamento.forma === 'PREFEITURA';
+    formCancelar.reset();
+    mostrarErrosForm(formCancelar, [], CAMPOS_CANC, 'cancelar-erro');
+    el('cancelar-titulo').textContent = prefeitura ? 'Registrar cancelamento' : 'Cancelar nota';
+    el('cancelar-subtitulo').textContent = (n.numero ? 'NFS-e nº ' + n.numero : 'Nota') + ' · ' + (n.tomador || '') + ' · ' + reais(n.valor);
+    el('canc-prefeitura').hidden = !prefeitura;
+    el('canc-processo-campo').hidden = !prefeitura;
+    el('botao-cancelar-nota').innerHTML = '<i class="icone icone--p">block</i> ' + (prefeitura ? 'Registrar cancelamento' : 'Cancelar nota');
+    atualizarCancelar();
+    abrirJanela('janela-cancelar');
+  }
+
+  function atualizarCancelar() {
+    var letras = el('canc-motivo').value.trim().length;
+    el('canc-contador').textContent = letras < 15 ? 'Mínimo 15 letras (faltam ' + (15 - letras) + ').' : letras + ' de 255 letras.';
+    el('botao-cancelar-nota').disabled = !el('canc-entendi').checked;
+  }
+  el('canc-motivo').addEventListener('input', atualizarCancelar);
+  el('canc-entendi').addEventListener('change', atualizarCancelar);
+
+  formCancelar.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var escolhido = formCancelar.querySelector('input[name="canc-motivo"]:checked');
+    var corpo = {
+      id: notaCancelando.id,
+      motivo_codigo: escolhido ? escolhido.value : '',
+      motivo: el('canc-motivo').value.trim()
+    };
+    if (notaCancelando.cancelamento.forma === 'PREFEITURA') { corpo.numero_processo = el('canc-processo').value.trim(); }
+    var botao = el('botao-cancelar-nota');
+    botao.disabled = true;
+    api('POST', 'cancelar.php', corpo).then(function (r) {
+      fecharJanela('janela-cancelar');
+      avisar(escapar(r.mensagem));
+      abrirNota(notaCancelando.id);
+      if (location.hash === '#notas') { carregarNotas(); }
+    }).catch(function (erro) {
+      mostrarErrosForm(formCancelar, erro.erros, CAMPOS_CANC, 'cancelar-erro');
+      if (!erro.erros || !erro.erros.length) { mostrarErro('cancelar-erro', erro.message); }
+    }).then(function () { botao.disabled = !el('canc-entendi').checked; });
+  });
 
   // ---- Servicos ----
   var listaServicos = [];

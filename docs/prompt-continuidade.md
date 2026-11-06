@@ -175,9 +175,10 @@ Documentação:
    banco `0006_portal_criar_usuarios.sql`): login, início, "Emitir nota",
    "Minhas notas", "Serviços", "Tomadores", "Minha empresa", "Usuários"
    (administrador/emissor, script 0010) e "Recorrências" (script 0011,
-   automática ou com confirmação; o worker confere a cada 5 min) já ligados
-   na API. Falta: "Esqueci a senha" por e-mail (hoje o admin gera nova
-   senha), cancelamento de nota e testar a
+   automática ou com confirmação; o worker confere a cada 5 min) e
+   "Cancelar nota" (qualquer usuário; Nacional envia, Salvador registra o
+   protocolo da prefeitura) já ligados na API. Falta: "Esqueci a senha" por
+   e-mail (hoje o admin gera nova senha) e testar a
    consulta de CNPJ/CEP com rede na VPS. Ver `docs/manual-operacao.md`
    seção 13.
 9. **Tudo pelo painel (pedido do xande):** o worker já é acompanhado e
@@ -201,7 +202,7 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 358/358 com banco e 92/92 sem.
+  - Situação atual: 370/370 com banco e 92/92 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
   `node --check public/admin/admin.js public/monitor/monitor.js public/portal/portal.js` e
   `shellcheck -S warning deploy/*.sh`.

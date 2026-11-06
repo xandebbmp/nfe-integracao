@@ -559,4 +559,13 @@ a { color: var(--primaria); }
 .modo input { margin-top: 2px; accent-color: var(--primaria); width: 16px; height: 16px; flex: none; }
 .modo small { display: block; color: var(--secundario); margin-top: 2px; }
 .modo:has(input:checked) { border-color: var(--primaria); box-shadow: 0 0 0 3px var(--foco); }
-@media (max-width: 640px) { .modos { grid-template-columns: minmax(0, 1fr); } }
+.modos--tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Opcoes dentro de um .campo (para o erro aparecer embaixo): desfaz o estilo de campo de texto. */
+.campo .modo { font-size: 13px; font-weight: 400; color: var(--texto); }
+.emitir .campo .modo input { width: 16px; height: 16px; padding: 0; border: 0; box-shadow: none; background: none; }
+@media (max-width: 640px) { .modos, .modos--tres { grid-template-columns: minmax(0, 1fr); } }
+
+/* Cancelar nota: botao vermelho desligado ate marcar "Entendi" */
+.btn--perigo:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.detalhe__acoes .btn--perigo-leve { color: var(--erro-texto); }
+

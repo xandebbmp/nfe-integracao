@@ -14,6 +14,7 @@ use Xande\NfeIntegracao\Nfse\Repositorio\PortalRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\AdministracaoClientes;
 use Xande\NfeIntegracao\Nfse\Servico\ConsultaCadastro;
 use Xande\NfeIntegracao\Nfse\Servico\PortalAcesso;
+use Xande\NfeIntegracao\Nfse\Servico\PortalCancelamento;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmissao;
 use Xande\NfeIntegracao\Nfse\Servico\PortalEmpresa;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
@@ -315,4 +316,39 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     Apoio::verificar(str_contains($rec('2026-04-10')->retomar($eu, $autoId)['mensagem'], '15/05/2026'), 'recorrencia: retomar mantem a data marcada que ainda esta a frente');
     Apoio::igual('RECORRENCIA_NAO_ENCONTRADA', $rec('2026-04-20')->remover(['cnpj' => '99999999000191'], $autoId)['codigo'] ?? null, 'recorrencia: outra empresa nao apaga');
     Apoio::verificar($rec('2026-04-20')->remover($eu, $autoId)['ok'], 'recorrencia: apagada');
+
+    // ---- Cancelar nota (nada vai ao fisco: o pedido so entra na fila) ----
+    $cancelamento = new PortalCancelamento($pdo, $cfgGeral);
+    $documentos = new DocumentoRepositorio($pdo);
+    $idNac = (string)$doc['id'];
+    $emissor = ['id' => $usuarioId, 'cnpj' => $cnpj, 'email' => 'm@x.com', 'administrador' => false];
+    $pedido = ['id' => $idNac, 'motivo_codigo' => '1', 'motivo' => 'Valor errado, sera emitida outra nota'];
+    Apoio::igual('STATUS_NAO_PERMITE', $cancelamento->cancelar($eu, $pedido)['codigo'] ?? null, 'cancelar: nota ainda na fila nao cancela');
+    $documentos->atualizar($idNac, ['status' => 'AUTORIZADO']);
+    $nacional = $documentos->buscar($idNac);
+    Apoio::igual(['ENVIAR', true], [$cancelamento->situacao($nacional)['forma'], $cancelamento->situacao($nacional)['pode']], 'cancelar: Nacional envia ao fisco');
+    Apoio::igual('NOTA_NAO_ENCONTRADA', $cancelamento->cancelar(['cnpj' => '99999999000191'] + $eu, $pedido)['codigo'] ?? null, 'cancelar: outra empresa nao cancela');
+    $r = $cancelamento->cancelar($eu, ['motivo_codigo' => '7', 'motivo' => 'curto'] + $pedido);
+    Apoio::igual(['motivo_codigo', 'motivo'], array_column($r['erros'] ?? [], 'campo'), 'cancelar: motivo e explicacao conferidos');
+    $r = $cancelamento->cancelar($emissor, $pedido);
+    Apoio::verificar($r['ok'] && $r['forma'] === 'ENVIAR', 'cancelar: emissor tambem cancela');
+    $sit = $cancelamento->situacao($documentos->buscar($idNac));
+    Apoio::igual('m@x.com', $sit['evento']['por'], 'cancelar: guarda quem pediu');
+    $jobs = (int)$pdo->query("SELECT COUNT(*) FROM nfse_jobs WHERE tipo = 'EVENTO' AND documento_id = '{$idNac}'")->fetchColumn();
+    Apoio::igual(['RECEBIDO', false, 'Erro na emissão', 1, 'AUTORIZADO'], [$sit['evento']['status'], $sit['pode'], $sit['evento']['motivo'], $jobs, $documentos->buscar($idNac)['status']],
+        'cancelar: vai para a fila, nota segue autorizada ate o fisco confirmar, sem segundo botao');
+    Apoio::verificar($cancelamento->cancelar($eu, $pedido)['ok'], 'cancelar: segundo clique nao cria outro pedido');
+    Apoio::igual(1, (int)$pdo->query("SELECT COUNT(*) FROM nfse_eventos WHERE documento_id = '{$idNac}'")->fetchColumn(), 'cancelar: um pedido so');
+
+    // Salvador: so registra o protocolo do cancelamento feito no site da prefeitura.
+    $idSsa = (string)$pdo->query("SELECT id FROM nfse_documentos WHERE referencia = 'PORTAL-rec-{$confId}-202601'")->fetchColumn();
+    $pdo->exec("UPDATE nfse_documentos SET padrao = 'SALVADOR', status = 'AUTORIZADO' WHERE id = '{$idSsa}'");
+    $salvador = $documentos->buscar($idSsa);
+    Apoio::igual('PREFEITURA', $cancelamento->situacao($salvador)['forma'], 'cancelar: Salvador pede pelo site da prefeitura');
+    $r = $cancelamento->cancelar($eu, ['id' => $idSsa] + $pedido);
+    Apoio::igual(['numero_processo'], array_column($r['erros'] ?? [], 'campo'), 'cancelar: Salvador exige o protocolo');
+    $r = $cancelamento->cancelar($eu, ['id' => $idSsa, 'numero_processo' => '2026/123'] + $pedido);
+    $sit = $cancelamento->situacao($documentos->buscar($idSsa));
+    Apoio::igual([true, 'CANCELADO', 'REGISTRADO', '2026/123', false], [$r['ok'], $documentos->buscar($idSsa)['status'], $sit['evento']['status'], $sit['evento']['numero_processo'], $sit['pode']],
+        'cancelar: protocolo registrado, nota cancelada na hora');
 }

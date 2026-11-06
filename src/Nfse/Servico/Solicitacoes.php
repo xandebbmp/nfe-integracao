@@ -51,7 +51,7 @@ final class Solicitacoes
     /**
      * @return array{ok: bool, http: int, mensagem: string, evento?: array}
      */
-    public function registrarEvento(array $documento, string $tipo, string $motivoCodigo, string $motivoTexto): array
+    public function registrarEvento(array $documento, string $tipo, string $motivoCodigo, string $motivoTexto, ?string $registradoPor = null): array
     {
         $capacidades = Capacidades::doPadrao($documento['padrao']);
 
@@ -99,7 +99,8 @@ final class Solicitacoes
                 return ['ok' => true, 'http' => 200, 'mensagem' => 'Evento ja solicitado anteriormente.', 'evento' => $ativo];
             }
 
-            $extras = [];
+            // Quem pediu (ex.: "portal:maria@empresa.com"); pela API fica vazio.
+            $extras = $registradoPor !== null ? ['registrado_por' => mb_substr($registradoPor, 0, 60)] : [];
             if ($cartaCorrecao) {
                 $extras['sequencia'] = $eventos->contarDoTipo($documento['id'], $tipo) + 1;
                 if ($extras['sequencia'] > 20) {
@@ -120,7 +121,7 @@ final class Solicitacoes
                 $documento,
                 'EVENTO',
                 $documento['status'],
-                "Evento {$tipo} solicitado"
+                "Evento {$tipo} solicitado" . ($registradoPor !== null ? " por {$registradoPor}" : '')
             );
             $this->pdo->commit();
         } catch (Throwable $e) {
