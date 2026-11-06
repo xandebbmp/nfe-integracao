@@ -36,7 +36,7 @@ ls -1 database/scripts/*.sql | sed 's/^/  - /'
 # --sim pula a pergunta (usado pelo deploy/atualizar.sh).
 if [ "${1:-}" != "--sim" ]; then
   read -r -p "Continuar? (s/N) " resposta
-  [ "${resposta,,}" = "s" ] || { echo "Cancelado."; exit 0; }
+  case "$resposta" in s|S) ;; *) echo "Cancelado."; exit 0 ;; esac
 fi
 
 for script in database/scripts/*.sql; do
@@ -52,6 +52,15 @@ for script in database/scripts/*.sql; do
     echo "$filtrada"
   fi
   echo "   ok"
+done
+
+# Anota o que rodou em sistema_scripts (script 0008), para o botao
+# "Atualizar banco" do painel saber que esta tudo em dia.
+for script in database/scripts/*.sql; do
+  nome="$(basename "$script")"
+  sha="$(php -r 'echo hash_file("sha256", $argv[1]);' "$script")"
+  psql -v ON_ERROR_STOP=1 -q -c "INSERT INTO sistema_scripts (nome, sha256, origem) VALUES ('${nome}', '${sha}', 'TERMINAL')
+    ON CONFLICT (nome) DO UPDATE SET sha256 = EXCLUDED.sha256, origem = EXCLUDED.origem, aplicado_em = CURRENT_TIMESTAMP" >/dev/null
 done
 
 echo

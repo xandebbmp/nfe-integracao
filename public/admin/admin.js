@@ -10,6 +10,7 @@
      token.php        gera token novo (aparece uma unica vez)
      uso.php          relatorio de cobranca do mes (JSON ou CSV)
      sistema.php      tela Sistema: worker ligado? fila; pausar/retomar/reiniciar
+     banco.php        tela Sistema: scripts do banco pendentes; botao Atualizar banco
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -38,6 +39,7 @@ const ACOES_HISTORICO = {
 
 const ACOES_SISTEMA = {
   WORKER_PAUSADO: 'Envios pausados', WORKER_RETOMADO: 'Envios retomados', WORKER_REINICIADO: 'Worker reiniciado',
+  BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco',
 };
 
 const ESTADOS_WORKER = { TRABALHANDO: 'Enviando notas', AGUARDANDO: 'Esperando notas', PAUSADO: 'Pausado' };
@@ -709,6 +711,8 @@ function abrirSistema() {
   const filaArea = el('div', {});
   const workersArea = el('div', {});
   const historicoArea = el('div', {});
+  const bancoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const bancoRetorno = el('div', {});
   const acoesArea = el('div', { class: 'acoes' });
   const retorno = el('div', {});
 
@@ -780,13 +784,63 @@ function abrirSistema() {
     }
   }
 
-  abrirModal('Sistema', 'Worker: o programa que envia as notas para a prefeitura', [
+  // ---- Banco de dados ----
+  function desenharBanco(b) {
+    const nomes = { APLICADO: 'aplicado', PENDENTE: 'pendente', ALTERADO: 'arquivo mudou: aplicar de novo' };
+    const pendentes = b.scripts.filter((x) => x.situacao !== 'APLICADO');
+    bancoArea.replaceChildren(...[
+      el('div', { class: 'sistema-estado' },
+        el('span', { class: `ponto-sistema ponto-sistema--${b.em_dia ? 'LIGADO' : 'PAUSADO'}` }),
+        el('strong', {}, b.em_dia ? 'Banco em dia' : `${b.pendentes} atualização(ões) pendente(s)`),
+        el('span', { class: 'suave' }, b.em_dia
+          ? `Todos os ${b.scripts.length} scripts de database/scripts/ já foram aplicados.`
+          : 'Aparece depois de atualizar o sistema. Os scripts só criam o que falta, sem apagar dados.')),
+      pendentes.length ? el('ul', {}, ...pendentes.map((x) => el('li', {}, el('span', { class: 'mono' }, x.nome), ` (${nomes[x.situacao]})`))) : null,
+      el('div', { class: 'acoes' },
+        el('button', { class: 'botao' + (b.em_dia ? '' : ' botao--forte'), type: 'button', disabled: b.em_dia,
+          onclick: () => bancoRetorno.replaceChildren(el('div', { class: 'confirmar' },
+            el('span', {}, `Aplicar ${b.pendentes} script(s) no banco agora? Leva poucos segundos.`),
+            el('button', { class: 'botao botao--forte', type: 'button', onclick: aplicarBanco }, 'Atualizar banco'),
+            el('button', { class: 'botao', type: 'button', onclick: () => bancoRetorno.replaceChildren() }, 'Cancelar'))) },
+        'Atualizar banco')),
+      el('details', {}, el('summary', { class: 'suave' }, 'Ver todos os scripts'),
+        el('table', { class: 'mini' }, el('tbody', {}, ...b.scripts.map((x) => el('tr', {},
+          el('td', { class: 'mono' }, x.nome),
+          el('td', {}, x.situacao === 'APLICADO' ? el('span', { class: 'ok-texto' }, 'aplicado') : el('span', { class: 'aviso' }, nomes[x.situacao])),
+          el('td', { class: 'suave' }, x.aplicado_em ? dataHora(x.aplicado_em) : '')))))),
+    ].filter(Boolean));
+  }
+
+  async function carregarBanco() {
+    try {
+      desenharBanco(await api('banco.php'));
+    } catch (e) {
+      bancoArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  async function aplicarBanco() {
+    bancoRetorno.replaceChildren(el('p', { class: 'suave' }, 'Atualizando o banco...'));
+    try {
+      const r = await api('banco.php', { metodo: 'POST', corpo: { acao: 'aplicar' } });
+      bancoRetorno.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      desenharBanco(r.banco);
+    } catch (e) {
+      bancoRetorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+      carregarBanco();
+    }
+    recarregar();
+  }
+
+  abrirModal('Sistema', 'Worker (o programa que envia as notas), fila de envio e banco de dados', [
     el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
+    el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
   ]);
   recarregar();
+  carregarBanco();
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }

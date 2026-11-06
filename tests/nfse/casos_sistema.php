@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 /**
  * Testes da tela "Sistema" do painel (script 0007): sinal de vida do
- * worker, pausar, retomar, reiniciar e resumo da fila.
+ * worker, pausar, retomar, reiniciar e resumo da fila (0007) e o botao
+ * "Atualizar banco" (0008).
  * Incluido por tests/nfse/executar.php.
  */
 
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
+use Xande\NfeIntegracao\Nfse\Servico\AtualizacaoBanco;
 use Xande\NfeIntegracao\Nfse\Servico\ControleSistema;
 
 function testesSistemaIntegracao(PDO $pdo): void
@@ -74,4 +76,38 @@ function testesSistemaIntegracao(PDO $pdo): void
     Apoio::verificar(isset($f['esperando'], $f['executando'], $f['agendados'], $f['falhas_24h']), 'resumo da fila com os 4 numeros');
 
     $pdo->exec('DELETE FROM sistema_workers');
+
+    // ---- Botao "Atualizar banco" ----
+    $pdo->exec('DELETE FROM sistema_scripts');
+    $banco = new AtualizacaoBanco($pdo);
+    $st = $banco->status();
+    Apoio::verificar(!$st['em_dia'] && $st['pendentes'] === count($st['scripts']), 'sem registro: todos os scripts pendentes');
+    $r = $banco->aplicar('10.0.0.1');
+    Apoio::verificar($r['ok'] && count($r['aplicados']) === count($st['scripts']), 'atualizar banco roda todos os scripts (podem repetir)');
+    Apoio::verificar($r['banco']['em_dia'], 'depois de atualizar: banco em dia');
+    $r = $banco->aplicar('10.0.0.1');
+    Apoio::igual('O banco já estava em dia.', $r['mensagem'], 'segundo clique nao roda nada');
+    Apoio::igual('BANCO_ATUALIZADO', $controle->status()['acoes_recentes'][0]['acao'], 'atualizacao fica no historico');
+
+    // Arquivo mudou depois de aplicado: aparece de novo.
+    $pdo->exec("UPDATE sistema_scripts SET sha256 = repeat('0', 64) WHERE nome LIKE '0001%'");
+    $st = $banco->status();
+    Apoio::igual('ALTERADO', $st['scripts'][0]['situacao'], 'script com arquivo diferente aparece como alterado');
+    $banco->aplicar(null);
+
+    // Script com erro: para, desfaz o script e mantem os anteriores.
+    $pasta = sys_get_temp_dir() . '/nfse_scripts_' . bin2hex(random_bytes(4));
+    mkdir($pasta);
+    file_put_contents("{$pasta}/9001_ok.sql", 'BEGIN; CREATE TABLE IF NOT EXISTS teste_banco_ok (id INT); COMMIT;');
+    file_put_contents("{$pasta}/9002_quebrado.sql", 'BEGIN; CREATE TABLE teste_banco_parcial (id INT); SELECT * FROM tabela_que_nao_existe; COMMIT;');
+    $r = (new AtualizacaoBanco($pdo, $pasta))->aplicar(null);
+    Apoio::verificar(!$r['ok'] && str_contains($r['mensagem'], '9002_quebrado.sql'), 'script com erro: mensagem diz qual foi');
+    Apoio::verificar($repo->tabelaExiste('teste_banco_ok'), 'script anterior ao erro ficou aplicado');
+    Apoio::verificar(!$repo->tabelaExiste('teste_banco_parcial'), 'nada do script com erro foi gravado');
+    $st = (new AtualizacaoBanco($pdo, $pasta))->status();
+    Apoio::igual(['APLICADO', 'PENDENTE'], array_column($st['scripts'], 'situacao'), 'o com erro continua pendente');
+    $pdo->exec('DROP TABLE IF EXISTS teste_banco_ok');
+    $pdo->exec("DELETE FROM sistema_scripts WHERE nome LIKE '900%'");
+    array_map('unlink', glob("{$pasta}/*.sql"));
+    rmdir($pasta);
 }

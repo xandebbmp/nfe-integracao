@@ -25,7 +25,15 @@ final class SistemaRepositorio
     /** As tabelas existem? (false = script 0007 ainda nao aplicado) */
     public function existe(): bool
     {
-        return (bool)$this->pdo->query("SELECT to_regclass('public.sistema_controle') IS NOT NULL")->fetchColumn();
+        return $this->tabelaExiste('sistema_controle');
+    }
+
+    /** A tabela ja foi criada? (usado antes de os scripts rodarem) */
+    public function tabelaExiste(string $tabela): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT to_regclass(:t) IS NOT NULL');
+        $stmt->execute([':t' => 'public.' . $tabela]);
+        return (bool)$stmt->fetchColumn();
     }
 
     // ------------------------------------------------------------------
@@ -141,16 +149,70 @@ final class SistemaRepositorio
     // Historico (o registro em si e gravado por ClienteRepositorio::registrarLog)
     // ------------------------------------------------------------------
 
-    /** Ultimas ordens dadas na tela Sistema (pausar, retomar, reiniciar). */
+    /** Ultimas ordens dadas na tela Sistema (worker e banco). */
     public function acoesRecentes(int $limite = 10): array
     {
         $stmt = $this->pdo->prepare(
             "SELECT acao, ip, criado_em FROM fiscal_admin_log
-              WHERE cnpj IS NULL AND acao LIKE 'WORKER\\_%'
+              WHERE cnpj IS NULL AND (acao LIKE 'WORKER\\_%' OR acao LIKE 'BANCO\\_%')
               ORDER BY id DESC LIMIT :limite"
         );
         $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ------------------------------------------------------------------
+    // Scripts do banco (botao "Atualizar banco", script 0008)
+    // ------------------------------------------------------------------
+
+    /** @return array<string, array{sha256: string, aplicado_em: string}> nome => dados ([] se a tabela ainda nao existe) */
+    public function scriptsAplicados(): array
+    {
+        if (!$this->tabelaExiste('sistema_scripts')) {
+            return [];
+        }
+        $saida = [];
+        foreach ($this->pdo->query('SELECT nome, sha256, aplicado_em FROM sistema_scripts')->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $saida[(string)$l['nome']] = ['sha256' => (string)$l['sha256'], 'aplicado_em' => (string)$l['aplicado_em']];
+        }
+        return $saida;
+    }
+
+    public function registrarScript(string $nome, string $sha256, string $origem): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO sistema_scripts (nome, sha256, origem) VALUES (:nome, :sha, :origem)
+             ON CONFLICT (nome) DO UPDATE SET sha256 = EXCLUDED.sha256, origem = EXCLUDED.origem, aplicado_em = CURRENT_TIMESTAMP'
+        )->execute([':nome' => $nome, ':sha' => $sha256, ':origem' => $origem]);
+    }
+
+    /**
+     * Roda um script inteiro (ele tem o proprio BEGIN/COMMIT).
+     * Se falhar no meio, desfaz o que ficou aberto e repassa o erro.
+     */
+    public function executarScript(string $sql): void
+    {
+        try {
+            $this->pdo->exec($sql);
+        } catch (\Throwable $e) {
+            try {
+                $this->pdo->exec('ROLLBACK');
+            } catch (\Throwable) {
+                // nada aberto
+            }
+            throw $e;
+        }
+    }
+
+    /** Trava para dois cliques (ou duas pessoas) nao atualizarem ao mesmo tempo. */
+    public function travarAtualizacao(): bool
+    {
+        return (bool)$this->pdo->query('SELECT pg_try_advisory_lock(70080008)')->fetchColumn();
+    }
+
+    public function liberarAtualizacao(): void
+    {
+        $this->pdo->query('SELECT pg_advisory_unlock(70080008)');
     }
 }

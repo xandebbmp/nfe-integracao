@@ -310,13 +310,20 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 ## 8. Banco de dados
 
 - **PostgreSQL 16.** Os scripts ficam em `database/scripts/`, numerados.
-  Aplicar ou atualizar:
+- **Atualizar pelo painel (sem terminal):** botão **Sistema** → seção
+  **Banco de dados**. Ela lista os scripts que ainda não rodaram neste banco
+  e o botão **Atualizar banco** aplica todos, em ordem. Se um der erro, ele
+  para ali, nada daquele script é gravado e a mensagem mostra qual foi.
+  Depois, clique em **Reiniciar worker**.
+- **Pelo terminal** (na instalação, antes de o painel existir):
 
   ```bash
   bash deploy/aplicar_banco.sh
   ```
 
-  Pode rodar de novo sem estragar nada.
+  Os dois caminhos podem rodar de novo sem estragar nada e anotam o que
+  rodou em `sistema_scripts` (script `0008`). Um script cujo arquivo mudou
+  depois de aplicado aparece de novo como pendente.
 
 | Script | Cria |
 |---|---|
@@ -324,6 +331,9 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 | `0003` | Multiempresa, rejeição na entrada, arquivamento |
 | `0004` | NF-e (padrão `NFE`, `DENEGADO`, protocolo, CC-e) |
 | `0005` | Empresas clientes, **uso para cobrança** e histórico do painel admin |
+| `0006` | Portal do cliente: usuários, sessões, serviços, tomadores, cache de CNPJ/CEP |
+| `0007` | Tela Sistema: sinal de vida e ordens do worker |
+| `0008` | Registro dos scripts aplicados (botão **Atualizar banco**) |
 
 - **Backup diário:** `deploy/backup_banco.sh`, no cron. Veja o manual de
   implantação, seção "Backup".
@@ -531,6 +541,8 @@ Para planilha, acrescente `&formato=csv`.
 | `GET /v1/admin/uso.php?mes=AAAA-MM[&formato=csv]` | Relatório de cobrança |
 | `GET /v1/admin/sistema.php` | Tela Sistema: worker ligado, fila e últimas ordens |
 | `POST /v1/admin/sistema.php` | `{"acao": "pausar" \| "retomar" \| "reiniciar"}` |
+| `GET /v1/admin/banco.php` | Scripts do banco aplicados e pendentes |
+| `POST /v1/admin/banco.php` | `{"acao": "aplicar"}`: roda os pendentes |
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
 exemplo, ao detectar fatura em atraso:
