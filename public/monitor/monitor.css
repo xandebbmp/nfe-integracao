@@ -83,7 +83,8 @@ input, select {
   position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center;
   gap: 12px; padding: 12px 20px; background: var(--cartao); border-bottom: 1px solid var(--borda);
 }
-.topo__titulo, .topo__acoes { display: flex; align-items: center; gap: 12px; }
+.topo { flex-wrap: wrap; }
+.topo__titulo, .topo__acoes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .selo { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; border: 1px solid currentColor; }
 .selo--homologacao { color: var(--st-erro); }
 .selo--producao { color: var(--st-autorizado); }
@@ -187,6 +188,9 @@ input, select {
 @media (max-width: 760px) {
   .filtros { grid-template-columns: 1fr 1fr; }
   .filtros__busca { grid-column: 1 / -1; }
-  .topo { padding: 10px 16px; }
+  /* Celular: o topo deixa de grudar (ocuparia meia tela) e os botoes quebram linha. */
+  .topo { padding: 10px 16px; position: static; }
+  .topo__titulo, .topo__acoes { gap: 8px; }
+  .topo__acoes .botao { padding: 6px 10px; }
   .conteudo { padding: 12px 16px 32px; }
 }
