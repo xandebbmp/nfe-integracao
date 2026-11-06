@@ -316,9 +316,12 @@ function recolhivel(titulo, resumo, aberto, ...conteudo) {
 
 function formularioEmpresa(c, novo) {
   const simples = selecao('Simples Nacional', 'opcao_simples_nacional', c.opcao_simples_nacional, [[1, 'Não optante'], [2, 'MEI'], [3, 'ME/EPP (Simples)']]);
-  const regimeApuracao = selecao('Regime de apuração (ME/EPP)', 'regime_apuracao_simples', c.regime_apuracao_simples, [['', 'Escolha'], [1, '1'], [2, '2'], [3, '3']]);
+  const regimeApuracao = selecao('Regime de apuração (ME/EPP)', 'regime_apuracao_simples', c.regime_apuracao_simples, [['', 'Escolha'],
+    [1, '1 - Tudo pelo Simples (DAS), inclusive o ISS'],
+    [2, '2 - Federais pelo Simples, ISS pela prefeitura'],
+    [3, '3 - Federais e ISS fora do Simples']]);
   regimeApuracao.dataset.mostrarSe = 'mepp';
-  regimeApuracao.append(el('span', { class: 'campo-ajuda' }, 'O contador informa.'));
+  regimeApuracao.append(el('span', { class: 'campo-ajuda' }, 'Como os impostos são pagos. O mais comum é o 1. Confirme com o contador.'));
   const regimeNacional = selecao('Regime especial (NFS-e Nacional)', 'regime_especial_tributacao', c.regime_especial_tributacao,
     [0, 1, 2, 3, 4, 5, 6].map((v) => [v, v === 0 ? 'Nenhum' : String(v)]));
   regimeNacional.dataset.tipos = 'NACIONAL';
