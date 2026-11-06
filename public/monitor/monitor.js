@@ -2,7 +2,8 @@
    Monitor Fiscal (NFS-e e NF-e)
    --------------------------------------------------------------------------
    Como funciona:
-     1. O usuario informa o token do painel (monitor_token).
+     1. O usuario informa o token do painel (monitor_token). Quem ja entrou
+        no painel admin (/admin/) cai direto aqui, com o mesmo token.
      2. Abrimos o stream em tempo real (SSE) em /v1/nfse/monitor.php.
      3. Carregamos as notas mais recentes em /v1/nfse/documentos.php.
      4. A cada evento do stream, buscamos a nota atualizada e redesenhamos
@@ -67,7 +68,12 @@ const estado = {
   fonte: null, // EventSource
   teveErro: false,
   modalId: null,
+  viaAdmin: false, // entrou com o login do painel admin (mostra o link de volta)
 };
+
+/** Chaves onde os tokens ficam guardados no navegador. */
+const CHAVE_MONITOR = 'nfse_monitor_token';
+const CHAVE_ADMIN = 'admin_token'; // a mesma do painel admin (admin.js)
 
 const $ = (id) => document.getElementById(id);
 
@@ -462,36 +468,46 @@ async function abrirPdf(doc) {
 // Acesso, filtros e inicializacao
 // ==========================================================================
 
+/** Token do monitor; se nao houver, o do painel admin (um login so). */
 function lerTokenSalvo() {
+  const ler = (chave) => sessionStorage.getItem(chave) || localStorage.getItem(chave) || '';
   try {
-    return sessionStorage.getItem('nfse_monitor_token') || localStorage.getItem('nfse_monitor_token') || '';
+    const monitor = ler(CHAVE_MONITOR);
+    if (monitor) return { token: monitor, viaAdmin: false };
+    return { token: ler(CHAVE_ADMIN), viaAdmin: true };
   } catch {
-    return '';
+    return { token: '', viaAdmin: false };
   }
 }
 
 function salvarToken(token, lembrar) {
   try {
-    sessionStorage.setItem('nfse_monitor_token', token);
-    if (lembrar) localStorage.setItem('nfse_monitor_token', token);
+    sessionStorage.setItem(CHAVE_MONITOR, token);
+    if (lembrar) localStorage.setItem(CHAVE_MONITOR, token);
   } catch { /* navegador sem storage: segue so em memoria */ }
 }
 
 function sair(mensagem = '') {
+  // Sair daqui tambem sai do painel admin (e o mesmo login).
   try {
-    sessionStorage.removeItem('nfse_monitor_token');
-    localStorage.removeItem('nfse_monitor_token');
+    for (const chave of [CHAVE_MONITOR, CHAVE_ADMIN]) {
+      sessionStorage.removeItem(chave);
+      localStorage.removeItem(chave);
+    }
   } catch { /* ignora */ }
   if (estado.fonte) estado.fonte.close();
   estado.token = '';
+  estado.viaAdmin = false;
+  $('link-admin').hidden = true;
   $('tela-painel').hidden = true;
   $('tela-acesso').hidden = false;
   $('erro-acesso').hidden = !mensagem;
   $('erro-acesso').textContent = mensagem;
 }
 
-async function entrar(token) {
+async function entrar(token, viaAdmin = false) {
   estado.token = token;
+  estado.viaAdmin = viaAdmin;
   try {
     const capacidades = await api('capacidades.php');
     const selo = $('selo-ambiente');
@@ -505,6 +521,12 @@ async function entrar(token) {
       estado.emitentes.set(String(e.cnpj), e.razao_social || cnpj(e.cnpj));
       filtroEmitente.append(el('option', { value: e.cnpj }, `${e.razao_social || ''} (${cnpj(e.cnpj)})`));
     }
+    // Veio da ficha da empresa no painel admin (?emitente=CNPJ): ja filtra.
+    const pedido = new URLSearchParams(window.location.search).get('emitente') || '';
+    if (pedido && estado.emitentes.has(pedido)) {
+      filtroEmitente.value = pedido;
+      estado.filtro.emitente = pedido;
+    }
   } catch (e) {
     if (estado.token) sair(`Não foi possível acessar a API: ${e.message}`);
     return false;
@@ -512,6 +534,7 @@ async function entrar(token) {
 
   $('tela-acesso').hidden = true;
   $('tela-painel').hidden = false;
+  $('link-admin').hidden = !estado.viaAdmin;
   conectarStream(); // primeiro o stream, depois a lista: nenhuma mudanca escapa
   await carregarDocumentos();
   return true;
@@ -541,6 +564,6 @@ function configurarTela() {
 }
 
 configurarTela();
-const tokenSalvo = lerTokenSalvo();
-if (tokenSalvo) entrar(tokenSalvo);
+const salvo = lerTokenSalvo();
+if (salvo.token) entrar(salvo.token, salvo.viaAdmin);
 else sair();

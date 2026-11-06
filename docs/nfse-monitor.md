@@ -6,7 +6,16 @@ enviada, autorizada, rejeitada, denegada, consultada ou cancelada.
 - Endereço: `https://<servidor>/monitor/`
 - Arquivos: `public/monitor/index.html`, `monitor.css`, `monitor.js`
   (HTML/CSS/JS puros: sem build, sem biblioteca externa).
-- Acesso: token do painel (`monitor_token` em `config/nfse.local.php`).
+- Acesso (um login só):
+  - quem já entrou no **painel admin** abre o monitor pelo botão **"Notas
+    (monitor)"** ou, na ficha da empresa, **"Ver notas desta empresa"**
+    (abre `/monitor/?emitente=<CNPJ>`, já filtrado). Não pede outro token.
+    O botão **"← Painel admin"** volta. **Sair**, em qualquer um dos dois,
+    sai dos dois;
+  - quem só acompanha as notas (suporte) pode continuar usando o
+    `monitor_token` de `config/nfse.local.php`;
+  - o token do admin no monitor é **só leitura**: ele não emite nem cancela
+    pela API (`emitir.php` responde `PROIBIDO`).
   Uso previsto: **rede interna/VPN** (decisão C3).
 
 ---

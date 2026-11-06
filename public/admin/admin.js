@@ -137,7 +137,10 @@ function salvarToken(token, lembrar) {
 }
 
 function sair(mensagem) {
-  try { sessionStorage.removeItem(CHAVE_TOKEN); localStorage.removeItem(CHAVE_TOKEN); } catch { /* ignora */ }
+  // O monitor usa o mesmo login: sair aqui sai de la tambem.
+  try {
+    for (const chave of [CHAVE_TOKEN, 'nfse_monitor_token']) { sessionStorage.removeItem(chave); localStorage.removeItem(chave); }
+  } catch { /* ignora */ }
   estado.token = '';
   $('tela-painel').hidden = true;
   $('tela-acesso').hidden = false;
@@ -276,7 +279,8 @@ function desenharCliente(c) {
   const partes = [];
 
   if (!novo) {
-    partes.push(el('div', { class: 'acoes' }, seloSituacao(c.situacao), el('span', {}, c.situacao_mensagem)));
+    partes.push(el('div', { class: 'acoes' }, seloSituacao(c.situacao), el('span', {}, c.situacao_mensagem),
+      el('a', { class: 'botao', href: `../monitor/?emitente=${encodeURIComponent(c.cnpj)}`, style: 'margin-left:auto' }, 'Ver notas desta empresa')));
     if (c.prontidao) partes.push(secaoProntidao(c.prontidao));
   }
 

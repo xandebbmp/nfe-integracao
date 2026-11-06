@@ -100,7 +100,7 @@ comentários estão em `config/nfse.php`):
 | `tpAmb` | `2` = homologação (testes, sem valor fiscal); `1` = produção | `2` |
 | `admin_token` | Senha do painel admin (`/admin/`). Vazio = painel desligado | `openssl rand -hex 32` |
 | `chave_certificados` | Chave que criptografa os certificados enviados pelo painel. **Guarde cópia.** | `php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'` |
-| `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas | `openssl rand -hex 32` |
+| `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas. Opcional: quem entra no painel admin já abre o monitor sem ele | `openssl rand -hex 32` |
 | `consumidores` | Sistemas internos com token fixo no arquivo, que emitem por vários CNPJs (opcional; as empresas clientes ficam no painel) | ver `config/nfse.local.php.example` |
 | `emitentes` | Empresas configuradas por arquivo (opcional; prefira o painel) | idem |
 | `armazenamento` | Cópia dos XMLs: `local` (pasta) ou `s3` (AWS S3, MinIO, Wasabi...) | `['tipo' => 's3', ...]` |
@@ -505,6 +505,8 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   - final do token.
 - **Ao clicar numa empresa:**
   - **Pronta para emitir?** (primeiro bloco da ficha, veja abaixo);
+  - botão **Ver notas desta empresa**: abre o monitor já filtrado nela,
+    com XML, PDF (DANFSe) e o motivo de cada rejeição;
   - controle de emissão;
   - dados cadastrais e webhook;
   - certificado;
@@ -656,7 +658,7 @@ o endereço no navegador.
 |---|---|---|---|---|
 | **Painel admin** | `https://SEU_DOMINIO/admin/` | `public/admin/` (`index.html`, `admin.css`, `admin.js`) | `admin_token` do `config/nfse.local.php` | Você: empresas, certificados, tokens, bloqueios, numeração e cobrança |
 | **Portal do cliente** | `https://SEU_DOMINIO/portal/` | `public/portal/` (`index.html`, `portal.css`, `portal.js`) | E-mail e senha da pessoa (criados no painel admin) | A empresa cliente: emite a própria NFS-e num formulário |
-| **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
+| **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | o login do **painel admin** (botão "Notas (monitor)", sem outro token) **ou** `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
 
 ### Passo a passo (servidor)
 

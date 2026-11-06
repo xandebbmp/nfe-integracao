@@ -12,7 +12,7 @@
   <section id="tela-acesso" class="acesso" hidden>
     <form id="form-acesso" class="cartao acesso__cartao">
       <h1>Monitor Fiscal</h1>
-      <p class="suave">Informe o token do painel (monitor_token em config/nfse.local.php).</p>
+      <p class="suave">Já entrou no <a href="../admin/">Painel Administrativo</a>? Abra o monitor por lá, sem outro login. Ou informe o token do monitor (monitor_token em config/nfse.local.php).</p>
       <label for="campo-token">Token</label>
       <input id="campo-token" type="password" autocomplete="current-password" required>
       <label class="linha-check">
@@ -34,6 +34,7 @@
         <span id="conexao" class="conexao conexao--desligada" title="Situação da conexão em tempo real">
           <span class="conexao__ponto"></span><span id="conexao-texto">Desconectado</span>
         </span>
+        <a id="link-admin" class="botao" href="../admin/" hidden>← Painel admin</a>
         <button id="botao-sair" class="botao">Sair</button>
       </div>
     </header>
