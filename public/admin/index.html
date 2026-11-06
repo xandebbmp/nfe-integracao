@@ -1,12 +1,13 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
+  <!-- Ao mudar admin.js/admin.css, troque o ?v= abaixo: o navegador baixa a versao nova. -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Painel Administrativo</title>
   <!-- Mesmo visual do monitor + ajustes do painel -->
-  <link rel="stylesheet" href="../monitor/monitor.css">
-  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="../monitor/monitor.css?v=20261106l">
+  <link rel="stylesheet" href="admin.css?v=20261106l">
 </head>
 <body>
 
@@ -33,7 +34,7 @@
       </div>
       <div class="topo__acoes">
         <button id="botao-sistema" class="botao" title="Worker e fila de envio"><span id="sistema-ponto" class="ponto-sistema"></span> Sistema</button>
-        <a class="botao" href="../monitor/">Monitor</a>
+        <a class="botao" href="../monitor/" title="Notas de todas as empresas, em tempo real, com XML e PDF">Notas (monitor)</a>
         <button id="botao-relatorio" class="botao">Relatório de cobrança</button>
         <button id="botao-nova" class="botao botao--forte">+ Nova empresa</button>
         <button id="botao-sair" class="botao">Sair</button>
@@ -90,9 +91,11 @@
       </div>
       <button id="modal-fechar" class="botao" aria-label="Fechar">✕</button>
     </div>
+    <nav id="modal-abas" class="modal__abas" hidden></nav>
     <div id="modal-corpo" class="modal__corpo"></div>
+    <div id="modal-rodape" class="modal__rodape" hidden></div>
   </dialog>
 
-  <script src="admin.js"></script>
+  <script src="admin.js?v=20261106l"></script>
 </body>
 </html>

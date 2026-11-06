@@ -31,9 +31,6 @@ a.botao { text-decoration: none; color: inherit; display: inline-flex; align-ite
 .modal--largo { width: min(980px, 96vw); }
 .secao { border: 1px solid var(--borda); border-radius: var(--raio); padding: 14px 16px; margin-top: 14px; }
 .secao h3 { margin-top: 0; }
-.prontidao { border-left: 4px solid var(--st-autorizado); }
-.prontidao[data-pronta=false] { border-left-color: var(--st-rejeitado); }
-.prontidao .sistema-estado strong { font-size: 16px; }
 .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 16px; }
 .campos label { display: grid; gap: 4px; font-size: 12px; color: var(--suave); }
 .campos label.linha-check { display: flex; color: var(--texto); font-size: 14px; }
@@ -76,3 +73,142 @@ details summary { cursor: pointer; margin-top: 10px; }
 .config-alterado { font-size: 11px; font-weight: 600; color: var(--destaque); border: 1px solid var(--destaque); border-radius: 99px; padding: 0 7px; }
 .config-ajuda { font-size: 12px; color: var(--suave); }
 .link-botao { background: none; border: 0; padding: 0; color: var(--destaque); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* Ficha da empresa: "Pronta para emitir?" (secaoProntidao em admin.js).
+   Nivel sempre aparece com icone + texto; a cor so reforca. */
+.visualmente-oculto { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+[data-nivel=OK] { --cor: var(--st-autorizado); }
+[data-nivel=ATENCAO] { --cor: var(--st-erro); }
+[data-nivel=FALTA] { --cor: var(--st-rejeitado); }
+.prontidao { border-left: 4px solid var(--cor); }
+.prontidao p { margin: 0; }
+.pront-icone { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--cor); color: var(--cartao); font-size: 12px; font-weight: 700; line-height: 1; }
+.pront-resumo { display: flex; gap: 12px; align-items: flex-start; }
+.pront-resumo > .pront-icone { width: 28px; height: 28px; font-size: 16px; }
+.pront-resumo__titulo { font-size: 17px; font-weight: 700; line-height: 1.3; }
+.pront-resumo__ambiente { font-size: 13px; color: var(--suave); margin-top: 2px; }
+
+/* Um selo por grupo (Geral, NFS-e Nacional, ...): o estado de cada tipo de relance. */
+.pront-grupos { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.pront-grupo { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px;
+  background: color-mix(in srgb, var(--cor) 7%, var(--cartao)); }
+.pront-grupo .pront-icone { grid-row: span 2; }
+.pront-grupo__nome { font-size: 13px; font-weight: 600; }
+.pront-grupo__estado { font-size: 12px; color: var(--suave); }
+.pront-grupo:not([data-nivel=OK]) .pront-grupo__estado { color: var(--texto); font-weight: 600; }
+
+.prontidao h4 { font-size: 13px; margin: 18px 0 8px; color: var(--texto); }
+.pront-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pront-item { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+.pront-subtitulo + .pront-lista > .pront-item { padding: 10px 12px; border: 1px solid var(--borda);
+  border-left: 3px solid var(--cor); border-radius: 8px; }
+.pront-item > .pront-icone { margin-top: 1px; }
+.pront-item__corpo { min-width: 0; }
+.pront-item__texto { font-weight: 600; overflow-wrap: anywhere; }
+.pront-tag { display: inline-block; margin-left: 8px; padding: 0 7px; border: 1px solid var(--borda); border-radius: 99px;
+  font-size: 11px; font-weight: 600; color: var(--suave); white-space: nowrap; vertical-align: 1px; }
+.pront-resolver { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--fundo); font-size: 13px; }
+.pront-resolver strong, .pront-dica strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--suave); margin-bottom: 2px; }
+.pront-resolver p { color: var(--texto); }
+.pront-ir { text-align: left; margin-top: 6px; font-size: 13px; font-weight: 600; min-height: 24px; }
+.pront-dica { margin-top: 2px; font-size: 12px; color: var(--suave); }
+.pront-dica strong { display: inline; margin-right: 4px; }
+.pront-dica p { display: inline; }
+
+/* Itens ok: recolhidos e compactos, por grupo. */
+.pront-oks { margin-top: 14px; border-top: 1px solid var(--borda); padding-top: 4px; }
+.pront-oks summary { color: var(--suave); font-size: 13px; font-weight: 600; padding: 4px 0; width: fit-content; }
+.pront-oks summary:hover { color: var(--texto); }
+.pront-oks__grupo h4 { margin: 12px 0 6px; font-size: 12px; color: var(--suave); }
+.pront-lista--compacta { gap: 4px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); column-gap: 16px; }
+.pront-lista--compacta .pront-icone { width: 16px; height: 16px; font-size: 10px; }
+.pront-lista--compacta .pront-item { gap: 8px; }
+.pront-lista--compacta .pront-item__texto { font-weight: 400; font-size: 13px; }
+.pront-rodape { font-size: 13px; margin-top: 14px !important; }
+.pront-retorno:empty { display: none; }
+.pront-retorno { font-size: 13px; margin-top: 6px !important; }
+.prontidao[aria-busy=true] .pront-lista, .prontidao[aria-busy=true] .pront-grupos { opacity: .6; }
+
+.prontidao summary:focus-visible, .pront-ir:focus-visible, .modal__corpo h3[tabindex="-1"]:focus-visible {
+  outline: 2px solid var(--destaque); outline-offset: 2px; border-radius: 4px; }
+
+@media (max-width: 520px) {
+  .pront-grupos { grid-template-columns: 1fr; gap: 6px; }
+  .pront-grupo { grid-template-columns: auto 1fr auto; padding: 6px 10px; }
+  .pront-grupo .pront-icone { grid-row: auto; }
+  .pront-grupo__estado { text-align: right; }
+  .pront-lista--compacta { grid-template-columns: 1fr; }
+  .pront-subtitulo + .pront-lista > .pront-item { padding: 10px; }
+  .pront-tag { margin: 4px 0 0; display: table; }
+  .pront-subtitulo + .pront-lista .pront-resolver { margin-left: -30px; }
+}
+
+/* ---------- Ficha da empresa: abas, grupos de campos e barra de salvar ---------- */
+/* A janela vira coluna: topo e abas fixos, so o meio rola, rodape (Salvar) fixo. */
+.modal--largo[open] { display: flex; flex-direction: column; overflow: hidden; }
+.modal--largo .modal__topo { position: static; flex: none; }
+/* flex 1 1 auto + min-height 0: no Safari, flex: 1 deixava o meio da janela com altura zero. */
+.modal--largo .modal__corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.modal__abas { flex: none; border-bottom: 1px solid var(--borda); padding: 0 20px; background: var(--cartao); }
+.modal__abas[hidden] { display: none; }
+.modal__rodape {
+  flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  padding: 12px 20px; border-top: 1px solid var(--borda); background: var(--cartao);
+}
+.modal__rodape[hidden] { display: none; }
+.rodape__texto { flex: 1; min-width: 0; }
+.rodape__mensagem { font-size: 13px; }
+
+.situacao-linha .botao { margin-left: auto; }
+/* Formulario da empresa: blocos curtos, um embaixo do outro. */
+.form-empresa > h3 { margin: 20px 0 4px; }
+.grupo-campos[hidden] { display: none; }
+.grupo-campos { border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px 16px 16px; margin: 12px 0 0; min-width: 0; }
+.grupo-campos legend { font-weight: 700; padding: 0 6px; margin-left: -6px; }
+
+/* Blocos que abrem e fecham (Mais opções, Certificado, Acessos...). */
+.recolhivel { border: 1px solid var(--borda); border-radius: var(--raio); margin-top: 12px; }
+.recolhivel > summary { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 16px; margin: 0; cursor: pointer; }
+.recolhivel > summary:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: var(--raio); }
+.recolhivel__titulo { font-weight: 700; }
+.recolhivel__resumo { color: var(--suave); font-size: 13px; }
+.recolhivel__corpo { padding: 0 16px 16px; }
+/* Dentro do bloco, a secao antiga perde a moldura e o titulo repetido (fica so para o "Ir para"). */
+.recolhivel__corpo > .secao { border: 0; padding: 0; margin-top: 8px; }
+.recolhivel__corpo > .secao + .secao { border-top: 1px solid var(--borda); padding-top: 12px; }
+.recolhivel__corpo > .secao:first-child { position: relative; }
+.recolhivel__corpo > .secao:first-child > h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.campo-ajuda { font-size: 12px; color: var(--suave); line-height: 1.35; }
+.campos label[hidden], .campos [hidden] { display: none; }
+.campos textarea { font: inherit; color: var(--texto); background: var(--fundo); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 9px; width: 100%; resize: vertical; }
+.opcoes-linha { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+
+@media (max-width: 760px) {
+  .modal__abas { padding: 0 8px; }
+  .modal__rodape { padding: 10px 16px; }
+  .situacao-linha .botao { margin-left: 0; }
+}
+/* Campos lado a lado ficam alinhados pelo topo (a caixa nao estica com a ajuda do vizinho). */
+.grupo-campos .campos { align-items: start; }
+.grupo-campos .campos label { align-content: start; }
+
+/* Caixa "Acesso pronto" (portal): enviar por e-mail ou copiar */
+.acesso-box { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+.acesso-box > * { min-width: 0; }
+.acesso-box__titulo, .envio-ok { overflow-wrap: anywhere; }
+.acesso-box pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.acesso-box .botao { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+.acesso-box p { margin: 0; }
+.acesso-box__titulo { font-size: 15px; }
+.acesso-box .acoes { flex-wrap: wrap; }
+.envio-ok { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--st-autorizado) 12%, transparent); color: var(--st-autorizado); font-weight: 600; }
+.envio-aviso { display: grid; gap: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid color-mix(in srgb, #d97706 45%, transparent); background: color-mix(in srgb, #d97706 10%, transparent); }
+.envio-aviso p { margin: 0; }
+.envio-aviso .botao { justify-self: start; }
+.opcao-linha { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; margin-top: 10px; font-weight: 400; }
+.opcao-linha input { width: auto; margin: 0; }

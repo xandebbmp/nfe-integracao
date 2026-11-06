@@ -75,7 +75,7 @@ final class Api
      *
      * @return array{consumidor: ?string, painel: bool}
      *   consumidor: nome do sistema (ve apenas os proprios documentos)
-     *   painel: true para o token do monitor (ve todos os documentos)
+     *   painel: true para o token do monitor ou do administrador (ve todos os documentos)
      */
     public function autenticar(bool $aceitaTokenNaUrl = false): array
     {
@@ -100,6 +100,12 @@ final class Api
             }
             $tokenPainel = (string)($this->cfg['monitor_token'] ?? '');
             if ($tokenPainel !== '' && hash_equals($tokenPainel, $token)) {
+                return ['consumidor' => null, 'painel' => true];
+            }
+            // Quem entrou no painel admin abre o monitor sem outro login.
+            // So leitura: emitir.php e as outras rotas de envio exigem consumidor.
+            $tokenAdmin = (string)($this->cfg['admin_token'] ?? '');
+            if (strlen($tokenAdmin) >= 24 && hash_equals($tokenAdmin, $token)) {
                 return ['consumidor' => null, 'painel' => true];
             }
         }

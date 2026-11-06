@@ -63,6 +63,26 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     $hash = $pdo->query("SELECT senha_hash FROM portal_usuarios WHERE id = {$usuarioId}")->fetchColumn();
     Apoio::verificar($hash !== $provisoria && password_verify($provisoria, (string)$hash), 'senha guardada so como hash');
 
+    // ---- Enviar os dados de acesso por e-mail (nenhum e-mail sai: o envio e trocado por uma funcao) ----
+    $cartas = [];
+    $smtp = ['email' => ['host' => 'smtp.teste', 'usuario' => 'u@teste.com', 'senha' => 'x', 'remetente' => 'u@teste.com']];
+    $carteiro = new EnvioEmail($smtp, static function (array $m) use (&$cartas): void { $cartas[] = $m; });
+    $semSmtp = new EnvioEmail(['email' => []], static function (array $m) use (&$cartas): void { $cartas[] = $m; });
+    $r = $acesso->enviarAcessoPorEmail($cnpj, $usuarioId, $provisoria, 'http://127.0.0.1:8099/portal/', 'ip', $semSmtp);
+    Apoio::verificar(($r['codigo'] ?? null) === 'EMAIL_NAO_CONFIGURADO' && str_contains($r['mensagem'], 'Sistema > E-mail') && $cartas === [],
+        'enviar acesso: sem SMTP explica onde configurar e nao envia');
+    Apoio::igual('SENHA_NAO_E_A_ATUAL', $acesso->enviarAcessoPorEmail($cnpj, $usuarioId, 'senha-errada', '', 'ip', $carteiro)['codigo'] ?? null,
+        'enviar acesso: so envia a senha provisoria atual');
+    Apoio::igual('USUARIO_NAO_ENCONTRADO', $acesso->enviarAcessoPorEmail('99999999000191', $usuarioId, $provisoria, '', 'ip', $carteiro)['codigo'] ?? null,
+        'enviar acesso: usuario de outra empresa recusado');
+    $r = $acesso->enviarAcessoPorEmail($cnpj, $usuarioId, $provisoria, 'http://127.0.0.1:8099/portal/', 'ip', $carteiro);
+    Apoio::verificar($r['ok'] && count($cartas) === 1 && $cartas[0]['para'] === 'mariana@empresa.com.br'
+        && str_contains($cartas[0]['texto'], $provisoria) && str_contains($cartas[0]['texto'], 'http://127.0.0.1:8099/portal/')
+        && str_contains((string)$cartas[0]['html'], 'Entrar no portal') && str_contains($cartas[0]['texto'], 'Olá, Mariana'),
+        'enviar acesso: e-mail com link, e-mail e senha provisoria para a pessoa');
+    Apoio::igual(1, (int)$pdo->query("SELECT COUNT(*) FROM fiscal_admin_log WHERE acao = 'PORTAL_ACESSO_ENVIADO' AND cnpj = '{$cnpj}'")->fetchColumn(),
+        'enviar acesso: fica no historico da empresa');
+
     // ---- Login ----
     Apoio::igual('LOGIN_INVALIDO', $acesso->entrar('ninguem@x.com', 'abc', false, 'ip', 'teste')['codigo'], 'login: e-mail inexistente com mensagem generica');
     $r = $acesso->entrar('MARIANA@empresa.com.br', $provisoria, false, 'ip', 'teste');

@@ -967,13 +967,31 @@
     return function () { clearTimeout(timer); timer = setTimeout(funcao, ms || 300); };
   }
 
-  function abrirJanela(id) { var j = el(id); if (!j.open) { j.showModal(); } }
+  function abrirJanela(id) { var j = el(id); delete j.dataset.sujo; if (!j.open) { j.showModal(); } }
   function fecharJanela(id) { var j = el(id); if (j.open) { j.close(); } }
-  document.querySelectorAll('dialog [data-fechar]').forEach(function (botao) {
-    botao.addEventListener('click', function () { botao.closest('dialog').close(); });
+
+  // Fechar pelo X, Esc ou clique fora: se a pessoa ja digitou algo, pergunta antes.
+  function podeFechar(janela) {
+    return janela.dataset.sujo !== '1' || window.confirm('Você digitou dados que ainda não foram salvos. Fechar mesmo assim?');
+  }
+  document.querySelectorAll('dialog.janela').forEach(function (janela) {
+    var comecouFora = false;
+    function fora(evento) {
+      var r = janela.getBoundingClientRect();
+      return evento.target === janela && (evento.clientX < r.left || evento.clientX > r.right || evento.clientY < r.top || evento.clientY > r.bottom);
+    }
+    janela.addEventListener('input', function () { janela.dataset.sujo = '1'; });
+    janela.addEventListener('cancel', function (evento) { if (!podeFechar(janela)) { evento.preventDefault(); } });
+    // So fecha se apertou E soltou fora (arrastar uma selecao de dentro para fora nao fecha).
+    janela.addEventListener('mousedown', function (evento) { comecouFora = fora(evento); });
+    janela.addEventListener('click', function (evento) {
+      if (comecouFora && fora(evento) && podeFechar(janela)) { janela.close(); }
+      comecouFora = false;
+    });
   });
-  // Clicar fora da janela de detalhe tambem fecha.
-  el('janela-nota').addEventListener('click', function (evento) { if (evento.target === this) { this.close(); } });
+  document.querySelectorAll('dialog [data-fechar]').forEach(function (botao) {
+    botao.addEventListener('click', function () { var j = botao.closest('dialog'); if (podeFechar(j)) { j.close(); } });
+  });
 
   /**
    * Mostra os erros da API ao lado de cada campo de um formulario.

@@ -5,6 +5,7 @@ namespace Xande\NfeIntegracao\Nfse;
 
 use PDO;
 use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
+use Xande\NfeIntegracao\Nfse\Servico\ConfiguracoesPainel;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use RuntimeException;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
@@ -161,7 +162,9 @@ final class NfseConfig
      */
     public static function comClientes(array $cfg, PDO $pdo): array
     {
-        $cfg = AjustesPainel::aplicar($cfg, (new SistemaRepositorio($pdo))->ajustes());
+        $ajustes = (new SistemaRepositorio($pdo))->ajustes();
+        $cfg = AjustesPainel::aplicar($cfg, $ajustes);
+        $cfg = ConfiguracoesPainel::aplicarSenhaEmail($cfg, $ajustes);
 
         $repositorio = new ClienteRepositorio($pdo);
         if (!$repositorio->existe()) {

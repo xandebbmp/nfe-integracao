@@ -100,7 +100,7 @@ comentários estão em `config/nfse.php`):
 | `tpAmb` | `2` = homologação (testes, sem valor fiscal); `1` = produção | `2` |
 | `admin_token` | Senha do painel admin (`/admin/`). Vazio = painel desligado | `openssl rand -hex 32` |
 | `chave_certificados` | Chave que criptografa os certificados enviados pelo painel. **Guarde cópia.** | `php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'` |
-| `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas | `openssl rand -hex 32` |
+| `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas. Opcional: quem entra no painel admin já abre o monitor sem ele | `openssl rand -hex 32` |
 | `consumidores` | Sistemas internos com token fixo no arquivo, que emitem por vários CNPJs (opcional; as empresas clientes ficam no painel) | ver `config/nfse.local.php.example` |
 | `emitentes` | Empresas configuradas por arquivo (opcional; prefira o painel) | idem |
 | `armazenamento` | Cópia dos XMLs: `local` (pasta) ou `s3` (AWS S3, MinIO, Wasabi...) | `['tipo' => 's3', ...]` |
@@ -503,8 +503,11 @@ Endereço: `https://SEU_DOMINIO/admin/`. Ele pede o `admin_token`.
   - franquia usada, com barra;
   - vencimento e validade do certificado;
   - final do token.
-- **Ao clicar numa empresa:**
+- **Ao clicar numa empresa** (uma página só: o essencial à mostra, o resto em
+  blocos que abrem com um clique; o botão **Salvar** fica fixo embaixo):
   - **Pronta para emitir?** (primeiro bloco da ficha, veja abaixo);
+  - botão **Ver notas desta empresa**: abre o monitor já filtrado nela,
+    com XML, PDF (DANFSe) e o motivo de cada rejeição;
   - controle de emissão;
   - dados cadastrais e webhook;
   - certificado;
@@ -656,7 +659,7 @@ o endereço no navegador.
 |---|---|---|---|---|
 | **Painel admin** | `https://SEU_DOMINIO/admin/` | `public/admin/` (`index.html`, `admin.css`, `admin.js`) | `admin_token` do `config/nfse.local.php` | Você: empresas, certificados, tokens, bloqueios, numeração e cobrança |
 | **Portal do cliente** | `https://SEU_DOMINIO/portal/` | `public/portal/` (`index.html`, `portal.css`, `portal.js`) | E-mail e senha da pessoa (criados no painel admin) | A empresa cliente: emite a própria NFS-e num formulário |
-| **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
+| **Monitor** | `https://SEU_DOMINIO/monitor/` | `public/monitor/` (`index.html`, `monitor.css`, `monitor.js`) | o login do **painel admin** (botão "Notas (monitor)", sem outro token) **ou** `monitor_token` (vê **todas** as notas) **ou** o token de uma empresa cliente (vê **só as notas dela**) | Você e a equipe de suporte; e também o próprio cliente, se quiser acompanhar as notas dele |
 
 ### Passo a passo (servidor)
 
@@ -736,8 +739,15 @@ fila. Bloqueios, franquia, cobrança, monitor e webhooks valem igual.
 **Dar acesso a uma pessoa:**
 1. No painel admin, abra a empresa e vá até **Portal do cliente**.
 2. Informe nome e e-mail e clique em **Dar acesso ao portal**.
-3. Copie os dados de acesso (endereço, e-mail e **senha provisória**) e envie
-   para a pessoa. A senha aparece uma vez só.
+3. A caixa **Enviar os dados de acesso por e-mail** já vem marcada: o sistema manda
+   tudo sozinho. Para quem já tem acesso, use **✉ Enviar acesso por e-mail** na linha
+   da pessoa (gera senha provisória nova e envia num clique).
+   Ou clique em **Enviar por e-mail** (o sistema manda na hora o endereço do portal,
+   o e-mail e a **senha provisória**) ou em **Copiar dados de acesso** para mandar
+   você mesmo (WhatsApp, etc.). A senha aparece uma vez só; se perder, use **Nova senha**.
+   O envio por e-mail precisa do e-mail configurado em **Sistema > E-mail**; sem isso
+   a tela avisa e oferece o botão **Configurar e-mail agora**. O envio fica no
+   histórico da empresa.
 4. No primeiro acesso o portal pede para ela criar a própria senha
    (mínimo 8 caracteres, com letras e números).
 
@@ -812,20 +822,14 @@ sessões abertas.
   resposta é sempre a mesma, exista ou não o e-mail. Criada a senha nova,
   as sessões abertas em outros navegadores saem. Quem envia o e-mail é o
   **worker**. Para ligar:
-  1. No painel, **Sistema > Configurações > E-mail**: servidor, porta,
-     criptografia, usuário, remetente e o **endereço do portal** (vai no
-     link do e-mail).
-  2. A **senha** do e-mail vai no arquivo **`.env`** da raiz do projeto
-     (fora do Git):
-     ```bash
-     cp .env.example .env     # uma vez só
-     nano .env                # preencha SMTP_PASSWORD (e o resto, se quiser)
-     chmod 600 .env
-     ```
-     O `.env` também aceita `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
-     `SMTP_USER`, `SMTP_FROM` e `PORTAL_URL`. O que estiver no painel ou no
-     `config/nfse.local.php` vale mais; o `.env` preenche o que falta.
-     Depois, "Reiniciar worker" no painel para ele ler o arquivo.
+  1. No painel, **Sistema > E-mail**: servidor, porta, criptografia,
+     usuário, **senha**, remetente e o **endereço do portal** (vai no link do
+     e-mail). Clique em **Salvar e-mail**. A senha fica guardada
+     criptografada no banco (mesma chave dos certificados, `chave_certificados`)
+     e nunca volta para a tela; para trocar, digite outra.
+  2. Opcional (servidor): a senha também pode ir no **`.env`** da raiz
+     (`SMTP_PASSWORD`, modelo em `.env.example`). A senha salva no painel
+     vale mais.
   3. No bloco **Sistema > E-mail**, use "Enviar e-mail de teste". Ali
      também aparecem os últimos e-mails e o erro do servidor, se falhar
      (tenta de novo em 1, 2, 4 e 8 minutos e desiste na 5ª vez).

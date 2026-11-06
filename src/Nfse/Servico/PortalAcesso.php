@@ -30,7 +30,7 @@ final class PortalAcesso
     private PortalRepositorio $portal;
     private array $opcoes;
 
-    public function __construct(private PDO $pdo, array $cfg)
+    public function __construct(private PDO $pdo, private array $cfg)
     {
         $this->portal = new PortalRepositorio($pdo);
         $this->opcoes = ($cfg['portal'] ?? []) + [
@@ -196,8 +196,62 @@ final class PortalAcesso
         $this->portal->definirSenha($id, password_hash($senha, PASSWORD_DEFAULT), true);
         $this->portal->apagarSessoesDoUsuario($id);
         (new ClienteRepositorio($this->pdo))->registrarLog($usuario['cnpj'], 'PORTAL_SENHA_REDEFINIDA', ['usuario_id' => $id], $ip);
-        return ['ok' => true, 'email' => $usuario['email'], 'senha_provisoria' => $senha,
+        return ['ok' => true, 'id' => $id, 'email' => $usuario['email'], 'senha_provisoria' => $senha,
             'mensagem' => 'Senha redefinida. A pessoa troca no próximo acesso.'];
+    }
+
+    /**
+     * Manda por e-mail os dados de acesso (endereco do portal, e-mail e senha
+     * provisoria) que o painel acabou de mostrar. Envia NA HORA (nao passa
+     * pela fila) para o painel mostrar se deu certo, e a senha nao fica gravada
+     * em lugar nenhum. So aceita a senha provisoria atual da pessoa.
+     *
+     * $linkPainel: endereco do portal visto pelo painel; usado so quando o
+     * "Endereço do portal" (email.url_portal) nao foi configurado.
+     */
+    public function enviarAcessoPorEmail(string $cnpj, int $id, string $senha, string $linkPainel, string $ip, ?EnvioEmail $envio = null): array
+    {
+        $usuario = $this->usuarioDaEmpresa($cnpj, $id);
+        if ($usuario === null) {
+            return self::falha(404, 'USUARIO_NAO_ENCONTRADO', 'Usuário não encontrado nesta empresa.');
+        }
+        if (empty($usuario['trocar_senha']) || !password_verify($senha, (string)$usuario['senha_hash'])) {
+            return self::falha(409, 'SENHA_NAO_E_A_ATUAL', 'Esta senha não vale mais (a pessoa já trocou ou foi gerada outra). Clique em "Nova senha" e envie de novo.');
+        }
+        $envio ??= new EnvioEmail($this->cfg);
+        if (!$envio->configurado()) {
+            return self::falha(503, 'EMAIL_NAO_CONFIGURADO', 'O envio de e-mail ainda não foi configurado. Falta: '
+                . implode(', ', $envio->pendencias()) . '. Configure em Sistema > E-mail, ou copie os dados e envie você mesmo.');
+        }
+        $link = trim((string)($this->cfg['email']['url_portal'] ?? ''));
+        if ($link === '' && preg_match('#^https?://[^\s]+$#i', $linkPainel)) {
+            $link = $linkPainel;
+        }
+
+        $primeiro = explode(' ', trim((string)$usuario['nome']))[0];
+        $assunto = 'Seu acesso ao portal de notas fiscais';
+        $texto = "Olá, {$primeiro}.\n\nVocê recebeu acesso ao portal de notas fiscais.\n\n"
+            . ($link !== '' ? "Portal: {$link}\n" : '')
+            . "E-mail: {$usuario['email']}\nSenha provisória: {$senha}\n\n"
+            . "No primeiro acesso o portal pede para você criar a sua própria senha.\n";
+        $e = static fn(string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+        $html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#1f2933;max-width:520px">'
+            . '<p>Olá, ' . $e($primeiro) . '.</p>'
+            . '<p>Você recebeu acesso ao portal de notas fiscais.</p>'
+            . '<table style="border-collapse:collapse;margin:16px 0">'
+            . '<tr><td style="padding:4px 12px 4px 0;color:#52606d">E-mail</td><td style="padding:4px 0"><strong>' . $e((string)$usuario['email']) . '</strong></td></tr>'
+            . '<tr><td style="padding:4px 12px 4px 0;color:#52606d">Senha provisória</td><td style="padding:4px 0;font-family:monospace;font-size:17px"><strong>' . $e($senha) . '</strong></td></tr>'
+            . '</table>'
+            . ($link !== '' ? '<p style="margin:24px 0"><a href="' . $e($link) . '" style="background:#17324d;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Entrar no portal</a></p>' : '')
+            . '<p style="color:#52606d;font-size:13px">No primeiro acesso o portal pede para você criar a sua própria senha.</p>'
+            . '</div>';
+        try {
+            $envio->enviar((string)$usuario['email'], $assunto, $texto, $html);
+        } catch (\Throwable $erro) {
+            return self::falha(502, 'EMAIL_FALHOU', 'O servidor de e-mail recusou: ' . $erro->getMessage());
+        }
+        (new ClienteRepositorio($this->pdo))->registrarLog($usuario['cnpj'], 'PORTAL_ACESSO_ENVIADO', ['usuario_id' => $id, 'email' => $usuario['email']], $ip);
+        return ['ok' => true, 'email' => $usuario['email'], 'mensagem' => "Enviado para {$usuario['email']}. Peça para a pessoa olhar também o spam."];
     }
 
     public function definirAtivo(string $cnpj, int $id, bool $ativo, string $ip): array

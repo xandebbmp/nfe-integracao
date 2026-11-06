@@ -7,6 +7,7 @@ use DateTimeImmutable;
 use NFePHP\Common\Certificate;
 use PDO;
 use Throwable;
+use Xande\NfeIntegracao\Nfse\Dominio\Documentos;
 use Xande\NfeIntegracao\Nfse\Dominio\Padrao;
 use Xande\NfeIntegracao\Nfse\Infra\CofreCertificado;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
@@ -124,6 +125,12 @@ final class AdministracaoClientes
         $cnpj = NfseConfig::normalizarCnpj($entrada['cnpj'] ?? '');
         if (!preg_match('/^[0-9A-Z]{14}$/', $cnpj)) {
             return self::falha(422, 'CNPJ_INVALIDO', 'Informe o CNPJ com 14 caracteres.');
+        }
+        // CNPJ so com numeros: confere os digitos (pega erro de digitacao no cadastro).
+        // O CNPJ alfanumerico (2026) passa so pelo formato acima.
+        if (ctype_digit($cnpj) && !Documentos::cnpjValido($cnpj)) {
+            return self::falha(422, 'CNPJ_INVALIDO', 'CNPJ inválido: confira os números (os dois últimos são dígitos verificadores).',
+                ['erros' => ['CNPJ inválido: confira os números.']]);
         }
 
         [$campos, $erros] = self::normalizar($entrada);

@@ -37,7 +37,10 @@ const TIPOS = [
 
 const ACOES_HISTORICO = {
   CADASTRO: 'Cadastro', ALTERACAO: 'Alteração', CERTIFICADO: 'Certificado enviado', TOKEN: 'Token gerado',
-  NUMERACAO: 'Numeração ajustada',
+  NUMERACAO: 'Numeração ajustada', PORTAL_USUARIO_CRIADO: 'Acesso ao portal criado', PORTAL_SENHA_REDEFINIDA: 'Nova senha do portal',
+  PORTAL_ACESSO_ENVIADO: 'Acesso ao portal enviado por e-mail', PORTAL_USUARIO_ATIVADO: 'Acesso ao portal reativado',
+  PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou administrador do portal',
+  PORTAL_ADMIN_RETIRADO: 'Deixou de ser administrador do portal',
 };
 
 const ACOES_SISTEMA = {
@@ -116,6 +119,7 @@ async function api(caminho, opcoes = {}) {
   if (!resposta.ok) {
     const erro = new Error(json.erro?.mensagem || `HTTP ${resposta.status}`);
     erro.detalhes = json.erro?.erros || [];
+    erro.codigo = json.erro?.codigo || '';
     throw erro;
   }
   return json;
@@ -137,7 +141,10 @@ function salvarToken(token, lembrar) {
 }
 
 function sair(mensagem) {
-  try { sessionStorage.removeItem(CHAVE_TOKEN); localStorage.removeItem(CHAVE_TOKEN); } catch { /* ignora */ }
+  // O monitor usa o mesmo login: sair aqui sai de la tambem.
+  try {
+    for (const chave of [CHAVE_TOKEN, 'nfse_monitor_token']) { sessionStorage.removeItem(chave); localStorage.removeItem(chave); }
+  } catch { /* ignora */ }
   estado.token = '';
   $('tela-painel').hidden = true;
   $('tela-acesso').hidden = false;
@@ -239,11 +246,45 @@ function linhaCliente(c) {
 // Modal da empresa
 // ==========================================================================
 
-function abrirModal(titulo, subtitulo, conteudo) {
+/**
+ * Abre a janela. opcoes.abas: barra de abas (ficha da empresa);
+ * opcoes.rodape: conteudo da barra fixa de baixo (ex.: botao Salvar).
+ */
+function abrirModal(titulo, subtitulo, conteudo, opcoes = {}) {
   $('modal-titulo').textContent = titulo;
   $('modal-subtitulo').textContent = subtitulo || '';
+  // Se o navegador guardou um index.html antigo (sem abas/rodape), segue sem eles.
+  const abas = $('modal-abas');
+  const rodape = $('modal-rodape');
+  if (abas) { abas.replaceChildren(...(opcoes.abas ? [opcoes.abas] : [])); abas.hidden = !opcoes.abas; }
+  if (rodape) { rodape.replaceChildren(...(opcoes.rodape || [])); rodape.hidden = !opcoes.rodape; }
+  else if (opcoes.rodape) conteudo = [...conteudo, el('div', { class: 'acoes' }, ...opcoes.rodape)];
   $('modal-corpo').replaceChildren(...conteudo);
+  $('modal-corpo').scrollTop = 0;
+  delete $('modal').dataset.sujo;
   if (!$('modal').open) $('modal').showModal();
+}
+
+// Fecha a janela pelo X, pelo Esc ou clicando fora dela. Se houver alteracao
+// nao salva (ou uma senha provisoria na tela), pergunta antes.
+function podeFecharModal() {
+  const modal = $('modal');
+  if (modal.dataset.sujo === '1' && !confirm('Há alterações não salvas. Fechar mesmo assim?')) return false;
+  if (modal.querySelector('.acesso-box') && !confirm('A senha provisória na tela some ao fechar (para mandar depois, só gerando outra). Fechar mesmo assim?')) return false;
+  return true;
+}
+function fecharModal() { if (podeFecharModal()) $('modal').close(); }
+
+/** Clique no fundo escuro (fora da caixa) fecha a janela. */
+function fecharAoClicarFora(dialogo, fechar) {
+  let comecouFora = false;
+  const fora = (e) => {
+    const r = dialogo.getBoundingClientRect();
+    return e.target === dialogo && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+  };
+  // So fecha se apertou E soltou fora (arrastar uma selecao de dentro para fora nao fecha).
+  dialogo.addEventListener('mousedown', (e) => { comecouFora = fora(e); });
+  dialogo.addEventListener('click', (e) => { if (comecouFora && fora(e)) fechar(); comecouFora = false; });
 }
 
 async function abrirCliente(numeroCnpj) {
@@ -270,162 +311,340 @@ function selecao(rotulo, nome, valor, opcoes) {
     el('select', { name: nome }, ...opcoes.map(([v, texto]) => el('option', { value: v, selected: String(valor ?? '') === String(v) }, texto))));
 }
 
+// ---- Ficha da empresa ----
+// Uma pagina so, curta:
+//   1. situacao + lista "Pronta para emitir" (so o que falta);
+//   2. formulario com o essencial a mostra (tipos de nota, identificacao,
+//      onde emite, impostos) e o resto recolhido em "Mais opções";
+//   3. certificado, acessos, numeracao e uso em blocos recolhidos.
+// Campos que so valem para um tipo de nota (ex.: inscricao estadual = NF-e)
+// aparecem so quando aquele tipo esta marcado (atributo data-tipos).
+
+/** Campo com rotulo e, se houver, uma explicacao curta embaixo. */
+function campoAjuda(rotulo, nome, valor, extra = {}) {
+  const label = campo(rotulo, nome, valor, extra);
+  if (extra.ajuda) label.append(el('span', { class: 'campo-ajuda' }, extra.ajuda));
+  if (extra.tipos) label.dataset.tipos = extra.tipos;
+  if (extra.mostrarSe) label.dataset.mostrarSe = extra.mostrarSe;
+  return label;
+}
+
+/** Bloco de campos com titulo curto. */
+function grupoCampos(titulo, ...campos) {
+  return el('fieldset', { class: 'grupo-campos' }, el('legend', {}, titulo), el('div', { class: 'campos' }, ...campos));
+}
+
+/** Bloco que abre e fecha (resumo sempre visivel). */
+function recolhivel(titulo, resumo, aberto, ...conteudo) {
+  return el('details', { class: 'recolhivel', open: aberto },
+    el('summary', {}, el('span', { class: 'recolhivel__titulo' }, titulo), resumo ? el('span', { class: 'recolhivel__resumo' }, resumo) : null),
+    el('div', { class: 'recolhivel__corpo' }, ...conteudo));
+}
+
+function formularioEmpresa(c, novo) {
+  const simples = selecao('Simples Nacional', 'opcao_simples_nacional', c.opcao_simples_nacional, [[1, '1 - Não optante'], [2, '2 - MEI'], [3, '3 - ME/EPP (Simples)']]);
+  const regimeApuracao = selecao('Regime de apuração (ME/EPP)', 'regime_apuracao_simples', c.regime_apuracao_simples, [['', 'Escolha'],
+    [1, '1 - Tudo pelo Simples (DAS), inclusive o ISS'],
+    [2, '2 - Federais pelo Simples, ISS pela prefeitura'],
+    [3, '3 - Federais e ISS fora do Simples']]);
+  regimeApuracao.dataset.mostrarSe = 'mepp';
+  regimeApuracao.append(el('span', { class: 'campo-ajuda' }, 'Como os impostos são pagos. O mais comum é o 1. Confirme com o contador.'));
+  const regimeNacional = selecao('Regime especial (NFS-e Nacional)', 'regime_especial_tributacao', c.regime_especial_tributacao,
+    [[0, '0 - Nenhum'], [1, '1 - Ato cooperado (cooperativa)'], [2, '2 - Estimativa'], [3, '3 - Microempresa municipal'],
+      [4, '4 - Notário ou registrador'], [5, '5 - Profissional autônomo'], [6, '6 - Sociedade de profissionais']]);
+  regimeNacional.dataset.tipos = 'NACIONAL';
+  const regimeSalvador = selecao('Regime especial (Salvador)', 'regime_especial_abrasf', c.regime_especial_abrasf,
+    [['', 'Nenhum'], [1, '1 - Microempresa municipal'], [2, '2 - Estimativa'], [3, '3 - Sociedade de profissionais'],
+      [4, '4 - Cooperativa'], [5, '5 - MEI do Simples'], [6, '6 - ME/EPP do Simples']]);
+  regimeSalvador.dataset.tipos = 'SALVADOR';
+
+  const form = el('form', { class: 'form-empresa', novalidate: false },
+    el('h3', {}, 'Dados da empresa'),
+    grupoCampos('O que a empresa emite',
+      el('div', { class: 'largo opcoes-linha' },
+        ...TIPOS.map((t) => el('label', { class: 'linha-check' },
+          el('input', { type: 'checkbox', name: 'padroes_permitidos', value: t.padrao, checked: (c.padroes_permitidos || []).includes(t.padrao) }), t.nome)))),
+    grupoCampos('Empresa',
+      campoAjuda('CNPJ', 'cnpj', novo ? '' : cnpj(c.cnpj), { obrigatorio: true, placeholder: '00.000.000/0000-00' }),
+      campoAjuda('Razão social', 'razao_social', c.razao_social, { obrigatorio: true, max: 150 }),
+      campoAjuda('Nome fantasia', 'nome_fantasia', c.nome_fantasia, { max: 150 }),
+      campoAjuda('E-mail', 'email', c.email, { tipo: 'email', max: 120 }),
+      campoAjuda('Telefone', 'telefone', c.telefone, { max: 20 })),
+    grupoCampos('Inscrições',
+      campoAjuda('Código IBGE do município', 'codigo_municipio', c.codigo_municipio, { max: 7, ajuda: 'Salvador = 2927408', tipos: 'NACIONAL SALVADOR' }),
+      campoAjuda('Inscrição municipal (NFS-e)', 'inscricao_municipal', c.inscricao_municipal, { max: 20, tipos: 'NACIONAL SALVADOR' }),
+      campoAjuda('UF (NF-e)', 'uf', c.uf, { max: 2, placeholder: 'BA', tipos: 'NFE' }),
+      campoAjuda('Inscrição estadual (NF-e)', 'ie', c.ie, { max: 20, tipos: 'NFE' })),
+    grupoCampos('Impostos',
+      simples, regimeApuracao,
+      campoAjuda('% tributos do Simples', 'percentual_tributos_simples', c.percentual_tributos_simples ?? '',
+        { max: 6, placeholder: 'ex.: 2', ajuda: 'O contador informa.', mostrarSe: 'mepp' })),
+    recolhivel('Mais opções', 'Liberação, plano, regimes especiais, webhook e anotações', false,
+      el('div', { class: 'campos' },
+        el('label', { class: 'linha-check largo' }, el('input', { type: 'checkbox', name: 'emissao_liberada', checked: c.emissao_liberada }), 'Emissão liberada'),
+        campoAjuda('Motivo do bloqueio (o cliente vê)', 'motivo_bloqueio', c.motivo_bloqueio, { max: 300, largo: true, mostrarSe: 'bloqueada' }),
+        campoAjuda('Liberado até', 'liberado_ate', c.liberado_ate, { tipo: 'date', ajuda: 'Vazio = sem vencimento' }),
+        campoAjuda('Plano', 'plano', c.plano, { max: 60, placeholder: 'Ex.: Básico' }),
+        campoAjuda('Limite de notas por mês', 'limite_mensal', c.limite_mensal, { tipo: 'number', min: 1, ajuda: 'Vazio = sem limite' }),
+        regimeNacional, regimeSalvador,
+        el('label', { class: 'linha-check', 'data-tipos': 'SALVADOR' },
+          el('input', { type: 'checkbox', name: 'incentivador_cultural', checked: c.incentivador_cultural }), 'Incentivador cultural (Salvador)'),
+        campoAjuda('Webhook (URL)', 'webhook_url', c.webhook_url, { largo: true, max: 500, placeholder: 'https://seu-sistema/webhook' }),
+        campoAjuda('Segredo do webhook', 'webhook_segredo', '', { max: 200, ajuda: c.tem_webhook_segredo ? 'Já preenchido. Digite só para trocar.' : '' }),
+        el('label', { class: 'largo' }, 'Anotações internas (só a equipe vê)',
+          el('textarea', { name: 'observacao', maxlength: 2000, rows: 2 }, c.observacao || '')))));
+  if (!novo) form.querySelector('[name=cnpj]').readOnly = true;
+
+  // Mostra so os campos que valem para o que esta marcado agora.
+  const ajustar = () => {
+    const tipos = [...form.querySelectorAll('[name=padroes_permitidos]:checked')].map((i) => i.value);
+    const mepp = form.querySelector('[name=opcao_simples_nacional]').value === '3';
+    const bloqueada = !form.querySelector('[name=emissao_liberada]').checked;
+    for (const item of form.querySelectorAll('[data-tipos]')) item.hidden = !item.dataset.tipos.split(' ').some((t) => tipos.includes(t));
+    for (const item of form.querySelectorAll('[data-mostrar-se]')) item.hidden = item.dataset.mostrarSe === 'mepp' ? !mepp : !bloqueada;
+    // Bloco sem nenhum campo visivel some (ex.: Inscricoes sem tipo marcado).
+    for (const grupo of form.querySelectorAll('.grupo-campos')) {
+      grupo.hidden = ![...grupo.querySelectorAll('.campos > *')].some((i) => !i.hidden);
+    }
+  };
+  form.addEventListener('change', ajustar);
+  ajustar();
+  return form;
+}
+
+/** Abre os blocos recolhidos que contem o elemento (usado pelo "Ir para"). */
+function mostrarAbaDe(elemento) {
+  for (let d = elemento.closest('details'); d; d = d.parentElement.closest('details')) d.open = true;
+}
+
 function desenharCliente(c) {
   const novo = c === null;
   c = c || { padroes_permitidos: TIPOS.map((t) => t.padrao), emissao_liberada: true, codigo_municipio: '2927408', opcao_simples_nacional: 1, regime_especial_tributacao: 0 };
-  const partes = [];
+  const form = formularioEmpresa(c, novo);
 
-  if (!novo) {
-    partes.push(el('div', { class: 'acoes' }, seloSituacao(c.situacao), el('span', {}, c.situacao_mensagem)));
-    if (c.prontidao) partes.push(secaoProntidao(c.prontidao));
-  }
-
-  // ---- 1. Controle de emissao (cobranca) ----
-  const formControle = el('form', { class: 'secao' },
-    el('h3', {}, 'Controle de emissão'),
-    el('div', { class: 'campos' },
-      el('label', { class: 'linha-check' }, el('input', { type: 'checkbox', name: 'emissao_liberada', checked: c.emissao_liberada }), 'Emissão liberada'),
-      campo('Motivo do bloqueio (aparece para o cliente)', 'motivo_bloqueio', c.motivo_bloqueio, { max: 300 }),
-      campo('Liberado até (vencimento)', 'liberado_ate', c.liberado_ate, { tipo: 'date' }),
-      campo('Limite de notas por mês (vazio = sem limite)', 'limite_mensal', c.limite_mensal, { tipo: 'number', min: 1 }),
-      campo('Plano', 'plano', c.plano, { max: 60, placeholder: 'Ex.: Básico, Pro' }),
-      el('div', { class: 'largo' },
-        el('span', { class: 'suave' }, 'Tipos de nota contratados: '),
-        ...TIPOS.map((t) => el('label', { class: 'linha-check', style: 'display:inline-flex;margin-right:16px' },
-          el('input', { type: 'checkbox', name: 'padroes_permitidos', value: t.padrao, checked: (c.padroes_permitidos || []).includes(t.padrao) }), t.nome))),
-    ),
-  );
-
-  // ---- 2. Dados cadastrais ----
-  const formDados = el('form', { class: 'secao' },
-    el('h3', {}, 'Dados da empresa'),
-    el('div', { class: 'campos' },
-      campo('CNPJ', 'cnpj', novo ? '' : cnpj(c.cnpj), { obrigatorio: true, placeholder: '00.000.000/0000-00' }),
-      campo('Razão social', 'razao_social', c.razao_social, { obrigatorio: true, max: 150 }),
-      campo('Nome fantasia', 'nome_fantasia', c.nome_fantasia, { max: 150 }),
-      campo('E-mail', 'email', c.email, { tipo: 'email', max: 120 }),
-      campo('Telefone', 'telefone', c.telefone, { max: 20 }),
-      campo('UF (NF-e)', 'uf', c.uf, { max: 2, placeholder: 'BA' }),
-      campo('Inscrição estadual (NF-e)', 'ie', c.ie, { max: 20 }),
-      campo('Inscrição municipal (NFS-e)', 'inscricao_municipal', c.inscricao_municipal, { max: 20 }),
-      campo('Código IBGE do município', 'codigo_municipio', c.codigo_municipio, { max: 7 }),
-      selecao('Simples Nacional', 'opcao_simples_nacional', c.opcao_simples_nacional, [[1, 'Não optante'], [2, 'MEI'], [3, 'ME/EPP']]),
-      selecao('Regime de apuração (ME/EPP)', 'regime_apuracao_simples', c.regime_apuracao_simples, [['', '—'], [1, '1'], [2, '2'], [3, '3']]),
-      campo('% tributos do Simples (ME/EPP, do contador)', 'percentual_tributos_simples', c.percentual_tributos_simples ?? '', { max: 6, placeholder: 'ex.: 2' }),
-      selecao('Regime especial (NFS-e Nacional)', 'regime_especial_tributacao', c.regime_especial_tributacao, [0, 1, 2, 3, 4, 5, 6].map((v) => [v, v === 0 ? '0 - Nenhum' : String(v)])),
-      selecao('Regime especial (Salvador)', 'regime_especial_abrasf', c.regime_especial_abrasf, [['', '—'], 1, 2, 3, 4, 5, 6].map((v) => (Array.isArray(v) ? v : [v, String(v)]))),
-      el('label', { class: 'linha-check' }, el('input', { type: 'checkbox', name: 'incentivador_cultural', checked: c.incentivador_cultural }), 'Incentivador cultural'),
-      campo('Webhook (URL que recebe os avisos)', 'webhook_url', c.webhook_url, { largo: true, max: 500, placeholder: 'https://seu-sistema/webhook' }),
-      campo(c.tem_webhook_segredo ? 'Segredo do webhook (preenchido — digite para trocar)' : 'Segredo do webhook', 'webhook_segredo', '', { max: 200 }),
-      campo('Observação interna', 'observacao', c.observacao, { largo: true, max: 2000 }),
-    ),
-  );
-  if (!novo) formDados.querySelector('[name=cnpj]').readOnly = true;
-
-  const mensagemSalvar = el('span', {});
+  // ---- Botao salvar (barra fixa embaixo da janela) ----
+  const mensagemSalvar = el('span', { class: 'rodape__mensagem', role: 'status' });
   const botaoSalvar = el('button', { class: 'botao botao--forte', type: 'button' }, novo ? 'Cadastrar empresa' : 'Salvar alterações');
+  form.addEventListener('input', () => { $('modal').dataset.sujo = '1'; mensagemSalvar.className = 'rodape__mensagem aviso'; mensagemSalvar.textContent = 'Alterações não salvas'; });
   botaoSalvar.addEventListener('click', async () => {
-    const corpo = lerFormulario(formDados, formControle);
+    const corpo = lerFormulario(form);
     if (!corpo) return;
     botaoSalvar.disabled = true;
-    mensagemSalvar.className = 'suave';
+    mensagemSalvar.className = 'rodape__mensagem suave';
     mensagemSalvar.textContent = 'Salvando...';
     try {
       const { cliente } = await api('clientes.php', { metodo: 'POST', corpo });
       await carregar();
       desenharCliente(cliente);
     } catch (e) {
-      mensagemSalvar.className = 'erro';
+      mensagemSalvar.className = 'rodape__mensagem erro';
       mensagemSalvar.textContent = [e.message, ...(e.detalhes || [])].filter((t, i, a) => a.indexOf(t) === i).join(' ');
       botaoSalvar.disabled = false;
     }
   });
-  partes.push(formControle, formDados, el('div', { class: 'acoes' }, botaoSalvar, mensagemSalvar));
+  const rodape = [el('div', { class: 'rodape__texto' }, mensagemSalvar), botaoSalvar];
 
-  if (!novo) {
-    partes.push(secaoCertificado(c), secaoToken(c), secaoPortal(c), secaoNumeracao(c), secaoUso(c), secaoHistorico(c));
-  } else {
-    partes.push(el('p', { class: 'suave' }, 'Depois de cadastrar, envie o certificado e gere o token de acesso.'));
+  if (novo) {
+    abrirModal('Nova empresa', 'Preencha o básico. Certificado e acessos aparecem depois de cadastrar.', [form], { rodape });
+    return;
   }
 
-  abrirModal(novo ? 'Nova empresa' : (c.nome_fantasia || c.razao_social), novo ? '' : cnpj(c.cnpj), partes);
+  const certificado = c.tem_certificado
+    ? (c.certificado_dias_restantes < 0 ? 'vencido' : `válido até ${dataCurta(c.certificado_validade)}`)
+    : 'não enviado';
+  const series = (c.numeracao || []).length;
+  abrirModal(c.nome_fantasia || c.razao_social, cnpj(c.cnpj), [
+    el('div', { class: 'acoes situacao-linha' }, seloSituacao(c.situacao), el('span', {}, c.situacao_mensagem),
+      el('a', { class: 'botao', href: `../monitor/?emitente=${encodeURIComponent(c.cnpj)}` }, 'Ver notas desta empresa')),
+    c.prontidao ? secaoProntidao(c.prontidao) : null,
+    form,
+    recolhivel('Certificado digital', certificado, !c.tem_certificado, secaoCertificado(c)),
+    recolhivel('Portal do cliente', 'quem entra no portal · enviar acesso por e-mail', true, secaoPortal(c)),
+    recolhivel('Acesso à API (token)', c.tem_token ? 'token ativo' : 'sem token', false, secaoToken(c)),
+    recolhivel('Numeração', series ? `${series} série(s) em uso` : 'nenhuma nota ainda', false, secaoNumeracao(c)),
+    recolhivel('Uso e histórico', `${c.autorizadas_mes?.total ?? 0} nota(s) autorizada(s) no mês`, false, secaoUso(c), secaoHistorico(c)),
+  ], { rodape });
 }
 
 // ---- Pronta para emitir ----
 // Lista que o servidor monta (Servico/ProntidaoEmissao.php): o que falta para
-// a empresa emitir cada tipo de nota contratado. Primeiro o que falta, depois
-// os avisos; os itens ok ficam recolhidos.
+// a empresa emitir cada tipo de nota contratado. No topo, o resultado geral e
+// um selo por grupo; depois o que falta (e os avisos) com "Como resolver";
+// os itens ok ficam recolhidos. Nivel sempre com icone + texto (nao so cor).
 const NIVEIS_PRONTIDAO = {
-  FALTA: { nome: 'Falta', ponto: 'PARADO' },
-  ATENCAO: { nome: 'Atenção', ponto: 'PAUSADO' },
-  OK: { nome: 'OK', ponto: 'LIGADO' },
+  FALTA: { nome: 'Falta', icone: '✕' },
+  ATENCAO: { nome: 'Atenção', icone: '!' },
+  OK: { nome: 'OK', icone: '✓' },
 };
+
+// Secoes da ficha citadas nos textos de "Como resolver" (o botao "Ir para"
+// leva ate elas). Campos entre aspas no texto sao procurados pelo rotulo.
+const DESTINOS_PRONTIDAO = [
+  ['Controle de emissão', /controle de emiss/i],
+  ['Dados da empresa', /dados da empresa/i],
+  ['Certificado digital', /certificado|\.pfx/i],
+  ['Acesso à API', /token da api/i],
+  ['Portal do cliente', /portal do cliente/i],
+  ['Numeração', /numera[cç][aã]o/i],
+];
+const CAMPOS_PRONTIDAO = [['E-mail', /\be-mail\b/i], ['Código IBGE do município', /7 números|confira o código/i]];
+
+function iconeProntidao(nivel) {
+  const n = NIVEIS_PRONTIDAO[nivel] || NIVEIS_PRONTIDAO.ATENCAO;
+  return el('span', { class: 'pront-icone', 'data-nivel': nivel, 'aria-hidden': 'true' }, n.icone);
+}
+
+/** Onde o "Ir para" deve levar: campo citado (entre aspas ou conhecido) ou a secao da ficha. */
+function destinoProntidao(texto) {
+  const campos = [...texto.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  for (const [rotulo, padrao] of CAMPOS_PRONTIDAO) if (padrao.test(texto)) campos.push(rotulo);
+  // Secao citada entre aspas tem preferencia ("Portal do cliente" ou token da API -> Portal).
+  const secao = DESTINOS_PRONTIDAO.find(([nome]) => campos.includes(nome)) || DESTINOS_PRONTIDAO.find(([, padrao]) => padrao.test(texto));
+  if (!campos.length && !secao) return null;
+  return { campos, secao: secao ? secao[0] : null, nome: campos[0] || secao[0] };
+}
+
+function irParaProntidao(destino) {
+  const corpo = $('modal-corpo');
+  const simples = (s) => s.toLowerCase().replace(/\s*\(.*$/, '').replace(/\b(de|da|do)\b/g, '').replace(/\s+/g, ' ').trim();
+  let alvo = null;
+  for (const nome of destino.campos) {
+    const label = [...corpo.querySelectorAll('label')].find((l) => simples(l.textContent).startsWith(simples(nome)));
+    alvo = label?.querySelector('input, select, textarea') || null;
+    if (alvo) break;
+  }
+  if (!alvo && destino.secao) {
+    alvo = [...corpo.querySelectorAll('h3')].find((h) => !h.closest('.prontidao') && simples(h.textContent).startsWith(simples(destino.secao))) || null;
+    if (alvo) alvo.setAttribute('tabindex', '-1');
+  }
+  if (!alvo) return;
+  // Titulo escondido de bloco recolhivel: vai para o cabecalho clicavel do bloco.
+  const caixa = alvo.tagName === 'H3' ? alvo.closest('details.recolhivel') : null;
+  if (caixa) alvo = caixa.querySelector('summary');
+  mostrarAbaDe(alvo);
+  const suave = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  alvo.scrollIntoView({ block: 'center', behavior: suave ? 'smooth' : 'auto' });
+  alvo.focus({ preventScroll: true });
+  // Garantia: so o corpo da janela rola; a janela inteira nunca sai do lugar.
+  $('modal').scrollTop = 0;
+}
 
 function itemProntidao(i, grupo) {
   const n = NIVEIS_PRONTIDAO[i.nivel] || NIVEIS_PRONTIDAO.ATENCAO;
-  return el('li', { class: 'diag-item' },
-    el('span', { class: `ponto-sistema ponto-sistema--${n.ponto}`, title: n.nome }),
-    el('div', {},
-      el('div', {}, el('span', { class: 'suave' }, `${grupo} · `), i.texto),
-      i.resolver ? el('div', { class: 'diag-resolver' }, el('strong', {}, i.nivel === 'OK' ? 'Dica: ' : 'Como resolver: '), i.resolver) : null));
+  const ok = i.nivel === 'OK';
+  const destino = !ok && i.resolver ? destinoProntidao(i.resolver) : null;
+  return el('li', { class: 'pront-item', 'data-nivel': i.nivel },
+    iconeProntidao(i.nivel),
+    el('div', { class: 'pront-item__corpo' },
+      el('p', { class: 'pront-item__texto' },
+        el('span', { class: 'visualmente-oculto' }, `${n.nome}: `),
+        i.texto,
+        grupo ? el('span', { class: 'pront-tag' }, grupo) : null),
+      i.resolver ? el('div', { class: ok ? 'pront-dica' : 'pront-resolver' },
+        el('strong', {}, ok ? 'Dica' : 'Como resolver'),
+        el('p', {}, i.resolver),
+        destino ? el('button', { type: 'button', class: 'link-botao pront-ir', onclick: () => irParaProntidao(destino) },
+          `Ir para ${destino.campos.length ? `“${destino.nome}”` : destino.nome}`) : null) : null));
+}
+
+/** Resumo de um grupo: "Pronto", "Falta 1", "2 avisos", "Falta 1 · 1 aviso". */
+function resumoGrupoProntidao(g) {
+  const faltam = g.itens.filter((i) => i.nivel === 'FALTA').length;
+  const avisos = g.itens.filter((i) => i.nivel === 'ATENCAO').length;
+  const partes = [];
+  if (faltam) partes.push(faltam === 1 ? 'falta 1' : `faltam ${faltam}`);
+  if (avisos) partes.push(avisos === 1 ? '1 aviso' : `${avisos} avisos`);
+  const nivel = faltam ? 'FALTA' : avisos ? 'ATENCAO' : 'OK';
+  const texto = partes.length ? partes.join(' · ') : 'pronto';
+  return { nivel, texto: texto[0].toUpperCase() + texto.slice(1) };
 }
 
 function secaoProntidao(p) {
-  const itens = p.grupos.flatMap((g) => g.itens.map((i) => [i, g.titulo]));
+  const grupos = (p.grupos || []).filter((g) => (g.itens || []).length);
+  const itens = grupos.flatMap((g) => g.itens.map((i) => [i, g.titulo]));
   const de = (nivel) => itens.filter(([i]) => i.nivel === nivel);
   const problemas = [...de('FALTA'), ...de('ATENCAO')];
   const certos = de('OK');
 
   let titulo;
-  let ponto;
+  let nivel;
   if (!p.pronta) {
     titulo = p.faltam === 1 ? 'Falta 1 item para emitir' : `Faltam ${p.faltam} itens para emitir`;
-    ponto = 'PARADO';
+    if (p.atencao > 0) titulo += ` (e ${p.atencao === 1 ? '1 aviso' : `${p.atencao} avisos`})`;
+    nivel = 'FALTA';
   } else if (p.atencao > 0) {
     titulo = `Pronta para emitir, com ${p.atencao === 1 ? '1 aviso' : `${p.atencao} avisos`}`;
-    ponto = 'PAUSADO';
+    nivel = 'ATENCAO';
   } else {
     titulo = 'Pronta para emitir';
-    ponto = 'LIGADO';
+    nivel = 'OK';
   }
 
-  return el('section', { class: 'secao prontidao', 'data-pronta': String(p.pronta) },
-    el('h3', {}, 'Pronta para emitir?'),
-    el('div', { class: 'sistema-estado' },
-      el('span', { class: `ponto-sistema ponto-sistema--${ponto}` }),
-      el('strong', {}, titulo),
-      el('span', { class: 'suave' }, p.ambiente)),
-    problemas.length ? el('ul', { class: 'diag-lista' }, ...problemas.map(([i, g]) => itemProntidao(i, g))) : null,
-    certos.length ? el('details', {}, el('summary', { class: 'suave' }, `Ver os ${certos.length} itens ok`),
-      el('ul', { class: 'diag-lista' }, ...certos.map(([i, g]) => itemProntidao(i, g)))) : null,
-    el('p', { class: 'suave' }, 'Corrigiu um item nos dados da empresa? Clique em "Salvar alterações" e a lista é conferida de novo.'));
+  const idTitulo = 'prontidao-titulo';
+  const secao = el('section', { class: 'secao prontidao', 'data-nivel': nivel, 'data-pronta': String(p.pronta), 'aria-labelledby': idTitulo },
+    el('h3', { id: idTitulo }, 'Pronta para emitir?'),
+    el('div', { class: 'pront-resumo' },
+      iconeProntidao(nivel),
+      el('div', {},
+        el('p', { class: 'pront-resumo__titulo' }, titulo),
+        el('p', { class: 'pront-resumo__ambiente' }, p.ambiente))),
+    grupos.length
+      ? el('ul', { class: 'pront-grupos', 'aria-label': 'Situação por tipo de nota' },
+        ...grupos.map((g) => {
+          const r = resumoGrupoProntidao(g);
+          return el('li', { class: 'pront-grupo', 'data-nivel': r.nivel },
+            iconeProntidao(r.nivel),
+            el('span', { class: 'pront-grupo__nome' }, g.titulo === 'Geral' ? 'Geral (todos os tipos)' : g.titulo),
+            el('span', { class: 'pront-grupo__estado' }, r.texto));
+        }))
+      : el('p', { class: 'suave' }, 'Nenhuma conferência para mostrar: confira os tipos de nota contratados em Controle de emissão.'),
+    problemas.length ? [
+      el('h4', { class: 'pront-subtitulo' }, `O que resolver (${problemas.length})`),
+      el('ul', { class: 'pront-lista' }, ...problemas.map(([i, g]) => itemProntidao(i, g))),
+    ] : null,
+    certos.length ? el('details', { class: 'pront-oks' },
+      el('summary', {}, certos.length === 1 ? 'Ver o item ok' : `Ver os ${certos.length} itens ok`),
+      ...grupos.filter((g) => g.itens.some((i) => i.nivel === 'OK')).map((g) => el('div', { class: 'pront-oks__grupo' },
+        el('h4', {}, g.titulo),
+        el('ul', { class: 'pront-lista pront-lista--compacta' },
+          ...g.itens.filter((i) => i.nivel === 'OK').map((i) => itemProntidao(i, null)))))) : null,
+    el('p', { class: 'pront-rodape suave' }, 'Corrigiu um item nos dados da empresa? Clique em "Salvar alterações" e a lista é conferida de novo.'),
+    el('p', { class: 'pront-retorno', role: 'status' }));
+  return secao;
 }
 
 /** Confere de novo so a lista (depois de gerar token ou mexer no portal), sem redesenhar a ficha. */
 async function atualizarProntidao(numeroCnpj) {
   const atual = $('modal-corpo').querySelector('.prontidao');
   if (!atual) return;
+  const retorno = atual.querySelector('.pront-retorno');
+  atual.setAttribute('aria-busy', 'true');
+  if (retorno) { retorno.className = 'pront-retorno suave'; retorno.textContent = 'Conferindo a lista de novo…'; }
   try {
     const { cliente } = await api(`cliente.php?cnpj=${encodeURIComponent(numeroCnpj)}`);
-    if (cliente.prontidao) atual.replaceWith(secaoProntidao(cliente.prontidao));
-  } catch { /* a lista antiga continua; ao reabrir a ficha ela e conferida de novo */ }
+    if (!cliente.prontidao) throw new Error('sem lista');
+    const nova = secaoProntidao(cliente.prontidao);
+    // Mantem aberto o "Ver os itens ok" se a pessoa tinha aberto.
+    if (atual.querySelector('.pront-oks')?.open) nova.querySelector('.pront-oks')?.setAttribute('open', '');
+    atual.replaceWith(nova);
+    const novoRetorno = nova.querySelector('.pront-retorno');
+    if (novoRetorno) { novoRetorno.className = 'pront-retorno suave'; novoRetorno.textContent = 'Lista conferida de novo.'; }
+  } catch {
+    // A lista antiga continua; ao reabrir a ficha ela e conferida de novo.
+    atual.removeAttribute('aria-busy');
+    if (retorno) { retorno.className = 'pront-retorno erro'; retorno.textContent = 'Não foi possível conferir a lista agora. Ela pode estar desatualizada: feche e abra a ficha de novo.'; }
+  }
 }
 
-function lerFormulario(formDados, formControle) {
-  if (!formDados.reportValidity()) return null;
-  const valor = (form, nome) => form.querySelector(`[name=${nome}]`);
-  const corpo = {};
-  for (const input of formDados.querySelectorAll('input, select')) {
-    if (input.type === 'checkbox') corpo[input.name] = input.checked;
+function lerFormulario(form) {
+  if (!form.reportValidity()) return null;
+  const corpo = { padroes_permitidos: [] };
+  for (const input of form.querySelectorAll('input, select, textarea')) {
+    if (input.name === 'padroes_permitidos') { if (input.checked) corpo.padroes_permitidos.push(input.value); }
+    else if (input.type === 'checkbox') corpo[input.name] = input.checked;
     else if (input.name === 'webhook_segredo' && input.value === '') continue; // vazio = manter o atual
     else corpo[input.name] = input.value;
   }
-  corpo.emissao_liberada = valor(formControle, 'emissao_liberada').checked;
-  corpo.motivo_bloqueio = valor(formControle, 'motivo_bloqueio').value;
-  corpo.liberado_ate = valor(formControle, 'liberado_ate').value;
-  corpo.limite_mensal = valor(formControle, 'limite_mensal').value;
-  corpo.plano = valor(formControle, 'plano').value;
-  corpo.padroes_permitidos = [...formControle.querySelectorAll('[name=padroes_permitidos]:checked')].map((i) => i.value);
   if (!corpo.emissao_liberada && !corpo.motivo_bloqueio.trim()
       && !confirm('Bloquear sem informar o motivo? O cliente verá só "Emissão bloqueada".')) {
     return null;
@@ -520,26 +739,95 @@ function secaoPortal(c) {
   const mensagem = el('span', {});
   const linkPortal = new URL('../portal/', window.location.href).href;
 
-  // Senha provisoria aparece uma vez so, com botao de copiar.
+  // Aviso quando o e-mail do sistema ainda nao foi configurado.
+  const semEmail = (detalhe, comSenha = true) => el('div', { class: 'envio-aviso' },
+    el('strong', {}, 'O envio de e-mail ainda não foi configurado neste sistema.'),
+    el('p', {}, detalhe || 'É preciso configurar uma vez só, em Sistema > E-mail.'),
+    el('p', {}, comSenha ? 'Por enquanto, clique em "Copiar dados de acesso" e mande pelo WhatsApp ou pelo seu e-mail.'
+      : 'Por enquanto, use "Nova senha" e copie os dados para mandar pelo WhatsApp ou pelo seu e-mail.'),
+    el('button', { class: 'botao', type: 'button', onclick: () => {
+      if (!comSenha || confirm('A senha desta tela some quando você sair dela. Depois de configurar o e-mail, volte aqui e clique em "✉ Enviar acesso por e-mail" na linha da pessoa. Abrir a configuração agora?')) abrirSistema({ focar: 'email' });
+    } }, 'Configurar e-mail agora'));
+
+  // Botao da linha: gera senha provisoria nova e ja manda por e-mail (um clique so).
+  async function enviarAcessoDaLinha(u) {
+    area.replaceChildren(el('p', { class: 'suave' }, 'Verificando o e-mail do sistema...'));
+    area.scrollIntoView({ block: 'nearest' });
+    try {
+      const m = await api('email.php');
+      if (!m.configurado) {
+        area.replaceChildren(semEmail(`Falta preencher: ${m.faltam.join(', ')}.`, false));
+        return;
+      }
+    } catch { /* segue: o servidor confere de novo no envio */ }
+    if (!confirm(`Enviar o acesso ao portal para ${u.email}?\n\nO sistema gera uma senha provisória nova e manda por e-mail. A senha atual dessa pessoa para de funcionar.`)) {
+      area.replaceChildren();
+      return;
+    }
+    try {
+      const r = await api('portal_usuarios.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, acao: 'redefinir_senha', id: u.id } });
+      mostrarSenha(r).click();
+      await recarregar();
+    } catch (e) {
+      area.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  // Senha provisoria aparece uma vez so. Dois caminhos para a pessoa receber:
+  // 1) "Enviar por e-mail" (o sistema manda na hora) ou 2) "Copiar" (manda voce mesmo).
   function mostrarSenha(r) {
     const texto = `Portal: ${linkPortal}\nE-mail: ${r.email}\nSenha provisória: ${r.senha_provisoria}`;
+    const resultado = el('div', { class: 'envio-resultado', 'aria-live': 'polite' });
+    const enviar = el('button', { class: 'botao botao--forte', type: 'button' }, `✉ Enviar por e-mail para ${r.email}`);
     const copiar = el('button', { class: 'botao', type: 'button', onclick: async () => {
-      try { await navigator.clipboard.writeText(texto); copiar.textContent = 'Copiado!'; } catch { copiar.textContent = 'Selecione e copie'; }
+      try { await navigator.clipboard.writeText(texto); copiar.textContent = '✓ Copiado'; } catch { copiar.textContent = 'Selecione o texto e copie'; }
     } }, 'Copiar dados de acesso');
-    area.replaceChildren(el('div', { class: 'token-box' },
-      el('strong', {}, 'Envie para a pessoa (a senha não será mostrada de novo):'),
+
+    enviar.addEventListener('click', async () => {
+      enviar.disabled = true;
+      enviar.textContent = 'Enviando... (até 20 s)';
+      resultado.replaceChildren();
+      try {
+        const e = await api('portal_usuarios.php', { metodo: 'POST', corpo: {
+          acao: 'enviar_acesso', cnpj: c.cnpj, id: r.id, senha: r.senha_provisoria, link_portal: linkPortal } });
+        resultado.replaceChildren(el('p', { class: 'envio-ok' }, `✓ E-mail enviado para ${e.email}. Peça para a pessoa olhar também a caixa de spam.`));
+        enviar.textContent = 'Enviar de novo';
+      } catch (e) {
+        const falta = (e.message.match(/Falta: ([^.]+)\./) || [])[1];
+        resultado.replaceChildren(e.codigo === 'EMAIL_NAO_CONFIGURADO' ? semEmail(falta ? `Falta preencher: ${falta}.` : '') : el('p', { class: 'erro' }, e.message));
+        enviar.textContent = `✉ Tentar enviar de novo para ${r.email}`;
+      }
+      enviar.disabled = false;
+    });
+
+    area.replaceChildren(el('div', { class: 'token-box acesso-box' },
+      el('strong', { class: 'acesso-box__titulo' }, `Acesso pronto para ${r.email}`),
+      el('p', { class: 'suave' }, 'Agora mande estes dados para a pessoa. A senha só aparece aqui agora: depois só gerando outra.'),
       el('pre', { class: 'exemplo mono' }, texto),
-      el('div', { class: 'acoes' }, copiar),
+      el('div', { class: 'acoes' }, enviar, copiar),
+      resultado,
       el('p', { class: 'suave' }, 'No primeiro acesso o portal pede para ela criar a própria senha.')));
+
+    // Ja avisa antes do clique quando o e-mail nao esta configurado.
+    api('email.php').then((m) => {
+      if (m.configurado || resultado.childNodes.length) return;
+      enviar.classList.remove('botao--forte');
+      copiar.classList.add('botao--forte');
+      resultado.replaceChildren(semEmail(`Falta preencher: ${m.faltam.join(', ')}.`));
+    }).catch(() => {});
+    area.scrollIntoView({ block: 'nearest' });
+    return enviar;
   }
 
   async function acao(corpo, confirmar) {
     if (confirmar && !confirm(confirmar)) return;
     try {
       const r = await api('portal_usuarios.php', { metodo: 'POST', corpo: { cnpj: c.cnpj, ...corpo } });
-      if (r.senha_provisoria) mostrarSenha(r); else area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      const enviar = r.senha_provisoria ? mostrarSenha(r) : null;
+      if (!enviar) area.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
       await recarregar();
       atualizarProntidao(c.cnpj);
+      return enviar;
     } catch (e) {
       area.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
@@ -562,6 +850,8 @@ function secaoPortal(c) {
           el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
           el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
           el('td', {},
+            u.ativo ? el('button', { class: 'botao botao--forte', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail para a pessoa',
+              onclick: () => enviarAcessoDaLinha(u) }, '✉ Enviar acesso por e-mail') : null, ' ',
             el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
             el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id }) },
               u.administrador ? 'Tirar administrador' : 'Tornar administrador'), ' ',
@@ -574,7 +864,8 @@ function secaoPortal(c) {
     }
   }
 
-  const botao = el('button', { class: 'botao', type: 'button' }, 'Dar acesso ao portal');
+  const porEmail = el('input', { type: 'checkbox', checked: true });
+  const botao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Dar acesso ao portal');
   botao.addEventListener('click', async () => {
     mensagem.textContent = '';
     if (nome.value.trim().length < 2 || !email.checkValidity() || !email.value) {
@@ -583,7 +874,8 @@ function secaoPortal(c) {
       return;
     }
     botao.disabled = true;
-    await acao({ acao: 'criar', nome: nome.value, email: email.value });
+    const enviar = await acao({ acao: 'criar', nome: nome.value, email: email.value });
+    if (enviar && porEmail.checked) enviar.click();
     if (area.querySelector('.token-box')) { nome.value = ''; email.value = ''; }
     botao.disabled = false;
   });
@@ -594,6 +886,7 @@ function secaoPortal(c) {
     el('p', { class: 'suave' }, `Pessoas desta empresa que emitem NFS-e pelo formulário em ${linkPortal}`),
     lista,
     el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
+    el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
     el('div', { class: 'acoes' }, botao, mensagem),
     area,
   );
@@ -614,7 +907,9 @@ function secaoNumeracao(c) {
         el('td', {}, dataHora(n.atualizado_em))))))
     : el('p', { class: 'suave' }, 'Nenhuma série usada ainda neste ambiente: a primeira nota de cada série sai com o número 1.');
 
-  const tipo = el('select', {}, ...TIPOS.map((t) => el('option', { value: t.padrao }, t.nome)));
+  // So os tipos que a empresa emite (se nenhum marcado, mostra todos).
+  const contratados = TIPOS.filter((t) => (c.padroes_permitidos || []).includes(t.padrao));
+  const tipo = el('select', {}, ...(contratados.length ? contratados : TIPOS).map((t) => el('option', { value: t.padrao }, t.nome)));
   const serie = el('input', { type: 'text', maxlength: 5 });
   const ultimo = el('input', { type: 'number', min: 0, placeholder: 'Ex.: 1520' });
   const mensagem = el('span', {});
@@ -777,7 +1072,7 @@ async function atualizarPontoSistema() {
   }
 }
 
-function abrirSistema() {
+function abrirSistema(opcoes = {}) {
   const estadoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   const filaArea = el('div', {});
   const workersArea = el('div', {});
@@ -911,36 +1206,40 @@ function abrirSistema() {
     return String(v);
   }
 
+  // Um campo de configuracao (lista de Dominio/AjustesPainel.php).
+  function campoConfig(c, entradas, erros) {
+    const id = 'cfg-' + c.chave.replace('.', '-');
+    let entrada;
+    if (c.tipo === 'opcao') {
+      entrada = el('select', { id }, ...Object.entries(c.opcoes).map(([v, nome]) => el('option', { value: v, selected: String(c.valor) === v }, nome)));
+    } else if (c.tipo === 'inteiro') {
+      entrada = el('input', { id, type: 'number', min: c.min, max: c.max, step: 1, value: c.valor });
+    } else if (c.tipo === 'texto' || c.tipo === 'email') {
+      entrada = el('input', { id, type: c.tipo === 'email' ? 'email' : 'text', value: c.valor ?? '', maxlength: 200 });
+    } else {
+      entrada = el('input', { id, type: 'url', value: c.valor ?? '', placeholder: 'https://...' });
+    }
+    entradas[c.chave] = entrada;
+    erros[c.chave] = el('span', { class: 'erro' });
+    const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
+    return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
+      el('span', { class: 'config-rotulo' }, c.rotulo),
+      entrada,
+      el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
+        c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
+      erros[c.chave]);
+  }
+
   function desenharConfiguracoes(dados, mensagem) {
     const entradas = {};
     const erros = {};
     const grupos = {};
-    for (const c of dados.campos) (grupos[c.grupo] ||= []).push(c);
+    // O grupo E-mail aparece no bloco "E-mail" (junto com a senha), nao aqui.
+    for (const c of dados.campos) if (c.grupo !== 'E-mail') (grupos[c.grupo] ||= []).push(c);
 
     const blocos = Object.entries(grupos).map(([grupo, campos]) => el('fieldset', { class: 'config-grupo' },
       el('legend', {}, grupo),
-      el('div', { class: 'campos' }, ...campos.map((c) => {
-        const id = 'cfg-' + c.chave.replace('.', '-');
-        let entrada;
-        if (c.tipo === 'opcao') {
-          entrada = el('select', { id }, ...Object.entries(c.opcoes).map(([v, nome]) => el('option', { value: v, selected: String(c.valor) === v }, nome)));
-        } else if (c.tipo === 'inteiro') {
-          entrada = el('input', { id, type: 'number', min: c.min, max: c.max, step: 1, value: c.valor });
-        } else if (c.tipo === 'texto' || c.tipo === 'email') {
-          entrada = el('input', { id, type: c.tipo === 'email' ? 'email' : 'text', value: c.valor ?? '', maxlength: 200 });
-        } else {
-          entrada = el('input', { id, type: 'url', value: c.valor ?? '', placeholder: 'https://...' });
-        }
-        entradas[c.chave] = entrada;
-        erros[c.chave] = el('span', { class: 'erro' });
-        const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
-        return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
-          el('span', { class: 'config-rotulo' }, c.rotulo),
-          entrada,
-          el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
-            c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
-          erros[c.chave]);
-      }))));
+      el('div', { class: 'campos' }, ...campos.map((c) => campoConfig(c, entradas, erros)))));
 
     const retorno = el('div', {}, mensagem ? el('p', { class: 'ok-texto' }, mensagem) : '');
     const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Salvar configurações');
@@ -953,7 +1252,6 @@ function abrirSistema() {
         const r = await api('configuracoes.php', { metodo: 'POST', corpo: { valores } });
         desenharConfiguracoes(r.configuracoes, r.mensagem);
         recarregar();
-        carregarEmail();
       } catch (e) {
         for (const d of e.detalhes || []) if (erros[d.campo]) erros[d.campo].textContent = d.mensagem;
         retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
@@ -963,7 +1261,7 @@ function abrirSistema() {
 
     configArea.replaceChildren(
       el('p', { class: 'suave' }, `Ambiente: ${dados.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'}. `,
-        'O ambiente, as senhas e os tokens só mudam no arquivo config/nfse.local.php, por segurança.'),
+        'O ambiente e os tokens só mudam no arquivo config/nfse.local.php, por segurança. O e-mail fica no bloco "E-mail", acima.'),
       ...blocos,
       el('div', { class: 'acoes' }, salvar),
       retorno);
@@ -1029,11 +1327,59 @@ function abrirSistema() {
 
   // ---- E-mail (Esqueci a senha do portal) ----
   const NOMES_EMAIL = { PENDENTE: 'na fila', ENVIADO: 'enviado', ERRO: 'falhou' };
-  function desenharEmail(m) {
+  // Bloco completo: servidor, usuario, SENHA (criptografada), remetente,
+  // endereco do portal, um botao "Salvar e-mail" e o e-mail de teste.
+  function desenharEmail(m, cfg) {
     if (!m.instalado) {
-      emailArea.replaceChildren(el('p', { class: 'aviso' }, 'Falta atualizar o banco (script 0012) para ligar o "Esqueci a senha".'));
+      emailArea.replaceChildren(el('p', { class: 'aviso' }, 'Falta atualizar o banco (script 0012) para ligar o e-mail.'));
       return;
     }
+    const situacao = !m.configurado
+      ? ['PAUSADO', 'E-mail não configurado', `Falta: ${m.faltam.join(', ')}. Preencha abaixo e clique em "Salvar e-mail".`]
+      : (!m.esqueci_ligado
+        ? ['LIGADO', 'E-mail pronto', 'Já envia o acesso ao portal. Para ligar o "Esqueci a senha", preencha o "Endereço do portal".']
+        : ['LIGADO', 'E-mail pronto', `Os e-mails saem por ${m.remetente}. O "Esqueci a senha" está ligado (quem envia é o worker).`]);
+
+    const entradas = {};
+    const erros = {};
+    const campos = (cfg?.campos || []).filter((c) => c.grupo === 'E-mail');
+    const porChave = Object.fromEntries(campos.map((c) => [c.chave, c]));
+    const campo = (chave) => (porChave[chave] ? campoConfig(porChave[chave], entradas, erros) : null);
+
+    const senha = el('input', { id: 'cfg-email-senha', type: 'password', autocomplete: 'new-password', maxlength: 200,
+      placeholder: m.senha_definida ? '•••••••• (já salva: digite só para trocar)' : 'Senha da conta de e-mail' });
+    const verSenha = el('button', { class: 'link-botao', type: 'button', onclick: () => {
+      senha.type = senha.type === 'password' ? 'text' : 'password';
+      verSenha.textContent = senha.type === 'password' ? 'mostrar' : 'esconder';
+    } }, 'mostrar');
+    const erroSenha = el('span', { class: 'erro' });
+    const campoSenha = el('label', { for: 'cfg-email-senha' },
+      el('span', { class: 'config-rotulo' }, 'Senha ', m.senha_definida ? el('span', { class: 'ok-texto' }, '✓ salva') : el('span', { class: 'aviso' }, 'falta')),
+      senha,
+      el('span', { class: 'config-ajuda' }, 'Fica guardada criptografada: ninguém consegue ver depois, nem aqui. Gmail: use uma "senha de app". ', verSenha),
+      erroSenha);
+
+    const retorno = el('div', {});
+    const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Salvar e-mail');
+    salvar.addEventListener('click', async () => {
+      Object.values(erros).forEach((e) => { e.textContent = ''; });
+      erroSenha.textContent = '';
+      salvar.disabled = true;
+      retorno.replaceChildren(el('p', { class: 'suave' }, 'Salvando...'));
+      try {
+        const valores = {};
+        for (const [chave, entrada] of Object.entries(entradas)) valores[chave] = entrada.value;
+        if (Object.keys(valores).length) await api('configuracoes.php', { metodo: 'POST', corpo: { valores } });
+        if (senha.value !== '') await api('email.php', { metodo: 'POST', corpo: { acao: 'salvar_senha', senha: senha.value } });
+        await carregarEmail('✓ E-mail salvo. Agora envie um e-mail de teste para conferir.');
+        carregarConfiguracoes();
+      } catch (e) {
+        for (const d of e.detalhes || []) if (erros[d.campo]) erros[d.campo].textContent = d.mensagem;
+        retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+        salvar.disabled = false;
+      }
+    });
+
     const para = el('input', { type: 'email', value: m.remetente, placeholder: 'voce@empresa.com.br', 'aria-label': 'E-mail para receber o teste' });
     const resultado = el('div', {});
     const testar = el('button', { class: 'botao', type: 'button', disabled: !m.configurado }, 'Enviar e-mail de teste');
@@ -1042,21 +1388,24 @@ function abrirSistema() {
       resultado.replaceChildren(el('p', { class: 'suave' }, 'Enviando... (até 20 s)'));
       try {
         const r = await api('email.php', { metodo: 'POST', corpo: { para: para.value } });
-        resultado.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+        resultado.replaceChildren(el('p', { class: 'envio-ok' }, '✓ ' + r.mensagem));
       } catch (e) {
         resultado.replaceChildren(el('p', { class: 'erro' }, e.message));
       }
       testar.disabled = false;
     });
-    const situacao = !m.configurado
-      ? ['PAUSADO', 'E-mail não configurado', `Falta: ${m.faltam.join(', ')}. Preencha em Configurações abaixo; a senha vai no arquivo config/nfse.local.php.`]
-      : (!m.esqueci_ligado
-        ? ['PAUSADO', 'E-mail pronto, mas o "Esqueci a senha" está desligado', 'Preencha o "Endereço do portal" em Configurações (vai no link do e-mail).']
-        : ['LIGADO', '"Esqueci a senha" ligado', `Os e-mails saem por ${m.remetente}. Quem envia é o worker: ele precisa estar ligado.`]);
+
     emailArea.replaceChildren(...[
       el('div', { class: 'sistema-estado' },
         el('span', { class: `ponto-sistema ponto-sistema--${situacao[0]}` }), el('strong', {}, situacao[1]), el('span', { class: 'suave' }, situacao[2])),
+      el('p', { class: 'suave' }, 'Usado para mandar o acesso ao portal e o "Esqueci a senha". Os dados você pega com quem cuida do e-mail da empresa.'),
+      el('div', { class: 'campos' }, campo('email.host'), campo('email.porta'), campo('email.seguranca'),
+        campo('email.usuario'), campoSenha, campo('email.remetente'), campo('email.nome_remetente'), campo('email.url_portal')),
+      el('div', { class: 'acoes' }, salvar),
+      retorno,
+      el('h4', { class: 'pront-subtitulo' }, 'Testar'),
       el('div', { class: 'acoes' }, para, testar),
+      m.configurado ? null : el('p', { class: 'suave' }, 'O teste libera depois de salvar o e-mail completo.'),
       resultado,
       m.ultimos.length ? el('details', {}, el('summary', { class: 'suave' }, 'Últimos e-mails'),
         el('table', { class: 'mini' }, el('tbody', {}, ...m.ultimos.map((x) => el('tr', {},
@@ -1066,11 +1415,16 @@ function abrirSistema() {
             : el('span', { class: x.status === 'ERRO' ? 'erro' : 'aviso', title: x.ultimo_erro || '' }, NOMES_EMAIL[x.status] + (x.ultimo_erro ? `: ${x.ultimo_erro}` : ''))),
           el('td', { class: 'suave' }, dataHora(x.enviado_em || x.criado_em))))))) : null,
     ].filter(Boolean));
+    if (retornoInicial) retorno.replaceChildren(el('p', { class: 'envio-ok' }, retornoInicial));
   }
 
-  async function carregarEmail() {
+  let retornoInicial = '';
+  async function carregarEmail(mensagem = '') {
     try {
-      desenharEmail(await api('email.php'));
+      const [m, cfg] = await Promise.all([api('email.php'), api('configuracoes.php').catch(() => null)]);
+      retornoInicial = mensagem;
+      desenharEmail(m, cfg);
+      retornoInicial = '';
     } catch (e) {
       emailArea.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
@@ -1082,7 +1436,7 @@ function abrirSistema() {
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
-    el('section', { class: 'secao' }, el('h3', {}, 'E-mail'), emailArea),
+    el('section', { class: 'secao', id: 'secao-email' }, el('h3', {}, 'E-mail'), emailArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
   ]);
@@ -1090,6 +1444,7 @@ function abrirSistema() {
   carregarBanco();
   carregarConfiguracoes();
   carregarEmail();
+  if (opcoes.focar === 'email') setTimeout(() => $('secao-email')?.scrollIntoView({ block: 'start' }), 50);
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }
@@ -1111,8 +1466,10 @@ $('form-acesso').addEventListener('submit', async (evento) => {
 $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
-$('botao-sistema').addEventListener('click', abrirSistema);
-$('modal-fechar').addEventListener('click', () => $('modal').close());
+$('botao-sistema').addEventListener('click', () => abrirSistema());
+$('modal-fechar').addEventListener('click', fecharModal);
+$('modal').addEventListener('cancel', (e) => { if (!podeFecharModal()) e.preventDefault(); });
+fecharAoClicarFora($('modal'), fecharModal);
 $('filtro-busca').addEventListener('input', desenhar);
 $('filtro-situacao').addEventListener('change', (e) => { estado.filtroSituacao = e.target.value; desenhar(); });
 

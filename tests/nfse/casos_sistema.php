@@ -44,7 +44,7 @@ function testesSistemaUnidade(array $cfg): void
     Apoio::verificar(AjustesPainel::validar('email.remetente', 'Nome <a@b.com>')[1] !== null, 'remetente com nome e <> recusado');
     Apoio::igual(['a@b.com.br', null], AjustesPainel::validar('email.remetente', ' a@b.com.br '), 'remetente valido aceito');
     Apoio::verificar(AjustesPainel::validar('email.host', "mail\nx")[1] !== null, 'texto com quebra de linha recusado');
-    Apoio::verificar(AjustesPainel::validar('email.senha', 'x')[1] !== null, 'senha do e-mail nao muda pelo painel');
+    Apoio::verificar(AjustesPainel::validar('email.senha', 'x')[1] !== null, 'senha do e-mail nao passa pelos ajustes comuns (tem campo proprio, criptografado)');
     putenv('SMTP_HOST=mail.exemplo.com.br');
     putenv('SMTP_PORT=587');
     putenv('SMTP_SECURE=false');
@@ -207,5 +207,22 @@ function testesSistemaIntegracao(PDO $pdo, array $cfg): void
     $r = $config->salvar(['portal.bloqueio_minutos' => '0', 'tpAmb' => '1'], null);
     Apoio::verificar(!$r['ok'] && $r['http'] === 422, 'valores invalidos recusados');
     Apoio::igual(['portal.bloqueio_minutos', 'tpAmb'], array_column($r['erros'], 'campo'), 'erro aponta cada campo');
+
+    // ---- Senha do e-mail digitada no painel (criptografada) ----
+    $comChave = $cfg;
+    $comChave['chave_certificados'] = base64_encode(random_bytes(32));
+    $comChave['email']['senha'] = '';
+    $configChave = new ConfiguracoesPainel($pdo, $comChave);
+    Apoio::igual('CHAVE_AUSENTE', (new ConfiguracoesPainel($pdo, ['chave_certificados' => ''] + $cfg))->salvarSenhaEmail('x', null)['codigo'] ?? null,
+        'senha do e-mail: sem a chave do servidor explica e nao grava');
+    Apoio::verificar($configChave->salvarSenhaEmail('s3nh@ do email', '10.0.0.1')['ok'] && $configChave->senhaEmailNoPainel(), 'senha do e-mail: salva pelo painel');
+    $guardado = (string)$pdo->query("SELECT valor FROM sistema_ajustes WHERE chave = 'email.senha_cifrada'")->fetchColumn();
+    Apoio::verificar($guardado !== '' && !str_contains($guardado, 's3nh@'), 'senha do e-mail: banco guarda so criptografada');
+    $log = (string)$pdo->query("SELECT detalhes FROM fiscal_admin_log ORDER BY id DESC LIMIT 1")->fetchColumn();
+    Apoio::verificar(str_contains($log, 'email.senha') && !str_contains($log, 's3nh@'), 'senha do e-mail: historico registra a troca sem a senha');
+    Apoio::igual('s3nh@ do email', NfseConfig::comClientes($comChave, $pdo)['email']['senha'], 'senha do e-mail: API usa a senha do painel');
+    $outraChave = ['chave_certificados' => base64_encode(random_bytes(32))] + $comChave;
+    Apoio::igual('', NfseConfig::comClientes($outraChave, $pdo)['email']['senha'], 'senha do e-mail: chave trocada nao quebra (fica sem senha)');
+    Apoio::verificar($configChave->salvarSenhaEmail('', null)['ok'] && !$configChave->senhaEmailNoPainel(), 'senha do e-mail: vazio apaga');
     $pdo->exec('DELETE FROM sistema_ajustes');
 }

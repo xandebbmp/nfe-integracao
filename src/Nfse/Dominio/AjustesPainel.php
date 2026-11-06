@@ -11,8 +11,8 @@ namespace Xande\NfeIntegracao\Nfse\Dominio;
  * esta lista.
  *
  * Ficam FORA de proposito (so no arquivo config/nfse.local.php):
- *   - senhas e tokens (admin_token, monitor_token, chave_certificados, S3,
- *     senha do e-mail);
+ *   - senhas e tokens (admin_token, monitor_token, chave_certificados, S3);
+ *     a senha do e-mail tem campo proprio, criptografado (ConfiguracoesPainel);
  *   - tpAmb (homologacao/producao): trocar por engano emitiria notas com
  *     valor fiscal.
  *
@@ -46,20 +46,20 @@ final class AjustesPainel
         'api.max_documentos_por_lote' => ['grupo' => 'API', 'rotulo' => 'Máximo de notas por envio', 'tipo' => 'inteiro', 'min' => 1, 'max' => 200,
             'ajuda' => 'Limite de documentos num único lote enviado à API.'],
 
-        'email.host' => ['grupo' => 'E-mail (Esqueci a senha)', 'rotulo' => 'Servidor SMTP', 'tipo' => 'texto',
-            'ajuda' => 'Endereço do servidor de e-mail, ex.: mail.suaempresa.com.br. A senha fica só no arquivo do servidor.'],
-        'email.porta' => ['grupo' => 'E-mail (Esqueci a senha)', 'rotulo' => 'Porta', 'tipo' => 'inteiro', 'min' => 1, 'max' => 65535,
+        'email.host' => ['grupo' => 'E-mail', 'rotulo' => 'Servidor SMTP', 'tipo' => 'texto',
+            'ajuda' => 'Endereço do servidor de e-mail, ex.: mail.suaempresa.com.br.'],
+        'email.porta' => ['grupo' => 'E-mail', 'rotulo' => 'Porta', 'tipo' => 'inteiro', 'min' => 1, 'max' => 65535,
             'ajuda' => 'Normalmente 465 (com "TLS direto") ou 587 (com "STARTTLS").'],
-        'email.seguranca' => ['grupo' => 'E-mail (Esqueci a senha)', 'rotulo' => 'Criptografia', 'tipo' => 'opcao',
+        'email.seguranca' => ['grupo' => 'E-mail', 'rotulo' => 'Criptografia', 'tipo' => 'opcao',
             'opcoes' => ['ssl' => 'TLS direto (porta 465)', 'tls' => 'STARTTLS (porta 587)', '' => 'Nenhuma (não recomendado)'],
             'ajuda' => 'Use a que o provedor do e-mail informar.'],
-        'email.usuario' => ['grupo' => 'E-mail (Esqueci a senha)', 'rotulo' => 'Usuário', 'tipo' => 'texto',
+        'email.usuario' => ['grupo' => 'E-mail', 'rotulo' => 'Usuário', 'tipo' => 'texto',
             'ajuda' => 'Geralmente o próprio endereço da conta que envia.'],
-        'email.remetente' => ['grupo' => 'E-mail (Esqueci a senha)', 'rotulo' => 'Remetente', 'tipo' => 'email',
+        'email.remetente' => ['grupo' => 'E-mail', 'rotulo' => 'Remetente', 'tipo' => 'email',
             'ajuda' => 'Endereço que aparece como "de". O provedor precisa autorizar.'],
-        'email.nome_remetente' => ['grupo' => 'E-mail (Esqueci a senha)', 'rotulo' => 'Nome do remetente', 'tipo' => 'texto',
+        'email.nome_remetente' => ['grupo' => 'E-mail', 'rotulo' => 'Nome do remetente', 'tipo' => 'texto',
             'ajuda' => 'Nome que aparece antes do endereço, ex.: Gestão Fiscal.'],
-        'email.url_portal' => ['grupo' => 'E-mail (Esqueci a senha)', 'rotulo' => 'Endereço do portal', 'tipo' => 'url',
+        'email.url_portal' => ['grupo' => 'E-mail', 'rotulo' => 'Endereço do portal', 'tipo' => 'url',
             'ajuda' => 'Vai no link do e-mail, ex.: https://fiscal.suaempresa.com.br/portal/. Vazio = "Esqueci a senha" desligado.'],
 
         'salvador.url_visualizacao' => ['grupo' => 'Salvador', 'rotulo' => 'Link para ver a nota no site da prefeitura', 'tipo' => 'url',
