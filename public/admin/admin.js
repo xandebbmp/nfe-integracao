@@ -9,6 +9,7 @@
      certificado.php  envio do .pfx (multipart)
      token.php        gera token novo (aparece uma unica vez)
      uso.php          relatorio de cobranca do mes (JSON ou CSV)
+     sistema.php      tela Sistema: worker ligado? fila; pausar/retomar/reiniciar
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -34,6 +35,12 @@ const ACOES_HISTORICO = {
   CADASTRO: 'Cadastro', ALTERACAO: 'Alteração', CERTIFICADO: 'Certificado enviado', TOKEN: 'Token gerado',
   NUMERACAO: 'Numeração ajustada',
 };
+
+const ACOES_SISTEMA = {
+  WORKER_PAUSADO: 'Envios pausados', WORKER_RETOMADO: 'Envios retomados', WORKER_REINICIADO: 'Worker reiniciado',
+};
+
+const ESTADOS_WORKER = { TRABALHANDO: 'Enviando notas', AGUARDANDO: 'Esperando notas', PAUSADO: 'Pausado' };
 
 const estado = { token: '', clientes: [], ambiente: '', mes: '', filtroSituacao: '' };
 
@@ -138,7 +145,11 @@ async function entrar(token) {
   await carregar();
   $('tela-acesso').hidden = true;
   $('tela-painel').hidden = false;
+  atualizarPontoSistema().catch(() => {});
 }
+
+// Bolinha do botao "Sistema" sempre atualizada.
+setInterval(() => { if (estado.token) atualizarPontoSistema().catch(() => {}); }, 15000);
 
 // ==========================================================================
 // Lista de empresas
@@ -670,6 +681,117 @@ async function abrirRelatorio(mes) {
 }
 
 // ==========================================================================
+// Sistema: worker e fila (sem terminal)
+//
+// O botao "Sistema" no topo tem uma bolinha: verde = worker ligado,
+// laranja = pausado/reiniciando, vermelha = parado. Ela se atualiza a cada
+// 15 s. A janela se atualiza a cada 5 s enquanto estiver aberta.
+// ==========================================================================
+
+let relogioSistema = null;
+
+async function atualizarPontoSistema() {
+  const ponto = $('sistema-ponto');
+  try {
+    const s = await api('sistema.php');
+    ponto.className = `ponto-sistema ponto-sistema--${s.situacao}`;
+    $('botao-sistema').title = `${s.titulo}. ${s.fila.esperando} na fila.`;
+    return s;
+  } catch (e) {
+    ponto.className = 'ponto-sistema';
+    $('botao-sistema').title = e.message;
+    throw e;
+  }
+}
+
+function abrirSistema() {
+  const estadoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const filaArea = el('div', {});
+  const workersArea = el('div', {});
+  const historicoArea = el('div', {});
+  const acoesArea = el('div', { class: 'acoes' });
+  const retorno = el('div', {});
+
+  async function comandar(acao) {
+    retorno.replaceChildren();
+    try {
+      const r = await api('sistema.php', { metodo: 'POST', corpo: { acao } });
+      retorno.replaceChildren(el('p', { class: 'ok-texto' }, r.mensagem));
+      desenhar(r.status);
+      atualizarPontoSistema().catch(() => {});
+    } catch (e) {
+      retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  // Confirmacao dentro da propria tela (sem janela do navegador).
+  function pedirConfirmacao(pergunta, rotulo, acao) {
+    retorno.replaceChildren(el('div', { class: 'confirmar' },
+      el('span', {}, pergunta),
+      el('button', { class: 'botao botao--forte', type: 'button', onclick: () => comandar(acao) }, rotulo),
+      el('button', { class: 'botao', type: 'button', onclick: () => retorno.replaceChildren() }, 'Cancelar')));
+  }
+
+  function desenhar(s) {
+    estadoArea.replaceChildren(el('div', { class: 'sistema-estado' },
+      el('span', { class: `ponto-sistema ponto-sistema--${s.situacao}` }),
+      el('strong', {}, s.titulo),
+      el('span', { class: 'suave' }, s.texto)));
+
+    acoesArea.replaceChildren(
+      s.pausado
+        ? el('button', { class: 'botao botao--forte', type: 'button', onclick: () => comandar('retomar') }, 'Retomar envios')
+        : el('button', { class: 'botao', type: 'button',
+          onclick: () => pedirConfirmacao('Pausar o envio de notas? As notas novas ficam esperando na fila.', 'Pausar envios', 'pausar') }, 'Pausar envios'),
+      el('button', { class: 'botao', type: 'button', disabled: s.situacao === 'PARADO' || s.situacao === 'REINICIANDO',
+        onclick: () => pedirConfirmacao('Reiniciar o worker? Ele termina a nota atual e volta sozinho em alguns segundos. Use depois de atualizar o sistema.', 'Reiniciar', 'reiniciar') }, 'Reiniciar worker'));
+
+    const f = s.fila;
+    filaArea.replaceChildren(...[el('div', { class: 'numeros' },
+      el('div', { class: 'numero' + (f.esperando > 0 && s.situacao !== 'LIGADO' ? ' numero--alerta' : '') }, el('b', {}, f.esperando), el('span', {}, 'esperando envio')),
+      el('div', { class: 'numero' }, el('b', {}, f.executando), el('span', {}, 'enviando agora')),
+      el('div', { class: 'numero' }, el('b', {}, f.agendados), el('span', {}, 'agendados (consultas)')),
+      el('div', { class: 'numero' + (f.falhas_24h > 0 ? ' numero--alerta' : '') }, el('b', {}, f.falhas_24h), el('span', {}, 'falharam nas últimas 24 h'))),
+    f.mais_antigo ? el('p', { class: 'suave' }, `A mais antiga esperando entrou em ${dataHora(f.mais_antigo)}.`) : null].filter(Boolean));
+
+    workersArea.replaceChildren(s.workers.length
+      ? el('div', { style: 'overflow-x:auto' }, el('table', { class: 'mini' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Servidor'), el('th', {}, 'Situação'), el('th', { class: 'num' }, 'Trabalhos feitos'), el('th', {}, 'Ligado desde'), el('th', {}, 'Último sinal'))),
+        el('tbody', {}, ...s.workers.map((w) => el('tr', {},
+          el('td', { class: 'mono' }, `${w.servidor} · ${w.pid}`),
+          el('td', {}, ESTADOS_WORKER[w.estado] || w.estado),
+          el('td', { class: 'num' }, w.jobs_feitos),
+          el('td', {}, dataHora(w.iniciado_em)),
+          el('td', {}, dataHora(w.batimento_em)))))))
+      : el('p', { class: 'suave' }, 'Nenhum worker dando sinal agora.'));
+
+    historicoArea.replaceChildren(s.acoes_recentes.length
+      ? el('ul', { class: 'linha-tempo' }, ...s.acoes_recentes.map((a) => el('li', {},
+        el('time', { class: 'suave' }, dataHora(a.criado_em)), ' · ', el('strong', {}, ACOES_SISTEMA[a.acao] || a.acao),
+        a.ip ? el('span', { class: 'suave' }, ` (IP ${a.ip})`) : null)))
+      : el('p', { class: 'suave' }, 'Nenhuma ação ainda.'));
+  }
+
+  async function recarregar() {
+    try {
+      desenhar(await atualizarPontoSistema());
+    } catch (e) {
+      estadoArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+  }
+
+  abrirModal('Sistema', 'Worker: o programa que envia as notas para a prefeitura', [
+    el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
+    el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
+    el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
+    el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
+  ]);
+  recarregar();
+  clearInterval(relogioSistema);
+  relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
+}
+
+// ==========================================================================
 // Inicio
 // ==========================================================================
 
@@ -686,6 +808,7 @@ $('form-acesso').addEventListener('submit', async (evento) => {
 $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
+$('botao-sistema').addEventListener('click', abrirSistema);
 $('modal-fechar').addEventListener('click', () => $('modal').close());
 $('filtro-busca').addEventListener('input', desenhar);
 $('filtro-situacao').addEventListener('change', (e) => { estado.filtroSituacao = e.target.value; desenhar(); });

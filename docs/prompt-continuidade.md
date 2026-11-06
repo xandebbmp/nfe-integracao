@@ -177,7 +177,12 @@ Documentação:
    gera nova senha), telas de Notas/Serviços/Tomadores completas e testar
    a consulta de CNPJ/CEP com rede na VPS. Ver `docs/manual-operacao.md`
    seção 13.
-9. **Não testados em ambiente real:** `deploy/apache/nfe-integracao.conf` e
+9. **Tudo pelo painel (pedido do xande):** o worker já é acompanhado e
+   comandado no botão "Sistema" do painel admin (pausar, retomar,
+   reiniciar; script 0007). Próximos itens da mesma tela: atualizar o
+   banco por botão, diagnóstico (o que o `bin/nfse_verificar.php` faz) e
+   configurações editáveis.
+10. **Não testados em ambiente real:** `deploy/apache/nfe-integracao.conf` e
    `deploy/pm2/ecosystem.config.js`.
 
 Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
@@ -191,7 +196,7 @@ Dúvidas ainda abertas, em `docs/nfse-duvidas-processo.md`:
   - sem banco: `php tests/nfse/executar.php`;
   - com banco descartável (as tabelas são recriadas):
     `NFSE_TESTE_EXIGIR_PG=1 NFSE_TESTE_PG="pgsql:host=127.0.0.1;dbname=nfephp_teste;user=...;password=..." php tests/nfse/executar.php`.
-  - Situação atual: 220/220 com banco e 80/80 sem.
+  - Situação atual: 240/240 com banco e 80/80 sem.
 - **Antes de enviar:** `php -l` nos arquivos alterados,
   `node --check public/admin/admin.js public/monitor/monitor.js public/portal/portal.js` e
   `shellcheck -S warning deploy/*.sh`.

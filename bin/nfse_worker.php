@@ -13,12 +13,19 @@ declare(strict_types=1);
  *
  * Para parar com seguranca envie SIGTERM (systemctl stop): o worker termina
  * o job atual antes de sair.
+ *
+ * Painel admin, tela "Sistema" (database/scripts/0007):
+ *   - a cada 10 s o worker grava um sinal de vida em sistema_workers;
+ *   - "Pausar envios": o worker para de pegar trabalhos (a fila espera);
+ *   - "Reiniciar": o worker termina o trabalho atual e sai. O systemd
+ *     (Restart=always) ou o pm2 liga de novo, ja com o codigo novo.
  */
 
 use Xande\NfeIntegracao\Database\ConnectionFactory;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\ProvedorFactory;
 use Xande\NfeIntegracao\Nfse\Repositorio\FilaRepositorio;
+use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\EntregadorWebhook;
 use Xande\NfeIntegracao\Nfse\Servico\ProcessadorJobs;
 
@@ -30,11 +37,40 @@ if (PHP_SAPI !== 'cli') {
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 $umaVez = in_array('--uma-vez', $argv, true);
-$workerId = gethostname() . ':' . getmypid();
+$servidor = (string)gethostname();
+$workerId = $servidor . ':' . getmypid();
+$iniciadoEm = time();
 
 $pdo = ConnectionFactory::make();
 $cfgArquivos = NfseConfig::carregar();
 $fila = new FilaRepositorio($pdo);
+
+// Controle pelo painel. Se o script 0007 ainda nao foi aplicado, o worker
+// funciona como antes (sem pausar/reiniciar pelo painel).
+$sistema = new SistemaRepositorio($pdo);
+if (!$sistema->existe()) {
+    $sistema = null;
+}
+$jobsFeitos = 0;
+$estadoAnterior = '';
+$ultimoBatimento = 0;
+$ordens = ['pausado' => false, 'reiniciar' => 0];
+
+// Le as ordens do painel e da sinal de vida (no maximo a cada 10 s, ou na
+// hora quando o estado muda).
+$sinalDeVida = static function (string $estado) use (&$sistema, $servidor, $workerId, &$jobsFeitos, &$estadoAnterior, &$ultimoBatimento): void {
+    if ($sistema === null || ($estado === $estadoAnterior && time() - $ultimoBatimento < 10)) {
+        return;
+    }
+    $sistema->batimento($workerId, $servidor, (int)getmypid(), $estado, $jobsFeitos);
+    $estadoAnterior = $estado;
+    $ultimoBatimento = time();
+};
+$lerOrdens = static function () use (&$sistema, &$ordens): void {
+    if ($sistema !== null) {
+        $ordens = $sistema->ordensDoWorker();
+    }
+};
 
 // Monta (ou remonta) o que depende do cadastro de empresas clientes.
 // O painel admin pode incluir empresas, trocar certificado ou webhook a
@@ -73,6 +109,9 @@ if (function_exists('pcntl_async_signals')) {
 // Escuta o canal avisado a cada job novo: o worker acorda na hora,
 // sem ficar consultando o banco em loop.
 $pdo->exec('LISTEN nfse_jobs');
+if ($sistema !== null) {
+    $pdo->exec('LISTEN ' . SistemaRepositorio::CANAL);
+}
 
 registrar("Worker {$workerId} iniciado (tpAmb={$cfg['tpAmb']}).");
 $ultimaLimpeza = 0;
@@ -85,12 +124,35 @@ while ($continuar) {
             registrar("{$liberados} job(s) travado(s) devolvido(s) para a fila.");
         }
         $recarregar();
+        $sistema?->apagarWorkersMortos(7 * 86400);
         $ultimaLimpeza = time();
+    }
+
+    // Ordens do painel.
+    $lerOrdens();
+    if ($ordens['reiniciar'] > $iniciadoEm) {
+        registrar('Reinicio pedido pelo painel: saindo (o systemd/pm2 liga de novo).');
+        break;
+    }
+    if ($ordens['pausado']) {
+        $sinalDeVida('PAUSADO');
+        if ($umaVez) {
+            break;
+        }
+        $pdo->pgsqlGetNotify(PDO::FETCH_ASSOC, 5000);
+        continue;
     }
 
     $processouAlgo = false;
     while ($continuar && $processador->processarProximo()) {
         $processouAlgo = true;
+        $jobsFeitos++;
+        $sinalDeVida('TRABALHANDO');
+        // Pausa pedida no meio de muitas notas: para depois da atual.
+        $lerOrdens();
+        if ($ordens['pausado'] || $ordens['reiniciar'] > $iniciadoEm) {
+            continue 2;
+        }
     }
 
     $entregador->entregarPendentes();
@@ -100,12 +162,14 @@ while ($continuar) {
     }
 
     if (!$processouAlgo) {
+        $sinalDeVida('AGUARDANDO');
         // Dorme ate chegar um aviso de job novo ou 5 segundos (jobs agendados
         // para o futuro, como as consultas de lote de Salvador).
         $pdo->pgsqlGetNotify(PDO::FETCH_ASSOC, 5000);
     }
 }
 
+$sistema?->removerWorker($workerId);
 registrar("Worker {$workerId} finalizado.");
 
 function registrar(string $mensagem): void

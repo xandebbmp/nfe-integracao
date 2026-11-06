@@ -193,6 +193,34 @@ chegado ao fisco (um timeout, por exemplo), o worker **consulta primeiro**,
 pela chave (NF-e) ou pela DPS/RPS (NFS-e). Só reenvia se o fisco disser que
 não existe.
 
+### No dia a dia: pelo painel (sem terminal)
+
+Depois de instalado (opção A ou B abaixo, **uma vez só**), o worker é
+acompanhado e comandado pelo botão **Sistema** no topo do painel admin.
+A bolinha do botão mostra a situação: verde = ligado, laranja = pausado ou
+reiniciando, vermelha = parado.
+
+| Botão | O que acontece |
+|---|---|
+| **Pausar envios** | Os workers param de enviar. Notas novas continuam entrando na fila e esperam. Use quando a prefeitura estiver fora do ar ou antes de uma manutenção. |
+| **Retomar envios** | Voltam a enviar, começando pelas que esperaram. |
+| **Reiniciar worker** | Cada worker termina a nota atual e sai; o systemd (ou o pm2) liga de novo em segundos, já com o código e a configuração novos. Use depois de atualizar o sistema. |
+
+A tela também mostra quantas notas esperam na fila, quantas falharam nas
+últimas 24 h, cada worker ligado (último sinal de vida) e quem deu cada
+ordem (IP e horário).
+
+Como funciona: o painel **não** liga processos no servidor (isso daria ao
+site poder de administrador). Ele grava a ordem na tabela `sistema_controle`
+e avisa no canal `nfse_controle`; o worker obedece na hora. A cada 10 s o
+worker grava um sinal de vida em `sistema_workers`; sem sinal por 30 s, o
+painel mostra "parado". Precisa do script `0007_sistema_criar_controle_worker.sql`
+(o `deploy/aplicar_banco.sh` aplica). Sem ele, o worker funciona normalmente,
+só não aparece no painel.
+
+> "Reiniciar" só religa o worker se ele estiver no systemd ou no pm2. Um
+> worker iniciado à mão no terminal apenas para.
+
 ### Quantos rodar
 
 Dois processos atendem bem até alguns milhares de notas por dia. Para mais
@@ -501,6 +529,8 @@ Para planilha, acrescente `&formato=csv`.
 | `POST /v1/admin/token.php` | Gerar um token novo |
 | `POST /v1/admin/numeracao.php` | Último número já usado numa série: `{"cnpj","padrao","serie","ultimo_numero"}` |
 | `GET /v1/admin/uso.php?mes=AAAA-MM[&formato=csv]` | Relatório de cobrança |
+| `GET /v1/admin/sistema.php` | Tela Sistema: worker ligado, fila e últimas ordens |
+| `POST /v1/admin/sistema.php` | `{"acao": "pausar" \| "retomar" \| "reiniciar"}` |
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
 exemplo, ao detectar fatura em atraso:
