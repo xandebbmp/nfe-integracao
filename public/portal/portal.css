@@ -177,7 +177,7 @@ a { color: var(--primaria); }
   background: var(--superficie); border-bottom: 1px solid var(--borda); box-shadow: var(--sombra);
   padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
 .topo__esquerda, .topo__direita { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.topo__abrir-menu { display: none; }
+.topo__abrir-menu { display: inline-flex; }
 
 .empresa-atual { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px;
   background: var(--hover); border: 1px solid var(--borda); font-size: 12px; min-width: 0; }
@@ -263,6 +263,20 @@ a { color: var(--primaria); }
 
 .cortina { display: none; }
 
+/* Menu recolhido (botao hamburguer no computador): fica so a faixa de icones.
+   O nome de cada item aparece como dica ao passar o mouse (atributo title). */
+.menu { transition: width .18s ease; }
+@media (min-width: 861px) {
+  .sistema.menu-recolhido { --largura-menu: 72px; }
+  .sistema.menu-recolhido .menu__topo, .sistema.menu-recolhido .menu__rodape { padding-inline: 12px; }
+  .sistema.menu-recolhido .menu__titulo { font-size: 0; padding: 0; height: 1px; margin: 8px 6px; background: var(--borda); }
+  .sistema.menu-recolhido .menu__item { justify-content: center; padding: 10px 0; position: relative; }
+  .sistema.menu-recolhido .menu__item span { display: none; }
+  .sistema.menu-recolhido .menu__item .menu__marca--qtd { display: block; position: absolute; top: 4px; right: 8px; padding: 0 5px; font-size: 9px; }
+  .sistema.menu-recolhido .selo-certificado { justify-content: center; padding: 10px 0; }
+  .sistema.menu-recolhido .selo-certificado div { display: none; }
+}
+
 /* ==========================================================================
    Tablet e celular
    ========================================================================== */
@@ -277,7 +291,6 @@ a { color: var(--primaria); }
   .login__marca h1 { font-size: 24px; }
   .login__nota, .login__rodape { display: none; }
 
-  .topo__abrir-menu { display: inline-flex; }
   .empresa-atual { display: none; }
   .usuario__nome { display: none; }
   .topo .logo__sub { display: none; }
@@ -296,7 +309,7 @@ a { color: var(--primaria); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .menu, .btn, .menu__item { transition: none; }
+  .menu, .btn, .menu__item, .mais summary::before { transition: none; }
 }
 
 /* ==========================================================================

@@ -116,11 +116,44 @@
   // ------------------------------------------------------------------
   // Menu no celular (gaveta)
   // ------------------------------------------------------------------
-  function fecharMenuCelular() { telaSistema.classList.remove('menu-aberto'); }
-  document.getElementById('botao-menu').addEventListener('click', function () {
-    telaSistema.classList.toggle('menu-aberto');
+  // Botao hamburguer:
+  //   - no celular abre/fecha o menu como gaveta;
+  //   - no computador recolhe o menu deixando so os icones (e lembra a escolha).
+  var botaoMenu = document.getElementById('botao-menu');
+  var telaPequena = window.matchMedia('(max-width: 860px)');
+
+  function fecharMenuCelular() {
+    telaSistema.classList.remove('menu-aberto');
+    atualizarBotaoMenu();
+  }
+  function atualizarBotaoMenu() {
+    var visivel = telaPequena.matches
+      ? telaSistema.classList.contains('menu-aberto')
+      : !telaSistema.classList.contains('menu-recolhido');
+    botaoMenu.setAttribute('aria-expanded', visivel ? 'true' : 'false');
+  }
+  botaoMenu.addEventListener('click', function () {
+    if (telaPequena.matches) {
+      telaSistema.classList.toggle('menu-aberto');
+    } else {
+      var recolhido = telaSistema.classList.toggle('menu-recolhido');
+      gravarPreferencia('portal_menu_recolhido', recolhido ? '1' : null);
+    }
+    atualizarBotaoMenu();
   });
   document.getElementById('cortina').addEventListener('click', fecharMenuCelular);
+  document.addEventListener('keydown', function (evento) {
+    if (evento.key === 'Escape') { fecharMenuCelular(); }
+  });
+  telaPequena.addEventListener('change', fecharMenuCelular);
+
+  // Dica com o nome do item quando o menu esta recolhido
+  document.querySelectorAll('.menu__item').forEach(function (link) {
+    var nome = link.querySelector('span');
+    if (nome) { link.setAttribute('title', nome.textContent); }
+  });
+  if (lerPreferencia('portal_menu_recolhido') === '1') { telaSistema.classList.add('menu-recolhido'); }
+  atualizarBotaoMenu();
 
   // ------------------------------------------------------------------
   // Tema claro/escuro
