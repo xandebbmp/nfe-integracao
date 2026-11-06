@@ -49,6 +49,14 @@ final class PortalRepositorio
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** Quantas pessoas ativas a empresa tem no portal (lista "Pronta para emitir"). */
+    public function usuariosAtivos(string $cnpj): int
+    {
+        $stmt = $this->pdo->prepare('SELECT count(*) FROM portal_usuarios WHERE cnpj = :cnpj AND ativo');
+        $stmt->execute([':cnpj' => $cnpj]);
+        return (int)$stmt->fetchColumn();
+    }
+
     public function criarUsuario(string $cnpj, string $nome, string $email, string $senhaHash, bool $administrador = false): int
     {
         $stmt = $this->pdo->prepare(

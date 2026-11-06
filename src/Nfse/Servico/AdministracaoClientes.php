@@ -11,6 +11,7 @@ use Xande\NfeIntegracao\Nfse\Dominio\Padrao;
 use Xande\NfeIntegracao\Nfse\Infra\CofreCertificado;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
+use Xande\NfeIntegracao\Nfse\Repositorio\PortalRepositorio;
 
 /**
  * Regras do painel admin (/admin/ e rotas /v1/admin/*.php):
@@ -54,13 +55,29 @@ final class AdministracaoClientes
         }
         $tpAmb = (int)$this->cfg['tpAmb'];
         $usoMes = $this->clientes->usoPorMes(self::mesAtual(), $tpAmb, $cliente['cnpj']);
-        return $this->resumo($cliente, $usoMes[$cliente['cnpj']] ?? []) + [
+        $detalhe = $this->resumo($cliente, $usoMes[$cliente['cnpj']] ?? []) + [
             'uso_mensal' => $this->clientes->usoMensal($cliente['cnpj'], $tpAmb, 12),
             'status_mes' => $this->clientes->statusDoMes($cliente['cnpj'], $tpAmb),
             'historico' => $this->clientes->historico($cliente['cnpj']),
             'numeracao' => $this->clientes->numeracoes($cliente['cnpj'], $tpAmb),
             'series_padrao' => $this->seriesPadrao(),
         ];
+        $detalhe['prontidao'] = $this->prontidao($detalhe);
+        return $detalhe;
+    }
+
+    /** Lista "Pronta para emitir" da ficha (Servico/ProntidaoEmissao). */
+    private function prontidao(array $c): array
+    {
+        $portal = new PortalRepositorio($this->pdo);
+        // Sem cadastro de certificado no painel, o emitente pode ter o .pfx no config/nfse.local.php.
+        $doArquivo = empty($this->cfg['emitente_implicito'])
+            && trim((string)($this->cfg['emitentes'][$c['cnpj']]['certificado']['arquivo'] ?? '')) !== '';
+        return ProntidaoEmissao::avaliar($c, [
+            'tp_amb' => (int)$this->cfg['tpAmb'],
+            'usuarios_portal' => $portal->existe() ? $portal->usuariosAtivos((string)$c['cnpj']) : null,
+            'certificado_no_arquivo' => $doArquivo,
+        ]);
     }
 
     /**
