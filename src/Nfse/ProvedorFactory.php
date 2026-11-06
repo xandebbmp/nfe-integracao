@@ -66,8 +66,7 @@ final class ProvedorFactory
             $cfg,
             new SefinNacionalCliente(
                 $this->transporte ?? new CurlTransporte($certificado, (int)$c['timeout_segundos']),
-                rtrim((string)$c['url_sefin'][$tpAmb], '/'),
-                rtrim((string)$c['url_danfse'][$tpAmb], '/')
+                rtrim((string)$c['url_sefin'][$tpAmb], '/')
             ),
             new AssinadorXml($certificado->certificado(), (string)$c['algoritmo_assinatura'])
         );

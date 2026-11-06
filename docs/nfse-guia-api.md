@@ -325,7 +325,7 @@ use `evento.php`), `409` se a nota não estiver `AUTORIZADO`.
 
 `GET /v1/nfse/pdf.php?id=...` → `application/pdf`
 
-- **Nacional:** DANFSe oficial, baixado do ADN.
+- **Nacional:** DANFSe v2.0 gerado pela própria API a partir do XML autorizado, no layout da NT 008/2026 (a API do ADN que entregava o PDF foi desligada em 03/08/2026). Nota cancelada sai com a marca d'água "CANCELADA".
 - **Salvador:** espelho gerado pela API (documento auxiliar; a prefeitura não
   fornece PDF por webservice), com o link de consulta no portal quando
   `salvador.url_visualizacao` estiver configurada.

@@ -97,7 +97,7 @@ function provedorNacional(array $cfg, TransporteFalso $http): ProvedorNacional
 {
     return new ProvedorNacional(
         $cfg,
-        new SefinNacionalCliente($http, 'https://sefin.teste', 'https://adn.teste'),
+        new SefinNacionalCliente($http, 'https://sefin.teste'),
         new AssinadorXml(Apoio::certificado(), 'sha256')
     );
 }
@@ -271,6 +271,19 @@ Apoio::igual(StatusEvento::REJEITADO, $retorno->status, 'cancelamento em Salvado
 
 $pdf = provedorSalvador($cfg, new TransporteFalso())->gerarPdf($docSalvador + ['numero_nfse' => '987', 'codigo_verificacao' => 'ABCD-1234', 'data_autorizacao' => '2026-11-04']);
 Apoio::verificar(str_starts_with($pdf, '%PDF'), 'espelho PDF de Salvador gerado');
+
+// DANFSe v2.0 do Nacional, gerado pela API a partir do XML autorizado (NT 008/2026).
+$xmlAutorizado = (string)file_get_contents(__DIR__ . '/fixtures/nfse_nacional_autorizada.xml');
+$pdf = provedorNacional($cfg, new TransporteFalso())->gerarPdf(['xml_autorizado' => $xmlAutorizado, 'status' => StatusNfse::AUTORIZADO]);
+Apoio::verificar(str_starts_with($pdf, '%PDF'), 'DANFSe do Nacional gerado a partir do XML, sem chamar o fisco');
+$pdfCancelada = provedorNacional($cfg, new TransporteFalso())->gerarPdf(['xml_autorizado' => $xmlAutorizado, 'status' => StatusNfse::CANCELADO]);
+Apoio::verificar(str_starts_with($pdfCancelada, '%PDF') && $pdfCancelada !== $pdf, 'DANFSe de nota cancelada sai diferente (marca d\'agua CANCELADA)');
+try {
+    provedorNacional($cfg, new TransporteFalso())->gerarPdf(['xml_autorizado' => null]);
+    Apoio::verificar(false, 'DANFSe sem XML autorizado deve falhar');
+} catch (RuntimeException $e) {
+    Apoio::verificar(str_contains($e->getMessage(), 'XML autorizado'), 'DANFSe sem XML autorizado explica o motivo');
+}
 
 // ===========================================================================
 echo "\n[4b] Armazenamento externo (S3 / pasta)\n";

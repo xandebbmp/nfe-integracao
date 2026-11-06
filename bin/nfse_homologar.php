@@ -267,7 +267,7 @@ function roteiroNacional(ProvedorNfse $provedor, array &$documento, bool $semCan
     $r = $provedor->consultar($documento);
     registrar('Consultar NFS-e', $r->status === StatusNfse::AUTORIZADO, descrever($r));
 
-    titulo('4. PDF (DANFSe do ADN)');
+    titulo('4. PDF (DANFSe gerado pela API)');
     salvarPdf($provedor, $documento);
 
     if ($semCancelar) {

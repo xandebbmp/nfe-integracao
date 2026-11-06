@@ -65,11 +65,6 @@ $cfg = [
             1 => 'https://sefin.nfse.gov.br/SefinNacional',
             2 => 'https://sefin.producaorestrita.nfse.gov.br/SefinNacional',
         ],
-        // DANFSe (PDF oficial) disponibilizado pelo ADN.
-        'url_danfse' => [
-            1 => 'https://adn.nfse.gov.br',
-            2 => 'https://adn.producaorestrita.nfse.gov.br',
-        ],
     ],
 
     // ---------------------------------------------------------------

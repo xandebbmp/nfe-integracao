@@ -62,7 +62,7 @@ php bin/nfse_homologar.php --padrao=NACIONAL
 | 1. Emitir | `POST /nfse` com a DPS assinada | `AUTORIZADO`, com número e chave da NFS-e |
 | 2. Consultar DPS | `GET /dps/{id}` (proteção contra nota duplicada) | `AUTORIZADO`, mesma chave |
 | 3. Consultar NFS-e | `GET /nfse/{chave}` + eventos | `AUTORIZADO` |
-| 4. PDF | DANFSe no ADN | `nfse.pdf` gravado |
+| 4. PDF | DANFSe v2.0 gerado pela API a partir do XML (NT 008/2026) | `nfse.pdf` gravado |
 | 5. Cancelar | Evento 101101 | `REGISTRADO` |
 | 6. Conferir cancelamento | Consulta após o evento | `CANCELADO` |
 

@@ -18,7 +18,9 @@ use Xande\NfeIntegracao\Nfse\Infra\TransporteHttp;
  *   GET  {base}/dps/{idDps}                   descobrir a chave a partir da DPS
  *   POST {base}/nfse/{chave}/eventos          registrar evento
  *   GET  {base}/nfse/{chave}/eventos/{tipo}/{seq}  consultar um evento da NFS-e
- *   GET  {url_danfse}/danfse/{chave}          PDF oficial (DANFSe)
+ *
+ * O PDF (DANFSe) nao vem mais do fisco: a API do ADN foi desligada em
+ * 03/08/2026 (NT 008/2026). Ele e gerado por Pdf\DanfsePdf.
  */
 final class SefinNacionalCliente
 {
@@ -29,8 +31,7 @@ final class SefinNacionalCliente
 
     public function __construct(
         private TransporteHttp $http,
-        private string $urlSefin,
-        private string $urlDanfse
+        private string $urlSefin
     ) {
     }
 
@@ -86,14 +87,6 @@ final class SefinNacionalCliente
         return new RespostaHttp(200, (string)json_encode(['eventos' => $eventos]), null, 'application/json');
     }
 
-    public function baixarDanfse(string $chave): RespostaHttp
-    {
-        return $this->http->enviar(
-            'GET',
-            $this->urlDanfse . '/danfse/' . rawurlencode($chave),
-            ['Accept' => 'application/pdf']
-        );
-    }
 
     // ---------------------------------------------------------------
     // Compactacao exigida pela API: XML -> gzip -> base64 (e o inverso)

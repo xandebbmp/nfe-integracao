@@ -311,7 +311,6 @@ if ($testarRede) {
     $tpAmb = (int)$cfg['tpAmb'];
     $destinos = [
         'Sefin Nacional' => $cfg['nacional']['url_sefin'][$tpAmb],
-        'ADN (DANFSe)' => $cfg['nacional']['url_danfse'][$tpAmb],
         'NFS-e Salvador' => $cfg['salvador']['url_base'][$tpAmb],
     ];
 

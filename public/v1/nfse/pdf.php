@@ -5,7 +5,7 @@ declare(strict_types=1);
  * GET /v1/nfse/pdf.php?id=<documento_id>[&download=1]
  *
  * PDF da NFS-e autorizada:
- *   - Nacional: DANFSe oficial baixado do ADN;
+ *   - Nacional: DANFSe v2.0 gerado pela API a partir do XML autorizado (NT 008/2026);
  *   - Salvador: espelho gerado pela API (Salvador nao fornece PDF por webservice).
  */
 
