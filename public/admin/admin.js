@@ -37,7 +37,10 @@ const TIPOS = [
 
 const ACOES_HISTORICO = {
   CADASTRO: 'Cadastro', ALTERACAO: 'Alteração', CERTIFICADO: 'Certificado enviado', TOKEN: 'Token gerado',
-  NUMERACAO: 'Numeração ajustada',
+  NUMERACAO: 'Numeração ajustada', PORTAL_USUARIO_CRIADO: 'Acesso ao portal criado', PORTAL_SENHA_REDEFINIDA: 'Nova senha do portal',
+  PORTAL_ACESSO_ENVIADO: 'Acesso ao portal enviado por e-mail', PORTAL_USUARIO_ATIVADO: 'Acesso ao portal reativado',
+  PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou administrador do portal',
+  PORTAL_ADMIN_RETIRADO: 'Deixou de ser administrador do portal',
 };
 
 const ACOES_SISTEMA = {
@@ -116,6 +119,7 @@ async function api(caminho, opcoes = {}) {
   if (!resposta.ok) {
     const erro = new Error(json.erro?.mensagem || `HTTP ${resposta.status}`);
     erro.detalhes = json.erro?.erros || [];
+    erro.codigo = json.erro?.codigo || '';
     throw erro;
   }
   return json;
@@ -706,17 +710,56 @@ function secaoPortal(c) {
   const mensagem = el('span', {});
   const linkPortal = new URL('../portal/', window.location.href).href;
 
-  // Senha provisoria aparece uma vez so, com botao de copiar.
+  // Senha provisoria aparece uma vez so. Dois caminhos para a pessoa receber:
+  // 1) "Enviar por e-mail" (o sistema manda na hora) ou 2) "Copiar" (manda voce mesmo).
   function mostrarSenha(r) {
     const texto = `Portal: ${linkPortal}\nE-mail: ${r.email}\nSenha provisória: ${r.senha_provisoria}`;
+    const resultado = el('div', { class: 'envio-resultado', 'aria-live': 'polite' });
+    const enviar = el('button', { class: 'botao botao--forte', type: 'button' }, `✉ Enviar por e-mail para ${r.email}`);
     const copiar = el('button', { class: 'botao', type: 'button', onclick: async () => {
-      try { await navigator.clipboard.writeText(texto); copiar.textContent = 'Copiado!'; } catch { copiar.textContent = 'Selecione e copie'; }
+      try { await navigator.clipboard.writeText(texto); copiar.textContent = '✓ Copiado'; } catch { copiar.textContent = 'Selecione o texto e copie'; }
     } }, 'Copiar dados de acesso');
-    area.replaceChildren(el('div', { class: 'token-box' },
-      el('strong', {}, 'Envie para a pessoa (a senha não será mostrada de novo):'),
+
+    const semEmail = (detalhe) => el('div', { class: 'envio-aviso' },
+      el('strong', {}, 'O envio de e-mail ainda não foi configurado neste sistema.'),
+      el('p', {}, detalhe || 'É preciso configurar uma vez só, em Sistema > E-mail.'),
+      el('p', {}, 'Por enquanto, clique em "Copiar dados de acesso" e mande pelo WhatsApp ou pelo seu e-mail.'),
+      el('button', { class: 'botao', type: 'button', onclick: () => {
+        if (confirm('A senha desta tela some quando você sair dela. Depois de configurar o e-mail, volte aqui e clique em "Nova senha" para enviar. Abrir a configuração agora?')) abrirSistema({ focar: 'email' });
+      } }, 'Configurar e-mail agora'));
+
+    enviar.addEventListener('click', async () => {
+      enviar.disabled = true;
+      enviar.textContent = 'Enviando... (até 20 s)';
+      resultado.replaceChildren();
+      try {
+        const e = await api('portal_usuarios.php', { metodo: 'POST', corpo: {
+          acao: 'enviar_acesso', cnpj: c.cnpj, id: r.id, senha: r.senha_provisoria, link_portal: linkPortal } });
+        resultado.replaceChildren(el('p', { class: 'envio-ok' }, `✓ E-mail enviado para ${e.email}. Peça para a pessoa olhar também a caixa de spam.`));
+        enviar.textContent = 'Enviar de novo';
+      } catch (e) {
+        const falta = (e.message.match(/Falta: ([^.]+)\./) || [])[1];
+        resultado.replaceChildren(e.codigo === 'EMAIL_NAO_CONFIGURADO' ? semEmail(falta ? `Falta preencher: ${falta}.` : '') : el('p', { class: 'erro' }, e.message));
+        enviar.textContent = `✉ Tentar enviar de novo para ${r.email}`;
+      }
+      enviar.disabled = false;
+    });
+
+    area.replaceChildren(el('div', { class: 'token-box acesso-box' },
+      el('strong', { class: 'acesso-box__titulo' }, `Acesso pronto para ${r.email}`),
+      el('p', { class: 'suave' }, 'Agora mande estes dados para a pessoa. A senha só aparece aqui agora: depois só gerando outra.'),
       el('pre', { class: 'exemplo mono' }, texto),
-      el('div', { class: 'acoes' }, copiar),
+      el('div', { class: 'acoes' }, enviar, copiar),
+      resultado,
       el('p', { class: 'suave' }, 'No primeiro acesso o portal pede para ela criar a própria senha.')));
+
+    // Ja avisa antes do clique quando o e-mail nao esta configurado.
+    api('email.php').then((m) => {
+      if (m.configurado || resultado.childNodes.length) return;
+      enviar.classList.remove('botao--forte');
+      copiar.classList.add('botao--forte');
+      resultado.replaceChildren(semEmail(`Falta preencher: ${m.faltam.join(', ')}.`));
+    }).catch(() => {});
   }
 
   async function acao(corpo, confirmar) {
@@ -963,7 +1006,7 @@ async function atualizarPontoSistema() {
   }
 }
 
-function abrirSistema() {
+function abrirSistema(opcoes = {}) {
   const estadoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   const filaArea = el('div', {});
   const workersArea = el('div', {});
@@ -1268,7 +1311,7 @@ function abrirSistema() {
     el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
-    el('section', { class: 'secao' }, el('h3', {}, 'E-mail'), emailArea),
+    el('section', { class: 'secao', id: 'secao-email' }, el('h3', {}, 'E-mail'), emailArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
   ]);
@@ -1276,6 +1319,7 @@ function abrirSistema() {
   carregarBanco();
   carregarConfiguracoes();
   carregarEmail();
+  if (opcoes.focar === 'email') setTimeout(() => $('secao-email')?.scrollIntoView({ block: 'start' }), 50);
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }
@@ -1297,7 +1341,7 @@ $('form-acesso').addEventListener('submit', async (evento) => {
 $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
-$('botao-sistema').addEventListener('click', abrirSistema);
+$('botao-sistema').addEventListener('click', () => abrirSistema());
 $('modal-fechar').addEventListener('click', () => $('modal').close());
 $('filtro-busca').addEventListener('input', desenhar);
 $('filtro-situacao').addEventListener('change', (e) => { estado.filtroSituacao = e.target.value; desenhar(); });
