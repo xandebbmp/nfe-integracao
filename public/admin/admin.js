@@ -494,10 +494,15 @@ function irParaProntidao(destino) {
     if (alvo) alvo.setAttribute('tabindex', '-1');
   }
   if (!alvo) return;
+  // Titulo escondido de bloco recolhivel: vai para o cabecalho clicavel do bloco.
+  const caixa = alvo.tagName === 'H3' ? alvo.closest('details.recolhivel') : null;
+  if (caixa) alvo = caixa.querySelector('summary');
   mostrarAbaDe(alvo);
   const suave = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   alvo.scrollIntoView({ block: 'center', behavior: suave ? 'smooth' : 'auto' });
   alvo.focus({ preventScroll: true });
+  // Garantia: so o corpo da janela rola; a janela inteira nunca sai do lugar.
+  $('modal').scrollTop = 0;
 }
 
 function itemProntidao(i, grupo) {

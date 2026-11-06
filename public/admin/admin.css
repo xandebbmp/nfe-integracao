@@ -181,6 +181,7 @@ details summary { cursor: pointer; margin-top: 10px; }
 /* Dentro do bloco, a secao antiga perde a moldura e o titulo repetido (fica so para o "Ir para"). */
 .recolhivel__corpo > .secao { border: 0; padding: 0; margin-top: 8px; }
 .recolhivel__corpo > .secao + .secao { border-top: 1px solid var(--borda); padding-top: 12px; }
+.recolhivel__corpo > .secao:first-child { position: relative; }
 .recolhivel__corpo > .secao:first-child > h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .campo-ajuda { font-size: 12px; color: var(--suave); line-height: 1.35; }
 .campos label[hidden], .campos [hidden] { display: none; }
