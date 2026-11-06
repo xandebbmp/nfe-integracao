@@ -488,7 +488,8 @@ a { color: var(--primaria); }
 .janela--larga { width: min(780px, calc(100vw - 32px)); }
 .janela::backdrop { background: rgba(15, 23, 42, .45); }
 .janela[open] { display: flex; flex-direction: column; }
-.janela > form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+/* flex 1 1 auto: no Safari, flex: 1 deixava o formulario da janela com altura zero (janela "nao abria"). */
+.janela > form { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
 .janela__cabeca { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px 18px;
   border-bottom: 1px solid var(--borda); }
 .janela__cabeca h2 { margin: 0; font-size: 17px; }
