@@ -56,6 +56,9 @@ final class PainelAcesso
         if (!$this->instalado()) {
             return self::falha(503, 'PAINEL_SEM_PESSOAS', 'Falta atualizar o banco (script 0014). Entre com a chave de emergência e clique em "Atualizar banco" em Sistema.');
         }
+        if (!$this->temPessoas()) {
+            return self::falha(401, 'PAINEL_SEM_PESSOAS', 'Ninguém foi cadastrado no painel ainda. Entre com a chave de emergência e cadastre você em Sistema > Pessoas do painel.');
+        }
         $email = mb_strtolower(trim($email));
         $pessoa = $email !== '' ? $this->pessoas->porEmail($email) : null;
 

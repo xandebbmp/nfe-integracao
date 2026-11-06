@@ -21,6 +21,8 @@ function testesPainelIntegracao(PDO $pdo, array $cfg): void
     $acesso = new PainelAcesso($pdo, $cfg);
     Apoio::verificar($acesso->instalado() && !$acesso->temPessoas(), 'painel: tabelas do 0014 existem, ninguem cadastrado ainda');
 
+    Apoio::igual('PAINEL_SEM_PESSOAS', $acesso->entrar('ana@empresa.com.br', 'qualquer', false, 'ip', 't')['codigo'] ?? null, 'login: sem ninguem cadastrado, manda usar a chave de emergencia');
+
     $r = $acesso->criar('Ana Paula Lima', ' Ana@Empresa.COM.br ', 'ip');
     Apoio::verificar($r['ok'] && strlen($r['senha_provisoria']) === 10 && $r['email'] === 'ana@empresa.com.br', 'painel: cria pessoa com senha provisoria');
     $ana = $r['id'];

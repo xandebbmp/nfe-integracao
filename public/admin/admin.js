@@ -164,6 +164,18 @@ function sair(mensagem) {
   if (estado.modoChave) $('trocar-modo-acesso').click(); // volta para e-mail e senha
   $('erro-acesso').hidden = !mensagem;
   $('erro-acesso').textContent = mensagem || '';
+  abrirChaveSeNinguemCadastrado();
+}
+
+// Painel sem nenhuma pessoa cadastrada: o login ja abre na chave de emergencia.
+async function abrirChaveSeNinguemCadastrado() {
+  try {
+    const r = await fetch(API + 'entrar.php?situacao=1');
+    const json = await r.json();
+    if (json.tem_pessoas) return;
+    if (!estado.modoChave) $('trocar-modo-acesso').click();
+    $('acesso-explica').textContent = 'Ninguém foi cadastrado no painel ainda. Entre com a chave de emergência (o admin_token) e cadastre você em Sistema > Pessoas do painel.';
+  } catch { /* sem resposta: fica no e-mail e senha */ }
 }
 
 // Entrou (pelo e-mail ou pela chave): confere quem e e abre o painel.
@@ -1752,6 +1764,7 @@ $('form-acesso').addEventListener('submit', async (evento) => {
       const resposta = await fetch(API + 'entrar.php', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, senha, lembrar }) });
       const json = await resposta.json().catch(() => ({}));
+      if (json.erro?.codigo === 'PAINEL_SEM_PESSOAS' && !estado.modoChave) $('trocar-modo-acesso').click();
       if (!resposta.ok) throw new Error(json.erro?.mensagem || `HTTP ${resposta.status}`);
       token = json.token;
       estado.senhaDigitada = senha;

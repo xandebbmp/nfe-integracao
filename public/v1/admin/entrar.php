@@ -9,6 +9,8 @@ declare(strict_types=1);
  *   cabecalho X-ADMIN-TOKEN (o mesmo de antes).
  * GET    /v1/admin/entrar.php  (com X-ADMIN-TOKEN)
  *   quem esta logado: { pessoa | null (chave de emergencia), tem_pessoas, instalado }
+ * GET    /v1/admin/entrar.php?situacao=1  (sem token)
+ *   { instalado, tem_pessoas }: a tela de login abre na chave se nao ha ninguem
  * DELETE /v1/admin/entrar.php  (com X-ADMIN-TOKEN)   sair
  *
  * O admin_token de config/nfse.local.php continua entrando como CHAVE DE
@@ -33,6 +35,11 @@ if ($metodo === 'POST') {
     }
     unset($r['ok']);
     $api->responder(200, $r);
+}
+
+// Tela de login (sem token): so diz se ja ha alguem cadastrado.
+if ($metodo === 'GET' && isset($_GET['situacao'])) {
+    $api->responder(200, ['instalado' => $acesso->instalado(), 'tem_pessoas' => $acesso->temPessoas()]);
 }
 
 $api->exigirAdmin(true);
