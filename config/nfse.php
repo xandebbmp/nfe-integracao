@@ -37,6 +37,10 @@ $cfg = [
         'opcao_simples_nacional' => 1,
         //   regApTribSN (somente se opSimpNac=3): 1, 2 ou 3. null = nao informar.
         'regime_apuracao_simples' => null,
+        //   pTotTribSN: percentual aproximado dos tributos do Simples (Lei 12.741).
+        //   OBRIGATORIO para ME/EPP (opSimpNac=3): sem ele o Sefin rejeita (E0712).
+        //   Usado quando a nota nao envia valores.percentual_tributos_simples. Ex.: 2.0
+        'percentual_tributos_simples' => null,
         //   regEspTrib: 0=Nenhum, 1=Ato cooperado, 2=Estimativa, 3=ME municipal,
         //   4=Notario/registrador, 5=Profissional autonomo, 6=Sociedade de profissionais
         'regime_especial_tributacao' => 0,

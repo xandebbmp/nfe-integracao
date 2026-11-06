@@ -352,6 +352,17 @@ final class AdministracaoClientes
             $campos[$c] = $v;
         }
 
+        if (array_key_exists('percentual_tributos_simples', $e)) {
+            $bruto = str_replace(',', '.', trim((string)$e['percentual_tributos_simples']));
+            if ($bruto === '') {
+                $campos['percentual_tributos_simples'] = null;
+            } elseif (!is_numeric($bruto) || (float)$bruto < 0 || (float)$bruto > 100) {
+                $erros[] = 'Percentual de tributos do Simples deve ser um numero de 0 a 100 (ex.: 2 ou 6,5).';
+            } else {
+                $campos['percentual_tributos_simples'] = round((float)$bruto, 2);
+            }
+        }
+
         foreach (['emissao_liberada', 'incentivador_cultural'] as $c) {
             if (array_key_exists($c, $e)) {
                 $campos[$c] = filter_var($e[$c], FILTER_VALIDATE_BOOLEAN);

@@ -143,7 +143,7 @@ Content-Type: application/json
 | `valores.aliquota_iss` | opcional | **obrig.** | Percentual: `5` = 5%. |
 | `valores.iss_retido` | opcional | opcional | `true` = retido pelo tomador. |
 | `valores.tributacao_issqn` | opcional | — | 1 Tributável (padrão), 2 Imunidade, 3 Exportação, 4 Não incidência. |
-| `valores.percentual_tributos_simples` | opcional | — | Só para optantes do Simples (pTotTribSN). |
+| `valores.percentual_tributos_simples` | opcional | — | Percentual aproximado dos tributos do Simples (pTotTribSN). Se não vier, vale o do cadastro da empresa. Para empresa ME/EPP, nota sem percentual (nem na nota nem no cadastro) volta `REJEITADO` com `SIMPLES_SEM_PERCENTUAL`. |
 | `natureza_operacao` | — | opcional | 1 (padrão) a 6, tabela ABRASF. |
 | `substituicao` | opcional | — | `{ "chave_substituida": "50 dígitos", "codigo_motivo": "01", "motivo": "..." }` |
 

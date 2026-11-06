@@ -191,6 +191,31 @@ $domEvento->loadXML($eventoXml);
 (new AssinadorXml(Apoio::certificado(), 'sha256'))->assinarNo($domEvento, $domEvento->getElementsByTagName('infPedReg')->item(0), $domEvento->documentElement, 'Id');
 Apoio::igual([], ValidadorXsd::validar($domEvento->saveXML(), "{$raiz}/schemas/nfse/nacional/1.01/pedRegEvento_v1.01.xsd"), 'pedido de cancelamento passa no XSD oficial');
 
+// Simples Nacional ME/EPP: percentual de tributos (pTotTribSN) vem do cadastro se a nota nao trouxer.
+$cfgMeEpp = $cfg;
+$cfgMeEpp['emitente']['opcao_simples_nacional'] = 3;
+$cfgMeEpp['emitente']['regime_apuracao_simples'] = 1;
+$http = new TransporteFalso();
+$retorno = provedorNacional($cfgMeEpp, $http)->emitir(Apoio::documentoNacional());
+Apoio::igual([StatusNfse::REJEITADO, 'SIMPLES_SEM_PERCENTUAL', 0], [$retorno->status, $retorno->mensagens[0]['codigo'] ?? null, count($http->requisicoes)],
+    'ME/EPP sem percentual do Simples: rejeitado antes de chamar o Sefin (evita E0712)');
+
+$cfgMeEpp['emitente']['percentual_tributos_simples'] = 2;
+$http = new TransporteFalso();
+$http->responder(201, respostaSefinAutorizada($chave));
+provedorNacional($cfgMeEpp, $http)->emitir(Apoio::documentoNacional());
+$dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
+Apoio::verificar(str_contains($dps, '<pTotTribSN>2.00</pTotTribSN>') && !str_contains($dps, '<indTotTrib>'), 'ME/EPP: DPS usa o percentual do cadastro (pTotTribSN 2.00)');
+Apoio::igual([], ValidadorXsd::validar($dps, "{$raiz}/schemas/nfse/nacional/1.01/DPS_v1.01.xsd"), 'ME/EPP: DPS com pTotTribSN passa no XSD');
+
+$docComPercentual = Apoio::documentoNacional();
+$docComPercentual['payload']['valores']['percentual_tributos_simples'] = 6.5;
+$http = new TransporteFalso();
+$http->responder(201, respostaSefinAutorizada($chave));
+provedorNacional($cfgMeEpp, $http)->emitir($docComPercentual);
+$dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
+Apoio::verificar(str_contains($dps, '<pTotTribSN>6.50</pTotTribSN>'), 'ME/EPP: percentual enviado na nota vale mais que o do cadastro');
+
 // ===========================================================================
 echo "\n[3] Padrao Nacional - rejeicao, falha e recuperacao\n";
 // ===========================================================================

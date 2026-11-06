@@ -59,7 +59,17 @@ final class ProvedorNacional implements ProvedorNfse
             }
         }
 
-        // 2) Monta, assina e valida a DPS.
+        // 2) Empresa ME/EPP precisa do percentual de tributos do Simples (senao o Sefin rejeita com E0712).
+        $valores = DpsXmlBuilder::valoresComPadraoDoEmitente((array)($documento['payload']['valores'] ?? []), $this->cfg['emitente']);
+        if ((int)($this->cfg['emitente']['opcao_simples_nacional'] ?? 1) === 3 && ($valores['percentual_tributos_simples'] ?? '') === '') {
+            return RetornoProvedor::rejeitado([[
+                'codigo' => 'SIMPLES_SEM_PERCENTUAL',
+                'mensagem' => 'Empresa ME/EPP do Simples Nacional sem o percentual aproximado de tributos (pTotTribSN). O Sefin rejeitaria a nota (E0712).',
+                'correcao' => 'Informe o percentual no cadastro da empresa (painel admin, "% tributos do Simples") ou envie valores.percentual_tributos_simples na nota. Quem informa o numero e o contador.',
+            ]]);
+        }
+
+        // 3) Monta, assina e valida a DPS.
         $montado = (new DpsXmlBuilder($this->cfg))->montar($documento);
         $xmlAssinado = $this->assinar($montado['xml'], 'DPS', 'infDPS');
         $dadosEnvio = ['id_dps' => $montado['id_dps'], 'xml_enviado' => $xmlAssinado];
@@ -69,7 +79,7 @@ final class ProvedorNacional implements ProvedorNfse
             return RetornoProvedor::rejeitado(self::mensagensXsd($errosXsd), $dadosEnvio);
         }
 
-        // 3) Envia ao Sefin.
+        // 4) Envia ao Sefin.
         $resposta = $this->cliente->emitir($xmlAssinado);
 
         if ($resposta->falhaTemporaria() || in_array($resposta->status, [401, 403], true)) {
