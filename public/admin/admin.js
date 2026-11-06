@@ -488,14 +488,18 @@ function secaoPortal(c) {
         return;
       }
       lista.replaceChildren(el('table', { class: 'mini' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
+        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Papel'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
         el('tbody', {}, ...r.usuarios.map((u) => el('tr', {},
           el('td', {}, u.nome),
           el('td', {}, u.email),
+          // Administrador convida e desativa colegas pela tela Usuarios do portal.
+          el('td', {}, u.administrador ? 'Administrador' : 'Emissor'),
           el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
           el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
           el('td', {},
             el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
+            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id }) },
+              u.administrador ? 'Tirar administrador' : 'Tornar administrador'), ' ',
             el('button', { class: 'botao' + (u.ativo ? ' botao--perigo' : ''), type: 'button',
               onclick: () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null) },
             u.ativo ? 'Desativar' : 'Reativar'))))),

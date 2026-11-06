@@ -47,6 +47,11 @@
       mensagens: n.status === 'REJEITADO' ? [{ codigo: 'E0312', mensagem: 'CEP do tomador não encontrado.', correcao: 'Confira o CEP no cadastro do tomador e emita de novo.' }] : []
     });
   }
+  var usuarios = [
+    { id: 1, nome: 'Mariana Souza', email: 'mariana@exemplo.com.br', administrador: true, situacao: 'ATIVO', ultimo_acesso: '2026-11-06T09:00:00', eu: true },
+    { id: 2, nome: 'Rafael Costa', email: 'rafael@exemplo.com.br', administrador: false, situacao: 'ATIVO', ultimo_acesso: '2026-11-04T14:00:00', eu: false },
+    { id: 3, nome: 'Júlia Andrade', email: 'julia@exemplo.com.br', administrador: false, situacao: 'PRIMEIRO_ACESSO', ultimo_acesso: null, eu: false }
+  ];
   var numero = 125;
 
   function ok(dados, atraso) {
@@ -88,6 +93,22 @@
         });
       }
       var q = parametros(busca);
+      if (rota === 'usuarios.php') {
+        if (metodo === 'POST') {
+          if (corpo.acao === 'convidar') {
+            usuarios.push({ id: Date.now(), nome: corpo.nome, email: corpo.email.toLowerCase(), administrador: !!corpo.administrador, situacao: 'PRIMEIRO_ACESSO', ultimo_acesso: null, eu: false });
+            return ok({ ok: true, email: corpo.email.toLowerCase(), senha_provisoria: 'Ab3dE5gH7k', mensagem: 'Acesso criado.' });
+          }
+          var alvo = usuarios.filter(function (u) { return u.id === corpo.id; })[0];
+          if (corpo.acao === 'redefinir_senha') { alvo.situacao = 'PRIMEIRO_ACESSO'; return ok({ ok: true, email: alvo.email, senha_provisoria: 'Zx9cV8bN7m' }); }
+          if (corpo.acao === 'desativar') { alvo.situacao = 'DESATIVADO'; }
+          if (corpo.acao === 'ativar') { alvo.situacao = 'ATIVO'; }
+          if (corpo.acao === 'tornar_admin' || corpo.acao === 'remover_admin') { alvo.administrador = corpo.acao === 'tornar_admin'; }
+          return ok({ ok: true, mensagem: 'Feito.' });
+        }
+        return ok({ usuarios: usuarios, pode_gerenciar: true });
+      }
+      if (rota === 'senha.php') { return ok({ mensagem: 'Senha alterada.' }); }
       if (rota === 'empresa.php') {
         return ok({
           cadastro: { cnpj: '41986662000160', razao_social: 'Studio Bela Forma Ltda', nome_fantasia: 'Studio Bela Forma', inscricao_municipal: '123456', inscricao_estadual: null, codigo_municipio: '2927408', municipio: 'Salvador / BA', email: 'contato@belaforma.com.br', telefone: '71999990000' },

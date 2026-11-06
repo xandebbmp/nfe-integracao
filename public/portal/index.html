@@ -509,7 +509,41 @@
             </div>
           </section>
           <section data-pagina="usuarios" data-titulo="Usuários" hidden>
-            <div class="cartao vazio"><i class="icone">manage_accounts</i><h2>Usuários</h2><p class="secundario">Quem da empresa pode emitir.</p></div>
+            <div class="pagina-lista">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Usuários</h1>
+                  <p class="secundario" id="usuarios-subtitulo">Quem da sua empresa entra no portal.</p>
+                </div>
+                <button type="button" class="btn btn--primario" id="botao-convidar" hidden><i class="icone icone--p">person_add</i> Convidar pessoa</button>
+              </div>
+
+              <div class="cartao">
+                <div class="tabela-rolagem">
+                  <table class="tabela">
+                    <thead>
+                      <tr><th>Nome</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th class="direita"><span class="so-leitor">Ações</span></th></tr>
+                    </thead>
+                    <tbody id="usuarios-linhas"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- A propria senha: qualquer usuario troca aqui -->
+              <form class="cartao bloco emitir minha-senha" id="form-minha-senha" novalidate>
+                <div class="bloco__cabeca"><h2><i class="icone">lock</i>Minha senha</h2></div>
+                <div class="bloco__corpo">
+                  <div class="linha-campos">
+                    <div class="campo campo--terco"><label for="ms-atual">Senha atual</label><input id="ms-atual" type="password" autocomplete="current-password"></div>
+                    <div class="campo campo--terco"><label for="ms-nova">Nova senha</label><input id="ms-nova" type="password" autocomplete="new-password" aria-describedby="ms-dica"></div>
+                    <div class="campo campo--terco"><label for="ms-confirma">Repita a nova senha</label><input id="ms-confirma" type="password" autocomplete="new-password"></div>
+                  </div>
+                  <small class="dica" id="ms-dica">Pelo menos 8 caracteres, com letras e números. Os outros aparelhos conectados com a sua conta saem.</small>
+                  <p id="ms-erro" class="erro" role="alert" hidden></p>
+                  <div><button type="submit" class="btn btn--secundario" id="botao-minha-senha"><i class="icone icone--p">key</i> Trocar minha senha</button></div>
+                </div>
+              </form>
+            </div>
           </section>
 
         </div>
@@ -594,6 +628,45 @@
         <button type="submit" class="btn btn--primario" id="botao-salvar-tomador"><i class="icone icone--p">save</i> Salvar tomador</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="janela-convite" class="janela" aria-labelledby="convite-titulo">
+    <form id="form-convite" class="emitir" novalidate>
+      <div class="janela__cabeca">
+        <h2 id="convite-titulo">Convidar pessoa</h2>
+        <button type="button" class="btn btn--icone" data-fechar aria-label="Fechar"><i class="icone">close</i></button>
+      </div>
+      <div class="janela__corpo">
+        <div class="linha-campos">
+          <div class="campo campo--meio"><label for="conv-nome">Nome</label><input id="conv-nome" maxlength="120" autocomplete="off"></div>
+          <div class="campo campo--meio"><label for="conv-email">E-mail</label><input id="conv-email" type="email" maxlength="160" autocomplete="off"></div>
+        </div>
+        <label class="interruptor"><input type="checkbox" id="conv-admin">
+          <span>Também é administrador<small class="secundario">Pode convidar e desativar pessoas. Deixe desmarcado para quem só emite notas.</small></span></label>
+        <p id="convite-erro" class="erro" role="alert" hidden></p>
+      </div>
+      <div class="janela__rodape">
+        <button type="button" class="btn btn--secundario" data-fechar>Cancelar</button>
+        <button type="submit" class="btn btn--primario" id="botao-enviar-convite"><i class="icone icone--p">person_add</i> Criar acesso</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Senha provisoria: aparece uma vez so, depois de convidar ou redefinir -->
+  <dialog id="janela-provisoria" class="janela" aria-labelledby="provisoria-titulo">
+    <div class="janela__cabeca">
+      <h2 id="provisoria-titulo">Acesso pronto</h2>
+      <button type="button" class="btn btn--icone" data-fechar aria-label="Fechar"><i class="icone">close</i></button>
+    </div>
+    <div class="janela__corpo">
+      <p id="provisoria-texto" class="secundario"></p>
+      <pre class="provisoria mono" id="provisoria-mensagem"></pre>
+      <div class="resultado resultado--alerta"><b>A senha aparece só agora.</b><span>Copie e envie para a pessoa. No primeiro acesso o portal pede para ela criar a própria senha.</span></div>
+    </div>
+    <div class="janela__rodape">
+      <button type="button" class="btn btn--secundario" data-fechar>Fechar</button>
+      <button type="button" class="btn btn--primario" id="botao-copiar-provisoria"><i class="icone icone--p">content_copy</i> Copiar mensagem</button>
+    </div>
   </dialog>
 
   <script src="portal.js"></script>

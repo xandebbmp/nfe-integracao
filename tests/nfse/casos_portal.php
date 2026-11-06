@@ -19,6 +19,7 @@ use Xande\NfeIntegracao\Nfse\Servico\PortalEmpresa;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
 use Xande\NfeIntegracao\Nfse\Servico\PortalServicos;
 use Xande\NfeIntegracao\Nfse\Servico\PortalTomadores;
+use Xande\NfeIntegracao\Nfse\Servico\PortalUsuarios;
 use Xande\NfeIntegracao\Nfse\Servico\RecebimentoLote;
 
 /** Sem banco: digitos de CPF/CNPJ. */
@@ -49,6 +50,7 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     $r = $acesso->criarUsuario($cnpj, 'Mariana Souza', ' Mariana@Empresa.com.BR ', '10.0.0.1');
     Apoio::verificar($r['ok'] && strlen($r['senha_provisoria']) === 10, 'admin: cria usuario com senha provisoria de 10 caracteres');
     Apoio::igual('mariana@empresa.com.br', $r['email'], 'admin: e-mail guardado em minusculas');
+    Apoio::igual(true, $r['administrador'], 'admin: primeira pessoa da empresa vira administradora');
     $provisoria = $r['senha_provisoria'];
     $usuarioId = $r['id'];
     Apoio::igual('EMAIL_EM_USO', $acesso->criarUsuario($cnpj, 'Outra', 'mariana@empresa.com.br', 'ip')['codigo'] ?? null, 'admin: e-mail repetido recusado');
@@ -230,4 +232,27 @@ function testesPortalIntegracao(PDO $pdo, array $cfgGeral): void
     Apoio::verificar(!str_contains($json, 'token') && !str_contains($json, 'cifrado') && !str_contains($json, 'segredo') && !str_contains($json, 'observacao'),
         'empresa: nao devolve token, certificado, segredo nem observacao interna');
     Apoio::igual(null, $empresa->ficha('99999999000191'), 'empresa: CNPJ sem cadastro devolve vazio');
+
+    // ---- Tela "Usuarios" ----
+    $usuariosPortal = new PortalUsuarios($pdo, $cfgGeral);
+    $eu = ['id' => $usuarioId, 'cnpj' => $cnpj, 'administrador' => true];
+    $r = $usuariosPortal->executar($eu, ['acao' => 'convidar', 'nome' => 'Carlos Lima', 'email' => 'Carlos@Empresa.com.br'], 'ip');
+    Apoio::verificar($r['ok'] && $r['administrador'] === false && strlen($r['senha_provisoria']) === 10, 'usuarios: administrador convida um emissor com senha provisoria');
+    $carlosId = $r['id'];
+    $carlos = ['id' => $carlosId, 'cnpj' => $cnpj, 'administrador' => false];
+    Apoio::igual('SEM_PERMISSAO', $usuariosPortal->executar($carlos, ['acao' => 'convidar', 'nome' => 'X', 'email' => 'x@x.com'], 'ip')['codigo'] ?? null, 'usuarios: emissor nao convida');
+    Apoio::igual('SEM_PERMISSAO', $usuariosPortal->executar($carlos, ['acao' => 'desativar', 'id' => $usuarioId], 'ip')['codigo'] ?? null, 'usuarios: emissor nao desativa ninguem');
+    Apoio::igual('NAO_PODE_SI_MESMO', $usuariosPortal->executar($eu, ['acao' => 'desativar', 'id' => $usuarioId], 'ip')['codigo'] ?? null, 'usuarios: administrador nao se desativa (empresa nunca fica sem administrador)');
+    Apoio::igual('NAO_PODE_SI_MESMO', $usuariosPortal->executar($eu, ['acao' => 'remover_admin', 'id' => $usuarioId], 'ip')['codigo'] ?? null, 'usuarios: administrador nao tira o proprio papel');
+    Apoio::igual('ACAO_INVALIDA', $usuariosPortal->executar($eu, ['acao' => 'apagar', 'id' => $carlosId], 'ip')['codigo'] ?? null, 'usuarios: acao desconhecida recusada');
+    $lista = $usuariosPortal->listar($carlos);
+    $linhaCarlos = array_values(array_filter($lista['usuarios'], static fn($u) => $u['id'] === $carlosId))[0] ?? [];
+    Apoio::igual([false, true, 'PRIMEIRO_ACESSO'], [$lista['pode_gerenciar'], $linhaCarlos['eu'] ?? null, $linhaCarlos['situacao'] ?? null], 'usuarios: emissor ve a lista sem poder mudar, com "voce" e 1o acesso');
+    Apoio::verificar($usuariosPortal->executar($eu, ['acao' => 'tornar_admin', 'id' => $carlosId], 'ip')['ok'], 'usuarios: torna o colega administrador');
+    Apoio::igual(true, $acesso->entrar('carlos@empresa.com.br', $r['senha_provisoria'], false, 'ip', 't')['usuario']['administrador'] ?? null, 'usuarios: login informa que e administrador');
+    $usuariosPortal->executar($eu, ['acao' => 'desativar', 'id' => $carlosId], 'ip');
+    $linhaCarlos = array_values(array_filter($usuariosPortal->listar($eu)['usuarios'], static fn($u) => $u['id'] === $carlosId))[0] ?? [];
+    Apoio::igual('DESATIVADO', $linhaCarlos['situacao'] ?? null, 'usuarios: desativado aparece na lista');
+    $outra = ['id' => $usuarioId, 'cnpj' => '41986662000160', 'administrador' => true];
+    Apoio::igual('USUARIO_NAO_ENCONTRADO', $usuariosPortal->executar($outra, ['acao' => 'ativar', 'id' => $carlosId], 'ip')['codigo'] ?? null, 'usuarios: administrador de outra empresa nao mexe');
 }

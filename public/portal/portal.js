@@ -9,7 +9,7 @@
      3. Menu, telas e tema
      4. Tela inicial
      5. Tela "Emitir nota"
-     6. Minhas notas, Servicos, Tomadores e Minha empresa
+     6. Minhas notas, Servicos, Tomadores, Minha empresa e Usuarios
      7. Inicio do portal
 
    Demonstracao sem servidor: portal-demo.js define window.PORTAL_DEMO e
@@ -326,6 +326,7 @@
     if (nome === 'servicos') { carregarListaServicos(); }
     if (nome === 'tomadores') { carregarListaTomadores(); }
     if (nome === 'empresa') { carregarEmpresa(); }
+    if (nome === 'usuarios') { carregarUsuarios(); }
 
     fecharMenuCelular();
     window.scrollTo(0, 0);
@@ -863,7 +864,7 @@
   });
 
   // ==================================================================
-  // 6. MINHAS NOTAS, SERVICOS, TOMADORES E MINHA EMPRESA
+  // 6. MINHAS NOTAS, SERVICOS, TOMADORES, MINHA EMPRESA E USUARIOS
   // ==================================================================
 
   // ---- Utilidades das telas de lista ----
@@ -908,11 +909,11 @@
     if (primeiro) { primeiro.focus(); }
   }
 
-  /** Troca o conteudo de um lugar por "Remover? Sim / Nao" (sem a caixa feia do navegador). */
-  function confirmarRemocao(lugar, pergunta, aoConfirmar) {
+  /** Troca o conteudo de um lugar por "Pergunta? Remover / Nao" (sem a caixa feia do navegador). */
+  function confirmarRemocao(lugar, pergunta, aoConfirmar, rotulo) {
     var antes = lugar.innerHTML;
     lugar.innerHTML = '<span class="confirmar">' + escapar(pergunta)
-      + ' <button type="button" class="btn btn--perigo" data-sim>Remover</button>'
+      + ' <button type="button" class="btn btn--perigo" data-sim>' + escapar(rotulo || 'Remover') + '</button>'
       + '<button type="button" class="btn btn--secundario" data-nao>Não</button></span>';
     lugar.querySelector('[data-nao]').addEventListener('click', function (evento) { evento.stopPropagation(); lugar.innerHTML = antes; });
     lugar.querySelector('[data-sim]').addEventListener('click', function (evento) { evento.stopPropagation(); aoConfirmar(); });
@@ -1476,6 +1477,150 @@
     el('empresa-conteudo').innerHTML = '<div class="pagina-lista">' + cadastro + fiscal + '</div><div class="pagina-lista">' + plano + certificado + '</div>';
   }
 
+
+  // ---- Usuarios ----
+  var SITUACAO_USUARIO = {
+    ATIVO: ['Ativo', 'ok'],
+    PRIMEIRO_ACESSO: ['Aguardando 1º acesso', 'info'],
+    BLOQUEADO: ['Bloqueado por senha errada', 'alerta'],
+    DESATIVADO: ['Desativado', 'neutro']
+  };
+  var listaUsuarios = [];
+
+  function carregarUsuarios() {
+    api('GET', 'usuarios.php').then(function (r) {
+      listaUsuarios = r.usuarios || [];
+      el('botao-convidar').hidden = !r.pode_gerenciar;
+      el('usuarios-subtitulo').textContent = r.pode_gerenciar
+        ? 'Quem da sua empresa entra no portal. Você é administrador: pode convidar, desativar e redefinir senhas.'
+        : 'Quem da sua empresa entra no portal. Para convidar ou tirar alguém, fale com um administrador.';
+      desenharUsuarios(r.pode_gerenciar);
+    }).catch(function (erro) {
+      if (erro.codigo !== 'SESSAO_EXPIRADA') { avisar(escapar(erro.message), 'error_outline'); }
+    });
+  }
+
+  function desenharUsuarios(podeGerenciar) {
+    el('usuarios-linhas').innerHTML = listaUsuarios.map(function (u) {
+      var s = SITUACAO_USUARIO[u.situacao] || [u.situacao, 'neutro'];
+      var acoes = '';
+      if (podeGerenciar && !u.eu) {
+        acoes = '<button type="button" class="btn btn--secundario" data-acao="redefinir_senha"><i class="icone icone--p">key</i> Nova senha</button> '
+          + '<button type="button" class="btn btn--icone" data-acao="' + (u.administrador ? 'remover_admin' : 'tornar_admin') + '" title="' + (u.administrador ? 'Tirar administrador' : 'Tornar administrador') + '" aria-label="' + (u.administrador ? 'Tirar administrador de ' : 'Tornar administrador ') + escapar(u.nome) + '"><i class="icone">' + (u.administrador ? 'remove_moderator' : 'add_moderator') + '</i></button>'
+          + (u.situacao === 'DESATIVADO'
+            ? '<button type="button" class="btn btn--icone" data-acao="ativar" title="Devolver o acesso" aria-label="Devolver o acesso de ' + escapar(u.nome) + '"><i class="icone">person_add_alt</i></button>'
+            : '<button type="button" class="btn btn--icone" data-acao="desativar" title="Desativar" aria-label="Desativar ' + escapar(u.nome) + '"><i class="icone">person_off</i></button>');
+      }
+      return '<tr data-id="' + u.id + '">'
+        + '<td><b>' + escapar(u.nome) + '</b>' + (u.eu ? '<span class="eu">você</span>' : '') + '<span class="sub">' + escapar(u.email) + '</span></td>'
+        + '<td>' + (u.administrador ? '<span class="pilula pilula--info">Administrador</span>' : '<span class="pilula pilula--neutro">Emissor</span>') + '</td>'
+        + '<td>' + '<span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span></td>'
+        + '<td class="num">' + escapar(dataCurta(u.ultimo_acesso) || 'nunca entrou') + '</td>'
+        + '<td class="acoes">' + acoes + '</td></tr>';
+    }).join('');
+  }
+
+  function acaoUsuario(corpo) {
+    return api('POST', 'usuarios.php', corpo).then(function (r) {
+      if (r.senha_provisoria) { mostrarProvisoria(r, corpo.acao); } else { avisar(escapar(r.mensagem)); }
+      carregarUsuarios();
+      return r;
+    });
+  }
+
+  el('usuarios-linhas').addEventListener('click', function (evento) {
+    var botao = evento.target.closest('[data-acao]');
+    if (!botao) { return; }
+    var id = Number(botao.closest('tr').getAttribute('data-id'));
+    var u = listaUsuarios.filter(function (x) { return x.id === id; })[0];
+    var acao = botao.getAttribute('data-acao');
+    var falhou = function (erro) { avisar(escapar(erro.message), 'error_outline'); };
+    // Acoes que tiram algo da pessoa pedem confirmacao na propria linha.
+    if (acao === 'desativar' || acao === 'redefinir_senha') {
+      confirmarRemocao(botao.closest('td'), acao === 'desativar' ? 'Tirar o acesso de ' + u.nome.split(' ')[0] + '?' : 'A senha atual para de funcionar.', function () {
+        acaoUsuario({ acao: acao, id: id }).catch(function (erro) { falhou(erro); carregarUsuarios(); });
+      }, acao === 'desativar' ? 'Desativar' : 'Gerar nova senha');
+      return;
+    }
+    acaoUsuario({ acao: acao, id: id }).catch(falhou);
+  });
+
+  function mostrarProvisoria(r, acao) {
+    var endereco = window.location.href.split('#')[0];
+    el('provisoria-titulo').textContent = acao === 'convidar' ? 'Acesso criado' : 'Senha provisória nova';
+    el('provisoria-texto').textContent = 'Envie esta mensagem para a pessoa por WhatsApp ou e-mail:';
+    el('provisoria-mensagem').textContent = 'Seu acesso ao portal de notas fiscais\n'
+      + 'Endereço: ' + endereco + '\nE-mail: ' + r.email + '\nSenha provisória: ' + r.senha_provisoria;
+    abrirJanela('janela-provisoria');
+  }
+
+  el('botao-copiar-provisoria').addEventListener('click', function () {
+    var texto = el('provisoria-mensagem').textContent;
+    var feito = function () { avisar('Mensagem copiada.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto).then(feito, function () { selecionarTexto(el('provisoria-mensagem')); });
+    } else { selecionarTexto(el('provisoria-mensagem')); }
+  });
+  function selecionarTexto(alvo) {
+    var faixa = document.createRange();
+    faixa.selectNodeContents(alvo);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(faixa);
+    avisar('Texto selecionado: use Ctrl+C (ou Copiar) para copiar.', 'content_copy');
+  }
+  // Fechou a janela: a senha some da tela.
+  el('janela-provisoria').addEventListener('close', function () { el('provisoria-mensagem').textContent = ''; });
+
+  var formConvite = el('form-convite');
+  el('botao-convidar').addEventListener('click', function () {
+    formConvite.reset();
+    mostrarErrosForm(formConvite, [], {}, 'convite-erro');
+    abrirJanela('janela-convite');
+    el('conv-nome').focus();
+  });
+  formConvite.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var erros = [];
+    if (el('conv-nome').value.trim().length < 2) { erros.push({ campo: 'nome', mensagem: 'Informe o nome da pessoa.' }); }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el('conv-email').value.trim())) { erros.push({ campo: 'email', mensagem: 'Informe um e-mail válido.' }); }
+    var mapa = { nome: 'conv-nome', email: 'conv-email' };
+    mostrarErrosForm(formConvite, erros, mapa, 'convite-erro');
+    if (erros.length) { return; }
+    var botao = el('botao-enviar-convite');
+    botao.disabled = true;
+    acaoUsuario({ acao: 'convidar', nome: el('conv-nome').value.trim(), email: el('conv-email').value.trim(), administrador: el('conv-admin').checked })
+      .then(function () { fecharJanela('janela-convite'); })
+      .catch(function (erro) {
+        var campo = { EMAIL_EM_USO: 'email', EMAIL_INVALIDO: 'email', NOME_INVALIDO: 'nome' }[erro.codigo];
+        if (campo) { mostrarErrosForm(formConvite, [{ campo: campo, mensagem: erro.message }], mapa, 'convite-erro'); }
+        else { mostrarErro('convite-erro', erro.message); }
+      })
+      .then(function () { botao.disabled = false; });
+  });
+
+  // ---- Minha senha ----
+  var formMinhaSenha = el('form-minha-senha');
+  formMinhaSenha.addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var mapa = { atual: 'ms-atual', nova: 'ms-nova', confirma: 'ms-confirma' };
+    var nova = el('ms-nova').value;
+    var erros = [];
+    if (!el('ms-atual').value) { erros.push({ campo: 'atual', mensagem: 'Digite a sua senha atual.' }); }
+    if (nova.length < 8 || !/[A-Za-z]/.test(nova) || !/\d/.test(nova)) { erros.push({ campo: 'nova', mensagem: 'Use pelo menos 8 caracteres, com letras e números.' }); }
+    else if (nova !== el('ms-confirma').value) { erros.push({ campo: 'confirma', mensagem: 'As duas senhas não são iguais.' }); }
+    mostrarErrosForm(formMinhaSenha, erros, mapa, 'ms-erro');
+    if (erros.length) { return; }
+    var botao = el('botao-minha-senha');
+    botao.disabled = true;
+    api('POST', 'senha.php', { senha_atual: el('ms-atual').value, senha_nova: nova }).then(function () {
+      formMinhaSenha.reset();
+      avisar('Senha trocada. Os outros aparelhos conectados saíram.');
+    }).catch(function (erro) {
+      var campo = { SENHA_ATUAL_INCORRETA: 'atual', SENHA_FRACA: 'nova', SENHA_REPETIDA: 'nova' }[erro.codigo];
+      if (campo) { mostrarErrosForm(formMinhaSenha, [{ campo: campo, mensagem: erro.message }], mapa, 'ms-erro'); }
+      else { mostrarErro('ms-erro', erro.message); }
+    }).then(function () { botao.disabled = false; });
+  });
 
   // ==================================================================
   // 7. INICIO DO PORTAL

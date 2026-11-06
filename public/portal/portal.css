@@ -537,3 +537,11 @@ a { color: var(--primaria); }
 @media (max-width: 860px) {
   .empresa-grade { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ==========================================================================
+   Usuarios: lista da empresa, convite e "Minha senha"
+   ========================================================================== */
+.tabela .eu { font-size: 11px; font-weight: 700; color: var(--acento); margin-left: 6px; }
+.provisoria { margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--hover); border: 1px solid var(--borda);
+  font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+.minha-senha .bloco__corpo { gap: 12px; }
