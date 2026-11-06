@@ -218,8 +218,10 @@ Apoio::verificar(str_ends_with($http->requisicoes[0]['url'], '/dps/DPS2927408241
 $http = new TransporteFalso();
 $http->responder(200, json_encode(['chaveAcesso' => $chave, 'nfseXmlGZipB64' => SefinNacionalCliente::compactar(nfseNacionalXml($chave))]));
 $http->responder(200, json_encode(['eventos' => [['chaveAcesso' => $chave, 'tipoEvento' => '101101']]]));
+$http->responder(404, '')->responder(404, '')->responder(404, ''); // demais tipos de evento: nenhum
 $retorno = provedorNacional($cfg, $http)->consultar(Apoio::documentoNacional(['chave_acesso' => $chave]));
 Apoio::igual(StatusNfse::CANCELADO, $retorno->status, 'consulta com evento 101101 vira CANCELADO');
+Apoio::verificar(str_ends_with($http->requisicoes[1]['url'], '/nfse/' . $chave . '/eventos/101101/1'), 'eventos consultados por tipo e sequencia (GET /eventos/{tipo}/{seq})');
 
 // ===========================================================================
 echo "\n[4] Salvador - lote assincrono\n";
@@ -479,7 +481,9 @@ if (!$dsn) {
     $pdo->exec("UPDATE nfse_jobs SET executar_apos = CURRENT_TIMESTAMP WHERE tipo = 'CONSULTAR'");
     $pdo->exec("DELETE FROM nfse_jobs WHERE tipo = 'ARQUIVAR' AND status = 'PENDENTE'");
     $http->responder(200, json_encode(['chaveAcesso' => str_repeat('2', 50), 'nfseXmlGZipB64' => SefinNacionalCliente::compactar(nfseNacionalXml(str_repeat('2', 50)))]));
+    $http->responder(404, ''); // 101101: nenhum
     $http->responder(200, json_encode(['eventos' => [['tipoEvento' => '105102']]]));
+    $http->responder(404, '')->responder(404, ''); // 105104 e 305101: nenhum
     while ($worker->processarProximo()) {
     }
     Apoio::igual(StatusNfse::SUBSTITUIDO, $documentos->buscar($doc2['id'])['status'], 'nota antiga passa a SUBSTITUIDO');
