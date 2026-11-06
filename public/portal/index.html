@@ -129,12 +129,11 @@
       <!-- Menu lateral. Para incluir uma tela: um <a> aqui + um <section data-pagina> no conteudo. -->
       <aside id="menu" class="menu">
         <div class="menu__topo">
-          <a href="#emitir" class="btn btn--acento btn--largo"><i class="icone icone--p">add</i> Emitir nota</a>
+          <a href="#emitir" class="btn btn--acento btn--largo menu__cta"><i class="icone icone--p">add</i> Emitir nota</a>
 
           <nav class="menu__grupo" aria-label="Notas">
             <div class="menu__titulo">Notas fiscais</div>
             <a class="menu__item" href="#inicio"><i class="icone">space_dashboard</i><span>Início</span></a>
-            <a class="menu__item" href="#emitir"><i class="icone">post_add</i><span>Emitir nota</span></a>
             <a class="menu__item" href="#notas"><i class="icone">receipt_long</i><span>Minhas notas</span><span class="menu__marca menu__marca--qtd" title="Notas rejeitadas">1</span></a>
             <a class="menu__item" href="#recorrencias"><i class="icone">event_repeat</i><span>Recorrências</span><span class="menu__marca menu__marca--breve">em breve</span></a>
           </nav>
@@ -246,8 +245,141 @@
           </section>
 
           <!-- ===== Demais telas: por enquanto so o espaco reservado ===== -->
+          <!-- ===== Emitir nota ===== -->
           <section data-pagina="emitir" data-titulo="Emitir nota" hidden>
-            <div class="cartao vazio"><i class="icone">post_add</i><h2>Emitir nota</h2><p class="secundario">Formulário de emissão (próximo passo da fase 1).</p></div>
+            <form id="form-emitir" class="emitir" novalidate>
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Emitir NFS-e</h1>
+                  <p class="secundario">Preencha o tomador, o serviço e o valor. O resto vem do cadastro da sua empresa.</p>
+                </div>
+                <span class="pilula pilula--neutro">Padrão Nacional · DPS série 1</span>
+              </div>
+
+              <div class="emitir__grade">
+                <div class="emitir__blocos">
+
+                  <!-- Bloco 1: tomador -->
+                  <fieldset class="cartao etapa">
+                    <legend class="etapa__cabeca"><span class="etapa__num">1</span> Para quem é a nota</legend>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--meio">
+                        <label for="tom-doc">CPF ou CNPJ do tomador</label>
+                        <div class="campo__grupo">
+                          <input id="tom-doc" inputmode="numeric" autocomplete="off" placeholder="Digite e saia do campo" maxlength="18">
+                          <button type="button" id="botao-buscar-doc" class="btn btn--secundario"><i class="icone icone--p">search</i> Buscar</button>
+                        </div>
+                        <small id="tom-doc-info" class="dica">Com CNPJ, nome e endereço são preenchidos sozinhos.</small>
+                      </div>
+                      <div class="campo campo--meio">
+                        <label for="tom-salvo">Ou escolha um tomador salvo</label>
+                        <select id="tom-salvo">
+                          <option value="">Selecione…</option>
+                          <option value="00394460005887">Clínica Vida Plena</option>
+                          <option value="52998224725">Ana Paula Souza (CPF)</option>
+                          <option value="11222333000181">Construtora Atlântico</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--meio"><label for="tom-nome">Nome / razão social</label><input id="tom-nome"></div>
+                      <div class="campo campo--meio"><label for="tom-email">E-mail (recebe PDF e XML)</label><input id="tom-email" type="email" placeholder="financeiro@cliente.com.br"></div>
+                    </div>
+
+                    <details class="mais" id="tom-endereco-box">
+                      <summary>Endereço <span id="tom-endereco-resumo" class="apagado">opcional no Padrão Nacional</span></summary>
+                      <div class="linha-campos">
+                        <div class="campo campo--terco"><label for="tom-cep">CEP</label><input id="tom-cep" inputmode="numeric" maxlength="9" placeholder="00000-000"></div>
+                        <div class="campo campo--largo"><label for="tom-logradouro">Logradouro</label><input id="tom-logradouro"></div>
+                        <div class="campo campo--terco"><label for="tom-numero">Número</label><input id="tom-numero"></div>
+                        <div class="campo campo--meio"><label for="tom-bairro">Bairro</label><input id="tom-bairro"></div>
+                        <div class="campo campo--meio"><label for="tom-cidade">Cidade / UF</label><input id="tom-cidade" readonly placeholder="pelo CEP"></div>
+                      </div>
+                    </details>
+                  </fieldset>
+
+                  <!-- Bloco 2: servico -->
+                  <fieldset class="cartao etapa">
+                    <legend class="etapa__cabeca"><span class="etapa__num">2</span> O que foi feito</legend>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--largo">
+                        <label for="srv-salvo">Serviço</label>
+                        <select id="srv-salvo">
+                          <option value="">Selecione um serviço salvo…</option>
+                          <option value="consultoria" selected>Consultoria em gestão — 17.01 · ISS 5%</option>
+                          <option value="software">Desenvolvimento de software — 01.01 · ISS 2%</option>
+                          <option value="treinamento">Treinamento profissional — 08.02 · ISS 3%</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="campo">
+                      <label for="srv-descricao">Descrição que vai na nota</label>
+                      <textarea id="srv-descricao" rows="3" maxlength="2000">Consultoria em gestão financeira referente a novembro/2026.</textarea>
+                      <small class="dica"><span id="srv-contador">0</span>/2000 caracteres</small>
+                    </div>
+
+                    <div class="codigos" id="srv-codigos">
+                      <div><span class="apagado">Cód. tributação nacional</span><b class="mono" id="srv-cod-nacional">170101</b></div>
+                      <div><span class="apagado">Item LC 116</span><b class="mono" id="srv-item">17.01</b></div>
+                      <div><span class="apagado">Alíquota ISS</span><b class="mono" id="srv-aliquota-txt">5,00%</b></div>
+                      <div><span class="apagado">Local da prestação</span><b>Salvador-BA</b></div>
+                    </div>
+                  </fieldset>
+
+                  <!-- Bloco 3: valores -->
+                  <fieldset class="cartao etapa">
+                    <legend class="etapa__cabeca"><span class="etapa__num">3</span> Quanto custou</legend>
+
+                    <div class="linha-campos">
+                      <div class="campo campo--meio">
+                        <label for="val-servico">Valor do serviço</label>
+                        <div class="campo__moeda"><span>R$</span><input id="val-servico" inputmode="decimal" placeholder="0,00" value="1.500,00"></div>
+                      </div>
+                      <div class="campo campo--meio">
+                        <label for="val-competencia">Competência</label>
+                        <input id="val-competencia" type="month" value="2026-11">
+                      </div>
+                    </div>
+
+                    <label class="interruptor">
+                      <input id="val-iss-retido" type="checkbox">
+                      <span>ISS retido pelo tomador <small class="apagado">o tomador recolhe o ISS e paga o valor líquido</small></span>
+                    </label>
+
+                    <details class="mais">
+                      <summary>Mais opções <span class="apagado">descontos e retenções federais</span></summary>
+                      <div class="linha-campos">
+                        <div class="campo campo--terco"><label for="val-desconto">Desconto incondicionado</label><div class="campo__moeda"><span>R$</span><input id="val-desconto" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-ir">IR retido</label><div class="campo__moeda"><span>R$</span><input id="val-ir" inputmode="decimal" placeholder="0,00"></div></div>
+                        <div class="campo campo--terco"><label for="val-pcc">PIS/COFINS/CSLL retidos</label><div class="campo__moeda"><span>R$</span><input id="val-pcc" inputmode="decimal" placeholder="0,00"></div></div>
+                      </div>
+                    </details>
+                  </fieldset>
+                </div>
+
+                <!-- Resumo fixo ao lado -->
+                <aside class="cartao resumo-nota">
+                  <h2>Resumo da nota</h2>
+                  <dl class="resumo-nota__linhas">
+                    <div><dt>Valor do serviço</dt><dd id="res-bruto" class="num">R$ 0,00</dd></div>
+                    <div><dt>Descontos</dt><dd id="res-desconto" class="num">R$ 0,00</dd></div>
+                    <div><dt>ISS <span id="res-aliquota">5%</span> <span id="res-iss-situacao" class="apagado">(a recolher)</span></dt><dd id="res-iss" class="num">R$ 0,00</dd></div>
+                    <div><dt>Retenções</dt><dd id="res-retencoes" class="num">R$ 0,00</dd></div>
+                  </dl>
+                  <div class="resumo-nota__liquido"><span>Você recebe</span><b id="res-liquido" class="num">R$ 0,00</b></div>
+
+                  <ul class="checagem" id="checagem"></ul>
+
+                  <button type="submit" class="btn btn--primario btn--largo" id="botao-emitir"><i class="icone icone--p">send</i> Emitir nota</button>
+                  <p id="emitir-retorno" class="dica" hidden></p>
+                  <p class="dica">Ao emitir, a nota entra na fila e o status aparece em <a href="#notas">Minhas notas</a>.</p>
+                </aside>
+              </div>
+            </form>
           </section>
           <section data-pagina="notas" data-titulo="Minhas notas" hidden>
             <div class="cartao vazio"><i class="icone">receipt_long</i><h2>Minhas notas</h2><p class="secundario">Lista com status em tempo real, PDF, XML e cancelamento (fase 1).</p></div>
