@@ -9,6 +9,10 @@ declare(strict_types=1);
  *   { "acao": "criar", "cnpj": "...", "nome": "...", "email": "..." }
  *   { "acao": "redefinir_senha", "cnpj": "...", "id": 1 }
  *   { "acao": "ativar" | "desativar", "cnpj": "...", "id": 1 }
+ *   { "acao": "tornar_admin" | "remover_admin", "cnpj": "...", "id": 1 }
+ *
+ * O primeiro usuario de uma empresa sem administrador ativo vira
+ * administrador sozinho (pode convidar colegas pela tela Usuarios do portal).
  *
  * "criar" e "redefinir_senha" devolvem uma senha PROVISORIA que aparece so
  * nesta resposta. Entregue a pessoa: ela troca no primeiro acesso.
@@ -38,7 +42,9 @@ $r = match ((string)($corpo['acao'] ?? '')) {
     'redefinir_senha' => $acesso->redefinirSenha($cnpj, $id, Api::ip()),
     'ativar' => $acesso->definirAtivo($cnpj, $id, true, Api::ip()),
     'desativar' => $acesso->definirAtivo($cnpj, $id, false, Api::ip()),
-    default => ['ok' => false, 'http' => 400, 'codigo' => 'ACAO_INVALIDA', 'mensagem' => 'Use acao: criar, redefinir_senha, ativar ou desativar.'],
+    'tornar_admin' => $acesso->definirAdministrador($cnpj, $id, true, Api::ip()),
+    'remover_admin' => $acesso->definirAdministrador($cnpj, $id, false, Api::ip()),
+    default => ['ok' => false, 'http' => 400, 'codigo' => 'ACAO_INVALIDA', 'mensagem' => 'Use acao: criar, redefinir_senha, ativar, desativar, tornar_admin ou remover_admin.'],
 };
 if (!$r['ok']) {
     $api->erro($r['http'], $r['codigo'], $r['mensagem']);

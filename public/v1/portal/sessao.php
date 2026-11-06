@@ -25,6 +25,7 @@ $api->responder(200, [
         'nome' => $usuario['nome'],
         'email' => $usuario['email'],
         'trocar_senha' => $usuario['trocar_senha'],
+        'administrador' => $usuario['administrador'],
     ],
     'empresa' => (new PortalInicio($api->pdo(), $api->cfg))->empresa($usuario['cnpj']),
 ]);

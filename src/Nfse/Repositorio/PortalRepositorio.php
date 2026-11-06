@@ -42,20 +42,42 @@ final class PortalRepositorio
     public function usuariosDaEmpresa(string $cnpj): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, cnpj, nome, email, ativo, trocar_senha, bloqueado_ate, ultimo_acesso, criado_em
-               FROM portal_usuarios WHERE cnpj = :cnpj ORDER BY nome'
+            'SELECT id, cnpj, nome, email, ativo, administrador, trocar_senha, bloqueado_ate, ultimo_acesso, criado_em
+               FROM portal_usuarios WHERE cnpj = :cnpj ORDER BY ativo DESC, nome'
         );
         $stmt->execute([':cnpj' => $cnpj]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function criarUsuario(string $cnpj, string $nome, string $email, string $senhaHash): int
+    public function criarUsuario(string $cnpj, string $nome, string $email, string $senhaHash, bool $administrador = false): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO portal_usuarios (cnpj, nome, email, senha_hash) VALUES (:cnpj, :nome, :email, :hash) RETURNING id'
+            'INSERT INTO portal_usuarios (cnpj, nome, email, senha_hash, administrador)
+             VALUES (:cnpj, :nome, :email, :hash, :administrador) RETURNING id'
         );
-        $stmt->execute([':cnpj' => $cnpj, ':nome' => $nome, ':email' => $email, ':hash' => $senhaHash]);
+        $stmt->bindValue(':cnpj', $cnpj);
+        $stmt->bindValue(':nome', $nome);
+        $stmt->bindValue(':email', $email);
+        $stmt->bindValue(':hash', $senhaHash);
+        $stmt->bindValue(':administrador', $administrador, PDO::PARAM_BOOL);
+        $stmt->execute();
         return (int)$stmt->fetchColumn();
+    }
+
+    /** A empresa tem pelo menos um administrador ativo? */
+    public function temAdministrador(string $cnpj): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM portal_usuarios WHERE cnpj = :cnpj AND administrador AND ativo LIMIT 1');
+        $stmt->execute([':cnpj' => $cnpj]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    public function definirAdministrador(int $id, bool $administrador): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE portal_usuarios SET administrador = :administrador, atualizado_em = CURRENT_TIMESTAMP WHERE id = :id');
+        $stmt->bindValue(':administrador', $administrador, PDO::PARAM_BOOL);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
     }
 
     /** Nova senha. $provisoria = true obriga a trocar no proximo acesso. */
@@ -127,7 +149,7 @@ final class PortalRepositorio
     public function sessaoValida(string $tokenHash): ?array
     {
         return $this->uma(
-            'SELECT u.id, u.cnpj, u.nome, u.email, u.trocar_senha, s.expira_em
+            'SELECT u.id, u.cnpj, u.nome, u.email, u.trocar_senha, u.administrador, s.expira_em
                FROM portal_sessoes s
                JOIN portal_usuarios u ON u.id = s.usuario_id
               WHERE s.token_hash = :hash AND s.expira_em > CURRENT_TIMESTAMP AND u.ativo',

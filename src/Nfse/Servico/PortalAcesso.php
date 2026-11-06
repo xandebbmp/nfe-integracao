@@ -105,6 +105,7 @@ final class PortalAcesso
         }
         $sessao['id'] = (int)$sessao['id'];
         $sessao['trocar_senha'] = (bool)$sessao['trocar_senha'];
+        $sessao['administrador'] = (bool)$sessao['administrador'];
         return $sessao;
     }
 
@@ -145,6 +146,7 @@ final class PortalAcesso
             $u['id'] = (int)$u['id'];
             $u['ativo'] = (bool)$u['ativo'];
             $u['trocar_senha'] = (bool)$u['trocar_senha'];
+            $u['administrador'] = (bool)$u['administrador'];
             return $u;
         }, $this->portal->usuariosDaEmpresa(NfseConfig::normalizarCnpj($cnpj)));
     }
@@ -152,8 +154,9 @@ final class PortalAcesso
     /**
      * Cria o usuario com uma senha PROVISORIA, devolvida so nesta resposta.
      * No 1o acesso o portal pede para a pessoa trocar.
+     * Empresa sem administrador ativo: a pessoa criada vira administradora.
      */
-    public function criarUsuario(string $cnpj, string $nome, string $email, string $ip): array
+    public function criarUsuario(string $cnpj, string $nome, string $email, string $ip, bool $administrador = false): array
     {
         $cnpj = NfseConfig::normalizarCnpj($cnpj);
         $nome = trim($nome);
@@ -173,11 +176,12 @@ final class PortalAcesso
             return self::falha(409, 'EMAIL_EM_USO', 'Este e-mail já tem acesso ao portal (nesta ou em outra empresa).');
         }
 
+        $administrador = $administrador || !$this->portal->temAdministrador($cnpj);
         $senha = self::senhaProvisoria();
-        $id = $this->portal->criarUsuario($cnpj, $nome, $email, password_hash($senha, PASSWORD_DEFAULT));
-        $clientes->registrarLog($cnpj, 'PORTAL_USUARIO_CRIADO', ['usuario_id' => $id, 'email' => $email], $ip);
+        $id = $this->portal->criarUsuario($cnpj, $nome, $email, password_hash($senha, PASSWORD_DEFAULT), $administrador);
+        $clientes->registrarLog($cnpj, 'PORTAL_USUARIO_CRIADO', ['usuario_id' => $id, 'email' => $email, 'administrador' => $administrador], $ip);
 
-        return ['ok' => true, 'id' => $id, 'email' => $email, 'senha_provisoria' => $senha,
+        return ['ok' => true, 'id' => $id, 'email' => $email, 'administrador' => $administrador, 'senha_provisoria' => $senha,
             'mensagem' => 'Usuário criado. Envie o e-mail e a senha provisória para a pessoa: ela troca no primeiro acesso.'];
     }
 
@@ -208,6 +212,17 @@ final class PortalAcesso
         }
         (new ClienteRepositorio($this->pdo))->registrarLog($usuario['cnpj'], $ativo ? 'PORTAL_USUARIO_ATIVADO' : 'PORTAL_USUARIO_DESATIVADO', ['usuario_id' => $id], $ip);
         return ['ok' => true, 'mensagem' => $ativo ? 'Acesso liberado.' : 'Acesso desativado.'];
+    }
+
+    public function definirAdministrador(string $cnpj, int $id, bool $administrador, string $ip): array
+    {
+        $usuario = $this->usuarioDaEmpresa($cnpj, $id);
+        if ($usuario === null) {
+            return self::falha(404, 'USUARIO_NAO_ENCONTRADO', 'Usuário não encontrado nesta empresa.');
+        }
+        $this->portal->definirAdministrador($id, $administrador);
+        (new ClienteRepositorio($this->pdo))->registrarLog($usuario['cnpj'], $administrador ? 'PORTAL_ADMIN_CONCEDIDO' : 'PORTAL_ADMIN_RETIRADO', ['usuario_id' => $id], $ip);
+        return ['ok' => true, 'mensagem' => $administrador ? 'Agora é administrador.' : 'Agora só emite notas.'];
     }
 
     // =====================================================================
@@ -249,7 +264,8 @@ final class PortalAcesso
 
     private static function publico(array $u): array
     {
-        return ['id' => (int)$u['id'], 'cnpj' => $u['cnpj'], 'nome' => $u['nome'], 'email' => $u['email'], 'trocar_senha' => (bool)$u['trocar_senha']];
+        return ['id' => (int)$u['id'], 'cnpj' => $u['cnpj'], 'nome' => $u['nome'], 'email' => $u['email'],
+            'trocar_senha' => (bool)$u['trocar_senha'], 'administrador' => (bool)($u['administrador'] ?? false)];
     }
 
     private static function falha(int $http, string $codigo, string $mensagem): array

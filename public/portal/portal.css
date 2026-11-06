@@ -513,3 +513,35 @@ a { color: var(--primaria); }
   .detalhe { grid-template-columns: minmax(0, 1fr); }
   .janela { width: 100vw; max-width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; margin: 0; }
 }
+
+/* ==========================================================================
+   Minha empresa (so leitura): quatro cartoes em duas colunas
+   ========================================================================== */
+.empresa-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.empresa-avisos { display: grid; gap: 10px; }
+.empresa-avisos:empty { display: none; }
+.ficha { margin: 0; display: grid; gap: 8px; font-size: 13px; }
+.ficha div { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px dashed var(--borda); }
+.ficha div:last-child { border-bottom: 0; padding-bottom: 0; }
+.ficha dt { color: var(--secundario); }
+.ficha dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.bloco__cabeca h2 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.bloco__cabeca h2 .icone { color: var(--acento); font-size: 19px; }
+.uso { display: grid; gap: 6px; }
+.uso__numeros { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
+.uso__numeros b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.barra__cheio--alerta { background: var(--alerta-texto); }
+.barra__cheio--erro { background: var(--erro-texto); }
+.resultado--alerta { background: var(--alerta-fundo); border-color: var(--alerta-borda); }
+
+@media (max-width: 860px) {
+  .empresa-grade { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ==========================================================================
+   Usuarios: lista da empresa, convite e "Minha senha"
+   ========================================================================== */
+.tabela .eu { font-size: 11px; font-weight: 700; color: var(--acento); margin-left: 6px; }
+.provisoria { margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--hover); border: 1px solid var(--borda);
+  font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+.minha-senha .bloco__corpo { gap: 12px; }

@@ -365,6 +365,7 @@ sistemas é o **webhook** (seção 11). O stream é pensado para telas.
 | `0007` | Tela Sistema: sinal de vida e ordens do worker |
 | `0008` | Registro dos scripts aplicados (botão **Atualizar banco**) |
 | `0009` | Configurações alteradas pelo painel (`sistema_ajustes`) |
+| `0010` | Portal: papel de administrador dos usuários (`portal_usuarios.administrador`) |
 
 - **Backup diário:** `deploy/backup_banco.sh`, no cron. Veja o manual de
   implantação, seção "Backup".
@@ -717,6 +718,19 @@ sessões abertas.
   cadastrar um novo (com CNPJ e CEP preenchidos sozinhos) e remover.
   "Emitir nota" abre a emissão com o tomador preenchido. Editar não muda a
   ordem da lista (os mais usados ficam em cima).
+- **Minha empresa:** só para ver. Mostra o cadastro, os dados fiscais (em
+  texto: Simples, regime especial, tipos de nota contratados), o certificado
+  (titular e validade) e o plano (limite do mês, uso e se a emissão está
+  liberada). Para mudar algo, o suporte altera no painel admin. Nunca mostra
+  token, certificado, segredo do webhook ou a observação interna.
+- **Usuários:** todos veem quem da empresa tem acesso. Cada pessoa é
+  **administrador** ou **emissor**. Só administradores convidam (a senha
+  provisória aparece uma vez, numa mensagem pronta para copiar), geram nova
+  senha, desativam e escolhem quem também é administrador. Ninguém mexe no
+  próprio acesso, então a empresa nunca fica sem administrador ativo. Cada um
+  troca a própria senha em "Minha senha". O primeiro usuário criado no painel
+  para uma empresa sem administrador ativo vira administrador sozinho; no
+  painel também há o botão "Tornar administrador" (script `0010`).
 
 **Configuração** (`portal` no `config/nfse.php`, troque no
 `config/nfse.local.php`):
@@ -736,7 +750,7 @@ chamada que altera algo exige o cabeçalho `X-Portal: 1` (o próprio portal
 envia), o que impede outro site de emitir usando a sessão de alguém.
 
 **Rotas** (`public/v1/portal/`): `entrar`, `sair`, `sessao`, `senha`,
-`inicio`, `notas`, `servicos`, `tomadores`, `consulta`, `emitir` e `arquivo` (PDF/XML).
+`inicio`, `notas`, `servicos`, `tomadores`, `empresa`, `usuarios`, `consulta`, `emitir` e `arquivo` (PDF/XML).
 No painel: `public/v1/admin/portal_usuarios.php`.
 
 ### Alterar o visual ou os textos
