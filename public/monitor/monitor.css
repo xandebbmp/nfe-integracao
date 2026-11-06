@@ -194,3 +194,9 @@ input, select {
   .topo__acoes .botao { padding: 6px 10px; }
   .conteudo { padding: 12px 16px 32px; }
 }
+
+/* Botao "Reenviar" (linha e detalhe de nota rejeitada) */
+.botao-reenviar { margin-left: 8px; padding: 3px 10px; border: 1px solid currentColor; border-radius: 6px; background: transparent;
+  color: var(--st-rejeitado, #b42318); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.botao-reenviar:hover:not(:disabled) { background: rgba(180, 35, 24, .08); }
+.botao-reenviar:disabled { opacity: .7; cursor: default; }

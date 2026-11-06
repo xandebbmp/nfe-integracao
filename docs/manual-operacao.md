@@ -547,7 +547,10 @@ o seu e-mail.
   blocos que abrem com um clique; o botão **Salvar** fica fixo embaixo):
   - **Pronta para emitir?** (primeiro bloco da ficha, veja abaixo);
   - botão **Ver notas desta empresa**: abre o monitor já filtrado nela,
-    com XML, PDF (DANFSe) e o motivo de cada rejeição;
+    com XML, PDF (DANFSe) e o motivo de cada rejeição. Nota **rejeitada** ou
+    **com erro** tem o botão **↻ Reenviar** (na linha e no detalhe; também em
+    "Minhas notas" do portal): manda de novo os mesmos dados, com o mesmo
+    número, e fica no histórico com o nome de quem reenviou;
   - controle de emissão;
   - dados cadastrais e webhook;
   - certificado;

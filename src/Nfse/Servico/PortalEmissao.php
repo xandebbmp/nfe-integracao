@@ -264,7 +264,7 @@ final class PortalEmissao
     }
 
     /** Config com a empresa como "consumidor" (mesmo sem token da API gerado). */
-    private function comConsumidor(string $cnpj, array $cliente): array
+    public function comConsumidor(string $cnpj, array $cliente): array
     {
         $cfg = $this->cfg;
         $cfg['consumidores'][$cnpj] = ($cfg['consumidores'][$cnpj] ?? []) + [

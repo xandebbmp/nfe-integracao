@@ -30,8 +30,13 @@ final class IniciadorWorker
         if (!is_dir(dirname($log))) {
             @mkdir(dirname($log), 0775, true);
         }
-        $comando = 'cd ' . escapeshellarg($raiz) . ' && nohup ' . escapeshellarg($php) . ' bin/nfse_worker.php --pelo-painel'
-            . ' >> ' . escapeshellarg($log) . ' 2>&1 < /dev/null &';
+        // As chaves { ... & } > /dev/null soltam o processo de verdade: sem elas,
+        // o sh do macOS fica esperando o worker e o exec() nunca volta (o
+        // worker que pediu o reinicio ficava travado, vivo, sem dar sinal).
+        // 3>&- ... 9>&- fecham o que veio do site (porta do servidor e a
+        // conexao do clique): o worker nao pode segurar a porta 8099.
+        $comando = 'cd ' . escapeshellarg($raiz) . ' && { nohup ' . escapeshellarg($php) . ' bin/nfse_worker.php --pelo-painel'
+            . ' >> ' . escapeshellarg($log) . ' 2>&1 < /dev/null 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & } > /dev/null 2>&1';
         exec($comando, $saida, $codigo);
         return $codigo === 0 ? null : 'Não consegui ligar o worker (código ' . $codigo . '). Veja storage/logs/worker.log.';
     }

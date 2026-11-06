@@ -366,6 +366,7 @@
     el('empresa-nome').textContent = e.nome_fantasia || e.razao_social || '';
     el('empresa-cnpj').textContent = formatarDoc(e.cnpj || '');
     el('selo-ambiente').hidden = e.ambiente !== 'HOMOLOGACAO';
+    ambienteProducao = e.ambiente === 'PRODUCAO';
     el('emitir-padrao').textContent = e.padrao === 'SALVADOR' ? 'Prefeitura de Salvador (RPS)' : 'Padrão Nacional (DPS)';
 
     // Certificado no rodape do menu
@@ -1094,7 +1095,7 @@
           + '<td class="num">' + escapar(dataCurta(n.criado_em)) + '</td>'
           + '<td class="direita num">' + reais(n.valor) + '</td>'
           + '<td' + (n.motivo ? ' title="' + escapar(n.motivo) + '"' : '') + '>' + pilulaStatus(n.status) + '</td>'
-          + '<td class="acoes">' + arquivos + '</td>'
+          + '<td class="acoes">' + arquivos + (PODE_REENVIAR.indexOf(n.status) >= 0 ? botaoReenviar() : '') + '</td>'
           + '</tr>';
       }).join('');
     }
@@ -1102,6 +1103,29 @@
     el('notas-contagem').textContent = r.total + (r.total === 1 ? ' nota' : ' notas') + (r.paginas > 1 ? ' · página ' + r.pagina + ' de ' + r.paginas : '');
     el('notas-anterior').disabled = r.pagina <= 1;
     el('notas-proxima').disabled = r.pagina >= r.paginas;
+  }
+
+  // ---- Reenviar nota rejeitada (linha e detalhe) ----
+  var ambienteProducao = false;
+  var PODE_REENVIAR = ['REJEITADO', 'ERRO'];
+
+  function botaoReenviar() {
+    return '<button type="button" class="btn btn--secundario" data-reenviar><i class="icone icone--p">replay</i> Reenviar</button>';
+  }
+
+  // Pergunta no proprio lugar do botao; em producao avisa que a nota vale.
+  function reenviarNota(id, lugar, depois) {
+    var pergunta = ambienteProducao ? 'Reenviar? Em produção a nota vale de verdade.' : 'Reenviar com os mesmos dados?';
+    confirmarRemocao(lugar, pergunta, function () {
+      lugar.innerHTML = '<span class="apagado">Reenviando…</span>';
+      api('POST', 'reenviar.php', { id: id }).then(function (r) {
+        avisar(escapar(r.mensagem));
+        if (depois) { depois(); }
+      }).catch(function (erro) {
+        avisar(escapar(erro.message), 'error_outline');
+        if (depois) { depois(); }
+      });
+    }, 'Reenviar');
   }
 
   function limparFiltrosNotas() {
@@ -1142,6 +1166,11 @@
   // Clique (ou Enter) na linha abre o detalhe. Os links de PDF/XML seguem normais.
   function aoEscolherLinha(evento) {
     if (evento.type === 'keydown' && evento.key !== 'Enter') { return; }
+    var reenviar = evento.type === 'click' && evento.target.closest('[data-reenviar]');
+    if (reenviar) {
+      reenviarNota(reenviar.closest('tr[data-id]').getAttribute('data-id'), reenviar.closest('td'), carregarNotas);
+      return;
+    }
     if (evento.target.closest('a, button')) { return; }
     var linha = evento.target.closest('tr[data-id]');
     if (linha) { abrirNota(linha.getAttribute('data-id')); }
@@ -1203,6 +1232,9 @@
     if (t.cpf_cnpj) {
       acoes += '<button type="button" class="btn btn--secundario" data-emitir-para="' + escapar(t.cpf_cnpj) + '"><i class="icone icone--p">add</i> Nova nota para este tomador</button>';
     }
+    if (PODE_REENVIAR.indexOf(n.status) >= 0) {
+      acoes += '<span data-reenviar-lugar>' + botaoReenviar() + '</span>';
+    }
     var canc = n.cancelamento || {};
     if (canc.pode) {
       acoes += '<button type="button" class="btn btn--secundario btn--perigo-leve" data-cancelar><i class="icone icone--p">block</i> Cancelar nota</button>';
@@ -1236,6 +1268,13 @@
     }
     html += '</div>';
     el('nota-corpo').innerHTML = html;
+
+    var lugarReenviar = el('nota-corpo').querySelector('[data-reenviar-lugar]');
+    if (lugarReenviar) {
+      lugarReenviar.querySelector('[data-reenviar]').addEventListener('click', function () {
+        reenviarNota(n.id, lugarReenviar, function () { fecharJanela('janela-nota'); carregarNotas(); });
+      });
+    }
 
     var botaoCancelar = el('nota-corpo').querySelector('[data-cancelar]');
     if (botaoCancelar) { botaoCancelar.addEventListener('click', function () { abrirCancelamento(n); }); }

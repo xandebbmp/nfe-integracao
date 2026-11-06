@@ -50,6 +50,7 @@ use Xande\NfeIntegracao\Nfse\Salvador\ProvedorSalvador;
 use Xande\NfeIntegracao\Nfse\Salvador\SalvadorSoapCliente;
 use Xande\NfeIntegracao\Nfse\Servico\ProcessadorJobs;
 use Xande\NfeIntegracao\Nfse\Servico\RecebimentoLote;
+use Xande\NfeIntegracao\Nfse\Servico\ReenvioDocumento;
 use Xande\NfeIntegracao\Nfse\Servico\Solicitacoes;
 use Xande\NfeIntegracao\Nfse\Servico\ValidadorPayload;
 
@@ -453,8 +454,17 @@ if (!$dsn) {
     Apoio::igual('JA_EXISTENTE', $repetido['documentos'][0]['situacao_recebimento'], 'mesma referencia autorizada nao gera nova nota');
     Apoio::igual(0, (int)$pdo->query("SELECT count(*) FROM nfse_jobs WHERE status = 'PENDENTE'")->fetchColumn(), 'nenhum job novo para documento ja autorizado');
 
-    $reenvio = $recebimento->receber('TESTE', ['padrao' => 'NACIONAL', 'documentos' => [array_replace($payload, ['referencia' => 'PEDIDO-2'])]]);
-    Apoio::igual('REENVIADO', $reenvio['documentos'][0]['situacao_recebimento'], 'referencia rejeitada pode ser reenviada');
+    // Botao "Reenviar" (portal/monitor): mesmos dados guardados, mesma nota.
+    $reenvioBotao = new ReenvioDocumento($pdo, $cfgGeral);
+    Apoio::igual('NAO_PODE_REENVIAR', $reenvioBotao->reenviar($doc1['id'], null, 'ip')['codigo'] ?? null, 'reenviar: nota autorizada nao reenvia');
+    Apoio::igual('NOTA_NAO_ENCONTRADA', $reenvioBotao->reenviar($doc2['id'], '99999999000191', 'ip')['codigo'] ?? null, 'reenviar: portal so reenvia nota da propria empresa');
+    $outroAmbiente = $cfgGeral;
+    $outroAmbiente['tpAmb'] = 1;
+    Apoio::igual('AMBIENTE_DIFERENTE', (new ReenvioDocumento($pdo, $outroAmbiente))->reenviar($doc2['id'], null, 'ip')['codigo'] ?? null, 'reenviar: nota de homologacao nao vai para producao');
+    $reenvio = $reenvioBotao->reenviar($doc2['id'], null, 'ip');
+    Apoio::verificar($reenvio['ok'] && !$reenvio['producao'], 'reenviar: rejeitada volta para a fila');
+    Apoio::igual(1, (int)$pdo->query("SELECT count(*) FROM nfse_jobs WHERE status = 'PENDENTE' AND documento_id = '{$doc2['id']}'")->fetchColumn(), 'reenviar: um job novo para a mesma nota');
+    Apoio::igual('NAO_PODE_REENVIAR', $reenvioBotao->reenviar($doc2['id'], null, 'ip')['codigo'] ?? null, 'reenviar: clique duplo nao cria outro job');
     $http->responder(201, respostaSefinAutorizada(str_repeat('2', 50)));
     while ($worker->processarProximo()) {
     }
