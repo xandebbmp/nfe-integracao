@@ -38,6 +38,7 @@ final class DanfsePdf
     private const LARGURA = 204.0;
     private const LINHA = 6.3;
     private const CINZA = 242; // cinza claro (~5%) dos titulos
+    private const MARCA_CINZA = 220; // cinza da marca d'agua: claro, para nao esconder os campos
 
     private Pdf $pdf;
     private DOMXPath $xp;
@@ -470,11 +471,17 @@ final class DanfsePdf
         }
     }
 
-    /** "CANCELADA" / "SUBSTITUÍDA" na diagonal, Arial 60 pt, cinza (NT 2.5). */
+    /**
+     * "CANCELADA" / "SUBSTITUÍDA" na diagonal, Arial 60 pt, cinza (NT 2.5).
+     *
+     * Ela e desenhada ANTES de todo o resto (ver gerar()), entao os campos
+     * ficam por cima. O cinza e bem claro (MARCA_CINZA) para que os textos
+     * pretos continuem faceis de ler mesmo em cima da marca.
+     */
     private function marcaDagua(string $texto): void
     {
         $this->pdf->setFont('Arial', 'B', 60);
-        $this->pdf->settextColor(166, 166, 166);
+        $this->pdf->settextColor(self::MARCA_CINZA);
         $largura = $this->pdf->getStringWidth($this->t($texto));
         $this->pdf->rotate(45, 105, 148);
         $this->pdf->text(105 - $largura / 2, 148, $this->t($texto));
