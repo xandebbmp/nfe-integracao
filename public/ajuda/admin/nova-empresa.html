@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova empresa - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">domain_add</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Nova empresa</span>
+    </nav>
+
+    <h1>Cadastrar uma nova empresa</h1>
+    <p class="artigo__resumo">Cadastre o cliente uma vez: dados, impostos, plano e o que ele emite. Depois a própria ficha diz o que falta para emitir.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">checklist</i> Antes de começar</h2>
+      <ul>
+        <li>Tenha em mãos: <b>CNPJ</b>, <b>razão social</b>, <b>inscrição municipal</b> (para NFS-e) e, se for NF-e, <b>UF</b> e <b>inscrição estadual</b>.</li>
+        <li>Pergunte ao <b>contador</b> do cliente: se é do Simples Nacional, como paga os impostos e o percentual aproximado de tributos.</li>
+        <li>Nunca chute CNPJ ou dados fiscais: confirme com o cliente.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Clique em "+ Nova empresa"</h2>
+        <p>No topo do painel, clique em <span class="botao-nome">+ Nova empresa</span>.</p>
+        <figure class="print">
+          <img src="../img/admin/painel-01-vazio.png" alt="Painel administrativo com os botões Sistema, Notas, Relatório de cobrança e + Nova empresa" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Preencha os dados</h2>
+        <ul>
+          <li><b>O que a empresa emite</b>: marque só o que ela contratou (NF-e, NFS-e Nacional, NFS-e Salvador). Os campos que não servem somem sozinhos.</li>
+          <li><b>Empresa</b>: CNPJ, razão social, nome fantasia, e-mail e telefone.</li>
+          <li><b>Inscrições</b>: código IBGE do município (Salvador = 2927408) e inscrição municipal.</li>
+          <li><b>Impostos</b>: "Simples Nacional" e, se for ME/EPP, o regime de apuração e o % de tributos do Simples (o contador informa).</li>
+        </ul>
+        <figure class="print">
+          <img src="../img/admin/empresa-01-nova.png" alt="Janela Nova empresa preenchida com CNPJ, razão social, inscrição municipal e Simples Nacional ME/EPP" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Ajuste plano, limite e liberação (Mais opções)</h2>
+        <p>Em <b>Mais opções</b> ficam: <b>Emissão liberada</b> (desmarque para bloquear, e escreva o motivo que o cliente vai ver), <b>Liberado até</b> (vencimento do contrato), <b>Plano</b>, <b>Limite de notas por mês</b>, regimes especiais, webhook e anotações internas.</p>
+        <figure class="print">
+          <img src="../img/admin/empresa-02-mais-opcoes.png" alt="Bloco Mais opções com emissão liberada, liberado até, plano, limite mensal e regimes especiais" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Clique em "Cadastrar empresa" e veja o que falta</h2>
+        <p>A ficha da empresa abre com o quadro <b>Pronta para emitir?</b>, que lista o que falta. Cada item tem <b>Como resolver</b> e um link <b>Ir para</b> que leva até o lugar certo.</p>
+        <p>Siga em <a href="certificado-pronta.html">Certificado e "pronta para emitir"</a>.</p>
+        <figure class="print">
+          <img src="../img/admin/empresa-03-ficha-pronta.png" alt="Ficha da empresa com o quadro Pronta para emitir mostrando o que falta: certificado e quem emite" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2>Integração por sistema (token da API)</h2>
+    <p>Se o cliente vai emitir pelo <b>sistema dele</b> (ERP, loja), abra <b>Acesso à API (token)</b> na ficha e clique em <span class="botao-nome">Gerar token</span>. O token aparece <b>uma vez só</b>: copie e mande para quem cuida do sistema do cliente. Se o cliente só usa o portal, não precisa de token.</p>
+        <figure class="print">
+          <img src="../img/admin/empresa-04-token.png" alt="Bloco Acesso à API com o botão Gerar token e um exemplo de chamada" loading="lazy">
+        </figure>
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>Erro de CNPJ ao cadastrar.</td><td>Confira os números. O sistema confere os dígitos.</td></tr>
+          <tr><td>Não aparece o campo de inscrição estadual.</td><td>Marque <b>NF-e (produtos)</b> em "O que a empresa emite".</td></tr>
+          <tr><td>Preciso bloquear um cliente (ex.: falta de pagamento).</td><td>Abra a ficha, em <b>Mais opções</b> desmarque <b>Emissão liberada</b>, escreva o motivo e clique em <b>Salvar alterações</b>. O cliente vê o motivo no portal.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

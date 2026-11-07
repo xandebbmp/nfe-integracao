@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitor e cobrança - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">monitor_heart</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Monitor e cobrança</span>
+    </nav>
+
+    <h1>Monitor de notas e relatório de cobrança</h1>
+    <p class="artigo__resumo">Acompanhe as notas de todas as empresas em tempo real e veja quantas cada uma emitiu no mês.</p>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra o monitor</h2>
+        <p>No topo do painel, clique em <span class="botao-nome">Notas (monitor)</span>. Para ver só uma empresa, abra a ficha dela e clique em <span class="botao-nome">Ver notas desta empresa</span>.</p>
+        <p>Os quadros do topo contam as notas por situação. A bolinha <b>Ao vivo</b> mostra que a lista se atualiza sozinha.</p>
+        <figure class="print">
+          <img src="../img/admin/monitor-01.png" alt="Monitor Fiscal com os contadores por situação, filtros e a lista de notas" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Filtre e abra uma nota</h2>
+        <p>Use os filtros <b>Status</b>, <b>Padrão</b>, <b>Emitente</b> e a busca (referência, número ou chave). Clique numa nota para ver o histórico, a mensagem da prefeitura e baixar XML e PDF.</p>
+
+      </li>
+      <li class="passo">
+        <h2>Veja a lista de empresas</h2>
+        <p>A tela inicial do painel mostra cada empresa com plano, situação, notas do mês por tipo, <b>franquia do mês</b> (usadas / limite), vencimento do contrato, certificado e token. Use o filtro <b>Situação</b> para achar quem está bloqueada, vencida ou no limite.</p>
+        <figure class="print">
+          <img src="../img/admin/painel-02-lista.png" alt="Lista de empresas com plano, situação, franquia do mês, liberado até, certificado e token" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Tire o relatório de cobrança</h2>
+        <p>Clique em <span class="botao-nome">Relatório de cobrança</span>, escolha o <b>mês</b> e veja as notas autorizadas por empresa e por tipo. Clique em <span class="botao-nome">Baixar planilha (CSV)</span> para abrir no Excel.</p>
+        <figure class="print">
+          <img src="../img/admin/painel-03-relatorio.png" alt="Relatório de cobrança do mês com plano, limite e notas por tipo de cada empresa" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">O que cada situação da empresa quer dizer</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Situação</th><th>O que significa</th></tr></thead>
+        <tbody>
+          <tr><td>Liberada</td><td>Pode emitir.</td></tr>
+          <tr><td>Bloqueada</td><td>Você desmarcou "Emissão liberada". O cliente vê o motivo.</td></tr>
+          <tr><td>Vencida</td><td>Passou da data "Liberado até".</td></tr>
+          <tr><td>Limite atingido</td><td>Chegou ao limite de notas do mês.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>A bolinha "Ao vivo" não fica verde.</td><td>Atualize a página. Se continuar, rode o diagnóstico em <b>Sistema</b>.</td></tr>
+          <tr><td>Quais notas o relatório conta?</td><td>Só as <b>autorizadas</b> no mês, no ambiente atual. Rejeitadas e com erro não entram. Uma nota autorizada e depois cancelada continua contando, porque foi autorizada.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

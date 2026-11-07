@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Certificado e pronta para emitir - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">verified_user</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Certificado e pronta para emitir</span>
+    </nav>
+
+    <h1>Certificado e "pronta para emitir"</h1>
+    <p class="artigo__resumo">Envie o certificado A1 da empresa e use o quadro "Pronta para emitir?" para não esquecer nada.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">checklist</i> Antes de começar</h2>
+      <ul>
+        <li>Peça ao cliente o arquivo do <b>certificado A1</b> (<code>.pfx</code> ou <code>.p12</code>) e a <b>senha</b> dele.</li>
+        <li>Tem que ser o <b>e-CNPJ da própria empresa</b> e estar dentro da validade.</li>
+        <li>O arquivo não fica salvo no servidor: o sistema guarda criptografado no banco.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra a ficha da empresa</h2>
+        <p>Na lista do painel, clique na linha da empresa.</p>
+
+      </li>
+      <li class="passo">
+        <h2>Envie o certificado</h2>
+        <p>No bloco <b>Certificado digital</b>, escolha o arquivo <code>.pfx</code>, digite a <b>senha do certificado</b> e clique em <span class="botao-nome">Enviar certificado</span>.</p>
+        <figure class="print">
+          <img src="../img/admin/certificado-01-enviar.png" alt="Bloco Certificado digital com o arquivo escolhido e a senha preenchida" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Confira se foi aceito</h2>
+        <p>Aparece em verde o titular e a validade. A coluna <b>Certificado</b> da lista mostra a data de vencimento.</p>
+        <figure class="print">
+          <img src="../img/admin/certificado-03-aceito.png" alt="Certificado aceito: titular e válido até, em verde" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Resolva o resto do "Pronta para emitir?"</h2>
+        <p>O quadro no topo da ficha se atualiza. <b>✕ Falta</b> impede a emissão; <b>! Atenção</b> é aviso. Clique em <b>Ir para</b> em cada item e resolva. Os itens que já estão certos ficam em <b>Ver os itens ok</b>.</p>
+        <figure class="print">
+          <img src="../img/admin/certificado-02-pronta-depois.png" alt="Quadro Pronta para emitir depois do certificado: falta só quem emite e há avisos de numeração" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">Itens mais comuns do quadro</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Item</th><th>Como resolver</th></tr></thead>
+        <tbody>
+          <tr><td>Sem certificado digital.</td><td>Envie o .pfx (passo 2).</td></tr>
+          <tr><td>Ninguém consegue emitir ainda.</td><td>Dê acesso ao portal para alguém da empresa (<a href="acesso-portal.html">Acesso ao portal</a>) ou gere o token da API.</td></tr>
+          <tr><td>Série 1 ainda não usada: a primeira nota sai com o nº 1.</td><td>Só um aviso. Se a empresa já emitia em outro sistema, informe o último número usado em <b>Numeração</b>.</td></tr>
+          <tr><td>Sem inscrição municipal / UF / inscrição estadual.</td><td>Preencha nos dados da empresa e clique em <b>Salvar alterações</b>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>"Senha incorreta ou o arquivo não é um certificado A1".</td><td>Confira a senha com o cliente (maiúsculas contam) e se o arquivo é .pfx/.p12.</td></tr>
+          <tr><td>"Este certificado é do CNPJ ..., que não é desta empresa".</td><td>O cliente mandou o certificado de outra empresa. Peça o certo.</td></tr>
+          <tr><td>"Certificado vencido".</td><td>O cliente precisa renovar o certificado com a certificadora e mandar o novo.</td></tr>
+          <tr><td>O certificado está para vencer.</td><td>Peça o novo com antecedência. Quando chegar, é só enviar de novo: o novo substitui o antigo.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>
