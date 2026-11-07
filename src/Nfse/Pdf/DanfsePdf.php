@@ -6,7 +6,6 @@ namespace Xande\NfeIntegracao\Nfse\Pdf;
 use Com\Tecnick\Barcode\Barcode;
 use DOMDocument;
 use DOMXPath;
-use NFePHP\DA\Legacy\Pdf;
 use RuntimeException;
 
 /**
@@ -38,9 +37,8 @@ final class DanfsePdf
     private const LARGURA = 204.0;
     private const LINHA = 6.3;
     private const CINZA = 242; // cinza claro (~5%) dos titulos
-    private const MARCA_CINZA = 220; // cinza da marca d'agua: claro, para nao esconder os campos
 
-    private Pdf $pdf;
+    private PdfComMarcaDagua $pdf;
     private DOMXPath $xp;
     private float $y = 0;
 
@@ -63,18 +61,11 @@ final class DanfsePdf
             throw new RuntimeException('XML nao e de uma NFS-e do Padrao Nacional.');
         }
 
-        $this->pdf = new Pdf('P', 'mm', 'A4');
+        $this->pdf = new PdfComMarcaDagua('P', 'mm', 'A4');
         $this->pdf->setMargins(0, 0, 0);
         $this->pdf->setAutoPageBreak(false);
         $this->pdf->addPage();
         $this->pdf->setLineWidth(0.18); // 0,5 ponto
-
-        // Marca d'agua primeiro, para ficar por baixo do texto (NT 2.5).
-        if ($status === 'CANCELADO') {
-            $this->marcaDagua('CANCELADA');
-        } elseif ($status === 'SUBSTITUIDO') {
-            $this->marcaDagua('SUBSTITUÍDA');
-        }
 
         $this->cabecalho();
         $this->dadosDaNfse();
@@ -88,6 +79,14 @@ final class DanfsePdf
         $this->tributacaoIbsCbs();
         $this->valorTotal();
         $this->informacoesComplementares();
+
+        // Marca d'agua por ULTIMO (NT 2.5). Ela usa o modo multiplicar, entao
+        // os campos continuam legiveis e as faixas cinza nao cortam as letras.
+        if ($status === 'CANCELADO') {
+            $this->marcaDagua('CANCELADA');
+        } elseif ($status === 'SUBSTITUIDO') {
+            $this->marcaDagua('SUBSTITUÍDA');
+        }
 
         // Borda da pagina (1 ponto).
         $this->pdf->setLineWidth(0.35);
@@ -474,19 +473,20 @@ final class DanfsePdf
     /**
      * "CANCELADA" / "SUBSTITUÍDA" na diagonal, Arial 60 pt, cinza (NT 2.5).
      *
-     * Ela e desenhada ANTES de todo o resto (ver gerar()), entao os campos
-     * ficam por cima. O cinza e bem claro (MARCA_CINZA) para que os textos
-     * pretos continuem faceis de ler mesmo em cima da marca.
+     * E desenhada depois de tudo, no modo multiplicar (ver PdfComMarcaDagua):
+     * o texto preto continua visivel por cima e nenhuma letra fica cortada.
      */
     private function marcaDagua(string $texto): void
     {
         $this->pdf->setFont('Arial', 'B', 60);
-        $this->pdf->settextColor(self::MARCA_CINZA);
+        $this->pdf->modoMultiplicar(true);
+        $this->pdf->settextColor(166, 166, 166);
         $largura = $this->pdf->getStringWidth($this->t($texto));
         $this->pdf->rotate(45, 105, 148);
         $this->pdf->text(105 - $largura / 2, 148, $this->t($texto));
         $this->pdf->rotate(0);
         $this->pdf->settextColor(0);
+        $this->pdf->modoMultiplicar(false);
     }
 
     // =================================================================
