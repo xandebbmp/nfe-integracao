@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minhas notas - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../portal/#notas"><i class="icone icone--p">receipt_long</i> Ir para Minhas notas</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Portal do cliente</span> <span>›</span> <span>Minhas notas</span>
+    </nav>
+
+    <h1>Minhas notas: status, PDF e XML</h1>
+    <p class="artigo__resumo">Onde ficam todas as notas da empresa, como achar uma nota, baixar os arquivos e resolver uma nota rejeitada.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">checklist</i> Antes de começar</h2>
+      <ul>
+        <li>Aqui aparecem as notas emitidas <b>pelo portal</b> e também as que o <b>sistema da sua empresa</b> emitiu.</li>
+        <li>A lista se atualiza sozinha enquanto a prefeitura processa uma nota.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra "Minhas notas"</h2>
+        <p>No menu da esquerda, clique em <span class="botao-nome">Minhas notas</span>. Se aparecer um número vermelho ao lado, há notas que não foram autorizadas e precisam da sua atenção.</p>
+        <figure class="print">
+          <img src="../img/portal/emitir-07-minhas-notas.png" alt="Lista Minhas notas com número, tomador, data, valor e status de cada nota" loading="lazy">
+          <figcaption>Notas autorizadas mostram <b>NFS-e</b> e o número. Notas ainda sem número mostram <b>DPS</b> (o número do pedido).</figcaption>
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Ache a nota que você procura</h2>
+        <ul>
+          <li>Clique em um filtro: <span class="botao-nome">Autorizadas</span>, <span class="botao-nome">Na prefeitura</span>, <span class="botao-nome">Com problema</span> ou <span class="botao-nome">Canceladas</span>.</li>
+          <li>Ou digite na busca o <b>nome do tomador</b>, o <b>CPF/CNPJ</b> ou o <b>número da nota</b>.</li>
+          <li>Para ver um mês só, escolha o mês no campo de data à direita.</li>
+        </ul>
+        <figure class="print">
+          <img src="../img/portal/notas-01-filtros.png" alt="Filtros da lista: Todas, Autorizadas, Na prefeitura, Com problema, Canceladas, busca e mês" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Baixe o PDF ou o XML</h2>
+        <p>Na própria linha da nota, clique em <span class="botao-nome">PDF</span> ou <span class="botao-nome">XML</span>. Ou clique na linha para abrir os detalhes e use <span class="botao-nome">Baixar PDF</span> e <span class="botao-nome">Baixar XML</span>.</p>
+        <p>O <b>PDF</b> é a nota para imprimir ou mandar ao cliente. O <b>XML</b> é o arquivo oficial, que o contador costuma pedir.</p>
+        <figure class="print">
+          <img src="../img/portal/notas-04-detalhe.png" alt="Detalhe de uma nota autorizada com botões Baixar PDF, Baixar XML, Nova nota para este tomador e Cancelar nota" loading="lazy">
+          <figcaption>No detalhe também dá para emitir uma <b>nova nota para o mesmo tomador</b> sem digitar tudo de novo.</figcaption>
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Resolva uma nota rejeitada</h2>
+        <p>Clique no filtro <span class="botao-nome">Com problema</span> e abra a nota. A caixa vermelha mostra <b>o que a prefeitura disse</b> e <b>como corrigir</b>.</p>
+        <figure class="print">
+          <img src="../img/portal/notas-03-rejeitada-detalhe.png" alt="Detalhe de uma nota rejeitada mostrando o motivo da prefeitura e os botões Nova nota para este tomador e Reenviar" loading="lazy">
+        </figure>
+        <ul>
+          <li><b>O erro está nos dados da nota</b> (CEP, CPF, valor...): corrija o cadastro e clique em <span class="botao-nome">Nova nota para este tomador</span>.</li>
+          <li><b>O problema era de fora</b> (prefeitura fora do ar, cadastro da empresa já corrigido): clique em <span class="botao-nome">Reenviar</span>. A mesma nota vai de novo.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h2>O que cada status quer dizer</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Status</th><th>O que significa</th><th>Filtro</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pilula pilula--info">Na fila</span> <span class="pilula pilula--info">Processando</span></td><td>A prefeitura ainda está analisando.</td><td>Na prefeitura</td></tr>
+          <tr><td><span class="pilula pilula--ok">Autorizada</span></td><td>A nota vale. PDF e XML disponíveis.</td><td>Autorizadas</td></tr>
+          <tr><td><span class="pilula pilula--erro">Rejeitada</span> <span class="pilula pilula--erro">Com erro</span></td><td>Não foi autorizada. Veja o motivo no detalhe.</td><td>Com problema</td></tr>
+          <tr><td><span class="pilula pilula--neutro">Cancelada</span></td><td>A nota foi cancelada e não vale mais.</td><td>Canceladas</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>Não acho a nota na lista.</td><td>Clique em <b>Todas</b>, apague a busca e limpe o mês. Notas antigas ficam nas próximas páginas (botão <b>Próxima</b>).</td></tr>
+          <tr><td>Não aparecem os links PDF e XML.</td><td>Eles só existem depois que a nota é <b>Autorizada</b>.</td></tr>
+          <tr><td>Não entendi o motivo da rejeição.</td><td>Mande um print do detalhe da nota para o suporte. O código entre parênteses (ex.: E0312) ajuda a achar o problema.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>
