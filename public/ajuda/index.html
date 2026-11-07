@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Central de Ajuda - Gestão Fiscal</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../portal/portal.css">
+  <link rel="stylesheet" href="ajuda.css">
+</head>
+<body>
+  <!--
+    Central de Ajuda: lista de todos os artigos.
+    Artigo pronto = <a href="...">. Artigo ainda nao escrito = <span class="em-breve">.
+    Ao terminar um artigo, troque o <span class="em-breve"> por <a href="pasta/arquivo.html">.
+  -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="./"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../portal/"><i class="icone icone--p">arrow_back</i> Voltar ao portal</a>
+  </header>
+
+  <main class="ajuda">
+    <div class="capa">
+      <h1>Como podemos ajudar?</h1>
+      <p>Passo a passo, com as telas do sistema, para as tarefas do dia a dia.</p>
+    </div>
+
+    <!-- ===== Para o cliente (portal) ===== -->
+    <section class="grupo-ajuda">
+      <h2><i class="icone">storefront</i> Portal do cliente</h2>
+      <p>Para quem emite as notas da empresa.</p>
+      <ul class="lista-artigos">
+        <li><a href="portal/emitir-nfse.html"><i class="icone">post_add</i><span><b>Emitir uma NFS-e</b><small>Tomador, serviço, valor e acompanhar a nota</small></span></a></li>
+        <li><span class="em-breve"><i class="icone">login</i><span><b>Primeiro acesso e "esqueci a senha"</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">receipt_long</i><span><b>Minhas notas: status, PDF e XML</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">block</i><span><b>Cancelar uma nota</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">groups</i><span><b>Cadastrar tomadores e serviços</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">event_repeat</i><span><b>Recorrências (nota todo mês)</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">manage_accounts</i><span><b>Usuários da empresa</b><small>Em breve</small></span></span></li>
+      </ul>
+    </section>
+
+    <!-- ===== Para o administrador (painel) ===== -->
+    <section class="grupo-ajuda">
+      <h2><i class="icone">admin_panel_settings</i> Painel do administrador</h2>
+      <p>Para quem cadastra as empresas e cuida da plataforma.</p>
+      <ul class="lista-artigos">
+        <li><span class="em-breve"><i class="icone">domain_add</i><span><b>Cadastrar uma nova empresa</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">verified_user</i><span><b>Certificado e "pronta para emitir"</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">mail</i><span><b>Criar usuário do portal e enviar acesso por e-mail</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">monitor_heart</i><span><b>Monitor de notas</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">settings</i><span><b>Sistema: worker, banco, diagnóstico e e-mail</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">swap_horiz</i><span><b>Trocar homologação e produção</b><small>Em breve</small></span></span></li>
+      </ul>
+    </section>
+
+    <!-- ===== Problemas comuns ===== -->
+    <section class="grupo-ajuda">
+      <h2><i class="icone">build</i> Problemas comuns</h2>
+      <p>O que fazer quando algo não sai como esperado.</p>
+      <ul class="lista-artigos">
+        <li><span class="em-breve"><i class="icone">hourglass_top</i><span><b>A nota ficou parada "Na fila" ou "Processando"</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">error</i><span><b>A prefeitura rejeitou a nota</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">mark_email_unread</i><span><b>O e-mail não chegou</b><small>Em breve</small></span></span></li>
+        <li><span class="em-breve"><i class="icone">event_busy</i><span><b>Certificado vencido ou perto de vencer</b><small>Em breve</small></span></span></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

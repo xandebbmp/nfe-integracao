@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emitir uma NFS-e - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!--
+    ARTIGO MODELO da Central de Ajuda. Para um artigo novo, copie este arquivo.
+    Estrutura fixa (sempre nesta ordem):
+      1. Titulo + resumo de uma linha
+      2. Caixa "Antes de comecar"
+      3. Passos numerados (<ol class="passos">), cada um com print da tela
+      4. "O que deve aparecer"
+      5. "Se der errado" (tabela problema -> o que fazer)
+    Prints: ficam em ../img/portal/. Sao tirados do portal em modo demonstracao.
+  -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../portal/#emitir"><i class="icone icone--p">post_add</i> Ir para Emitir nota</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Portal do cliente</span> <span>›</span> <span>Emitir uma NFS-e</span>
+    </nav>
+
+    <h1>Emitir uma NFS-e</h1>
+    <p class="artigo__resumo">Em 3 blocos: para quem é a nota, o que foi feito e quanto custou. Leva cerca de 1 minuto.</p>
+
+    <!-- ===== Antes de comecar ===== -->
+    <div class="caixa caixa--info">
+      <h2><i class="icone">checklist</i> Antes de começar</h2>
+      <ul>
+        <li>Tenha em mãos o <b>CPF ou CNPJ</b> de quem contratou o serviço (o <b>tomador</b>).</li>
+        <li>Saiba <b>o que foi feito</b> e o <b>valor</b>.</li>
+        <li>Veja no topo da tela se aparece <span class="pilula pilula--alerta">Homologação</span>. Nesse modo a nota é só de <b>teste</b> e não vale de verdade.</li>
+      </ul>
+    </div>
+
+    <!-- ===== Passo a passo ===== -->
+    <ol class="passos">
+
+      <li class="passo">
+        <h2>Abra a tela "Emitir nota"</h2>
+        <p>No menu da esquerda, clique em <span class="botao-nome">Emitir nota</span>. Também dá para usar o botão <span class="botao-nome">+ Nova NFS-e</span> da tela inicial.</p>
+        <figure class="print">
+          <img src="../img/portal/emitir-01-tela.png" alt="Tela Emitir NFS-e com os três blocos vazios e o resumo da nota à direita" loading="lazy">
+          <figcaption>À esquerda ficam os 3 blocos. À direita, o resumo mostra o que falta preencher.</figcaption>
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Bloco 1: para quem é a nota</h2>
+        <p>Escolha <b>um</b> dos jeitos:</p>
+        <ul>
+          <li><b>Tomador que já recebeu nota antes:</b> escolha o nome em <span class="botao-nome">Ou escolha um tomador salvo</span>. Tudo se preenche sozinho.</li>
+          <li><b>Tomador novo com CNPJ:</b> digite o CNPJ e clique em <span class="botao-nome">Buscar</span>. Nome e endereço vêm sozinhos.</li>
+          <li><b>Tomador novo com CPF (pessoa física):</b> digite o CPF e escreva o nome completo.</li>
+        </ul>
+        <p>Se preencher o <b>e-mail</b>, o tomador recebe o PDF e o XML da nota. O <b>endereço</b> é opcional no Padrão Nacional.</p>
+        <figure class="print">
+          <img src="../img/portal/emitir-02-tomador.png" alt="Bloco 1 preenchido com um tomador salvo: CNPJ, nome, e-mail e endereço" loading="lazy">
+          <figcaption>Quando o bloco fica completo, o número dele fica verde.</figcaption>
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Bloco 2: o que foi feito</h2>
+        <p>Em <span class="botao-nome">Serviço</span>, escolha um serviço da lista. Os códigos fiscais e a alíquota do ISS aparecem logo abaixo, você não precisa digitar nada.</p>
+        <p>Confira o texto em <b>Descrição que vai na nota</b> e ajuste se quiser. Onde estiver escrito <code>{mes}</code>, a nota mostra o mês da competência por extenso (ex.: <i>novembro/2026</i>).</p>
+        <figure class="print">
+          <img src="../img/portal/emitir-03-servico.png" alt="Bloco 2 com o serviço Consultoria em gestão escolhido, descrição e códigos" loading="lazy">
+        </figure>
+        <div class="caixa caixa--alerta">
+          <p><b>O serviço não está na lista?</b> Escolha <span class="botao-nome">+ Outro serviço (digitar os códigos)</span> e informe o código de tributação nacional e a alíquota. Não sabe os códigos? Eles estão em uma nota antiga da empresa ou com o seu contador. Deixe marcado <b>Salvar este serviço</b> para não digitar de novo.</p>
+        </div>
+      </li>
+
+      <li class="passo">
+        <h2>Bloco 3: quanto custou</h2>
+        <p>Digite o <b>Valor do serviço</b>. A <b>Competência</b> já vem com o mês atual; mude só se o serviço foi de outro mês.</p>
+        <p>Marque <b>ISS retido pelo tomador</b> somente se o seu cliente for pagar o ISS no seu lugar. Na dúvida, pergunte ao seu contador. Desconto e retenções federais ficam em <span class="botao-nome">Mais opções</span>, e na maioria das notas não são usados.</p>
+        <figure class="print">
+          <img src="../img/portal/emitir-04-valores.png" alt="Bloco 3 com valor de R$ 1.500,00 e competência preenchidos" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Confira o resumo e clique em "Emitir nota"</h2>
+        <p>O resumo à direita mostra o ISS e quanto você recebe. Quando os 4 itens ficarem verdes, o botão <span class="botao-nome">Emitir nota</span> é liberado. Clique uma vez e aguarde.</p>
+        <figure class="print print--estreito">
+          <img src="../img/portal/emitir-05-resumo.png" alt="Resumo da nota com os quatro itens verdes e o botão Emitir nota liberado" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Veja o resultado</h2>
+        <p>Em poucos segundos aparece uma destas mensagens logo abaixo do botão:</p>
+        <ul>
+          <li><span class="pilula pilula--ok">autorizada</span> pronto! Baixe o <b>PDF</b> e o <b>XML</b> ali mesmo, ou clique em <span class="botao-nome">Emitir outra</span>.</li>
+          <li><span class="pilula pilula--info">enviada</span> a prefeitura ainda está processando. Pode seguir trabalhando, o status atualiza sozinho.</li>
+          <li><span class="pilula pilula--erro">A prefeitura não autorizou</span> leia o motivo, corrija o campo e clique em <span class="botao-nome">Emitir nota</span> de novo. A mesma nota é reenviada, não duplica.</li>
+        </ul>
+        <figure class="print print--estreito">
+          <img src="../img/portal/emitir-06-enviada.png" alt="Mensagem verde: NFS-e nº 125 autorizada, com botões PDF, XML e Emitir outra" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Acompanhe em "Minhas notas"</h2>
+        <p>Toda nota emitida aparece em <span class="botao-nome">Minhas notas</span>, com o status e os arquivos para baixar.</p>
+        <figure class="print">
+          <img src="../img/portal/emitir-07-minhas-notas.png" alt="Lista Minhas notas com notas autorizadas, em processamento, rejeitada e cancelada" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <!-- ===== O que deve aparecer ===== -->
+    <h2>O que cada status quer dizer</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Status</th><th>O que significa</th><th>Precisa fazer algo?</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pilula pilula--info">Na fila</span></td><td>A nota foi recebida e vai ser enviada à prefeitura.</td><td>Não, só aguardar.</td></tr>
+          <tr><td><span class="pilula pilula--info">Processando</span></td><td>A prefeitura está analisando a nota.</td><td>Não, só aguardar.</td></tr>
+          <tr><td><span class="pilula pilula--ok">Autorizada</span></td><td>A nota vale. PDF e XML disponíveis.</td><td>Não.</td></tr>
+          <tr><td><span class="pilula pilula--erro">Rejeitada</span></td><td>A prefeitura recusou a nota e diz o motivo.</td><td>Sim: ver o motivo e corrigir (veja "Se der errado").</td></tr>
+          <tr><td><span class="pilula pilula--neutro">Cancelada</span></td><td>A nota foi cancelada e não vale mais.</td><td>Não.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ===== Se der errado ===== -->
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>O botão <b>Emitir nota</b> está cinza e não clica.</td><td>Olhe a lista no resumo: o item sem o visto verde é o que falta preencher.</td></tr>
+          <tr><td>Aparece um aviso vermelho embaixo de um campo.</td><td>O aviso diz o que corrigir. Corrija e clique em <b>Emitir nota</b> de novo.</td></tr>
+          <tr><td>O CNPJ não preencheu o nome sozinho.</td><td>Confira os números do CNPJ. Se estiver certo, digite o nome manualmente.</td></tr>
+          <tr><td>A nota ficou muito tempo em <b>Na fila</b> ou <b>Processando</b>.</td><td>A prefeitura pode estar lenta. Espere alguns minutos. Se passar de 1 hora, fale com o suporte.</td></tr>
+          <tr><td>A prefeitura rejeitou a nota.</td><td>Leia o motivo em <b>Minhas notas</b>. Se o erro está nos dados da nota (CEP, CPF, valor...), emita de novo com o dado certo. Se o problema não era na nota (prefeitura fora do ar, cadastro da empresa já corrigido), clique em <b>Reenviar</b>, que manda a mesma nota outra vez. Não entendeu o motivo? Mande um print para o suporte.</td></tr>
+          <tr><td>Emiti a nota errada.</td><td>Ela pode ser cancelada em <b>Minhas notas</b>. Veja o artigo "Cancelar uma nota".</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>
