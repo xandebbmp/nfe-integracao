@@ -229,3 +229,7 @@ details summary { cursor: pointer; margin-top: 10px; }
 .ambiente-atual__nome--producao { color: #b42318; }
 .ambiente-confirmar { display: grid; gap: 8px; max-width: 520px; padding: 12px; border-radius: 8px; border: 1px solid #f0b4ae; background: color-mix(in srgb, #b42318 7%, transparent); }
 .ambiente-confirmar input { text-transform: uppercase; letter-spacing: 1px; }
+
+/* Modelo da nota NFS-e Nacional na producao (Sistema > Ambiente) */
+.ambiente-modelo { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--borda); border-radius: 10px; display: grid; gap: 6px; }
+.ambiente-modelo p { margin: 0; }

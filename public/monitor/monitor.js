@@ -54,6 +54,7 @@ const SUGESTOES_PADRAO = {
   FALHA_TEMPORARIA: 'Falha técnica de comunicação. A API tenta de novo sozinha. Se persistir, verifique o certificado digital do emitente e se o serviço do fisco está no ar.',
   DPS_NAO_LOCALIZADA: 'O Sefin não recebeu esta DPS. É seguro reenviar com a mesma referência.',
   RPS_NAO_LOCALIZADO: 'A prefeitura não localizou este RPS. É seguro reenviar com a mesma referência.',
+  E1235: 'O XML não bateu com o modelo de nota da Receita. Se a mensagem cita finNFSe, a Receita mudou o modelo da produção: no painel, em Sistema > Ambiente de emissão, troque o "Modelo da nota na produção" e clique em Reenviar.',
   NAO_SUPORTADO_PELO_PADRAO: 'Esta operação não existe neste padrão. Veja a orientação na mensagem.',
 };
 const SUGESTAO_GENERICA = 'O fisco não informou sugestão. Confira no cadastro do sistema de origem o dado citado na mensagem e reenvie com a mesma referência.';

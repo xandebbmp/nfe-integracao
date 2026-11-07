@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Xande\NfeIntegracao\Nfse\Servico;
 
 use PDO;
+use Xande\NfeIntegracao\Nfse\Nacional\DpsXmlBuilder;
 use Throwable;
 use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
 use Xande\NfeIntegracao\Nfse\Infra\CofreCertificado;
@@ -33,6 +34,15 @@ final class ConfiguracoesPainel
     public const CHAVE_SENHA_EMAIL = 'email.senha_cifrada';
     /** Ambiente de emissao escolhido no painel (1 = producao, 2 = homologacao). */
     public const CHAVE_AMBIENTE = 'sistema.tpAmb';
+
+    /**
+     * A PRODUCAO da NFS-e Nacional ja usa o modelo novo da Receita (XSD de
+     * 20/10/2026, com finNFSe)? true/false. Sem ajuste vale o arquivo
+     * (nacional.leiaute_por_ambiente). A homologacao ja usa o novo.
+     */
+    public const CHAVE_MODELO_PRODUCAO = 'nacional.producao_modelo_novo';
+    public const LEIAUTE_NOVO = ['xsd' => '1.01', 'finNFSe' => true];
+    public const LEIAUTE_ANTIGO = ['xsd' => '1.01-producao', 'finNFSe' => false];
 
     private SistemaRepositorio $sistema;
 
@@ -164,8 +174,31 @@ final class ConfiguracoesPainel
     public function ambiente(): array
     {
         $arquivo = (int)$this->cfgArquivo['tpAmb'];
-        $painel = self::aplicarAmbiente(['tpAmb' => $arquivo], $this->sistema->ajustes());
-        return ['atual' => (int)$painel['tpAmb'], 'arquivo' => $arquivo, 'no_painel' => $painel['tpAmb'] !== $arquivo];
+        $ajustes = $this->sistema->ajustes();
+        $painel = self::aplicarAmbiente(['tpAmb' => $arquivo] + $this->cfgArquivo, $ajustes);
+        $producao = DpsXmlBuilder::leiaute(['tpAmb' => 1] + $painel);
+        return [
+            'atual' => (int)$painel['tpAmb'], 'arquivo' => $arquivo, 'no_painel' => $painel['tpAmb'] !== $arquivo,
+            // Modelo da nota NFS-e Nacional usado na producao.
+            'producao_modelo_novo' => (bool)$producao['finNFSe'],
+        ];
+    }
+
+    /** Diz ao sistema que a Receita passou (ou nao) a producao para o modelo novo. */
+    public function trocarModeloProducao(bool $novo, ?string $ip): array
+    {
+        $antes = $this->ambiente();
+        if ($antes['producao_modelo_novo'] === $novo) {
+            return ['ok' => true, 'mensagem' => 'Nada mudou.', 'ambiente' => $antes];
+        }
+        $this->sistema->salvarAjuste(self::CHAVE_MODELO_PRODUCAO, $novo);
+        (new ClienteRepositorio($this->pdo))->registrarLog(null, 'AMBIENTE_MODELO_ALTERADO', ['producao' => $novo ? 'NOVO' : 'ANTIGO'], $ip);
+        return [
+            'ok' => true,
+            'mensagem' => ($novo ? 'Produção agora usa o modelo NOVO da Receita (com finNFSe).' : 'Produção voltou para o modelo ANTIGO da Receita (sem finNFSe).')
+                . ' O worker passa a usar em até 1 minuto.',
+            'ambiente' => $this->ambiente(),
+        ];
     }
 
     /**
@@ -207,6 +240,10 @@ final class ConfiguracoesPainel
         $tpAmb = $ajustes[self::CHAVE_AMBIENTE] ?? null;
         if ($tpAmb === 1 || $tpAmb === 2) {
             $cfg['tpAmb'] = $tpAmb;
+        }
+        $modeloNovo = $ajustes[self::CHAVE_MODELO_PRODUCAO] ?? null;
+        if (is_bool($modeloNovo)) {
+            $cfg['nacional']['leiaute_por_ambiente'][1] = $modeloNovo ? self::LEIAUTE_NOVO : self::LEIAUTE_ANTIGO;
         }
         return $cfg;
     }

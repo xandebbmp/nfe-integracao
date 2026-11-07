@@ -45,7 +45,7 @@ const ACOES_HISTORICO = {
 
 const ACOES_SISTEMA = {
   WORKER_PAUSADO: 'Envios pausados', WORKER_RETOMADO: 'Envios retomados', WORKER_REINICIADO: 'Worker reiniciado',
-  WORKER_LIGADO: 'Worker ligado', WORKER_DESLIGADO: 'Worker desligado',
+  WORKER_LIGADO: 'Worker ligado', AMBIENTE_MODELO_ALTERADO: 'Modelo da nota na produção trocado', WORKER_DESLIGADO: 'Worker desligado',
   BANCO_ATUALIZADO: 'Banco atualizado', BANCO_ERRO: 'Erro ao atualizar o banco', CONFIG_ALTERADA: 'Configurações alteradas',
   PAINEL_PESSOA_CRIADA: 'Pessoa do painel cadastrada', PAINEL_SENHA_REDEFINIDA: 'Senha nova de pessoa do painel',
   PAINEL_PESSOA_ATIVADA: 'Pessoa do painel reativada', PAINEL_PESSOA_DESATIVADA: 'Pessoa do painel desativada',
@@ -1603,8 +1603,39 @@ function secaoAmbiente() {
       });
       filhos.push(el('div', { class: 'acoes' }, voltar));
     }
+    filhos.push(modeloDaReceita(a, retorno));
     filhos.push(retorno);
     area.replaceChildren(...filhos);
+  }
+
+  // Modelo da nota NFS-e Nacional na producao: a Receita troca um dia, e aqui
+  // a gente avisa o sistema (antes era uma linha no config/nfse.php).
+  function modeloDaReceita(a, retorno) {
+    const novo = a.producao_modelo_novo;
+    const trocar = el('button', { class: 'botao', type: 'button' },
+      novo ? 'Voltar a produção para o modelo antigo' : 'A Receita mudou: usar o modelo novo na produção');
+    trocar.addEventListener('click', async () => {
+      const pergunta = novo
+        ? 'Voltar a PRODUÇÃO para o modelo ANTIGO (sem finNFSe)? Use só se as notas de produção estiverem sendo recusadas por causa do finNFSe.'
+        : 'Passar a PRODUÇÃO para o modelo NOVO (com finNFSe)? Faça isso quando a Receita avisar a mudança, ou quando as notas de produção voltarem com E1235 pedindo finNFSe.';
+      if (!confirm(pergunta)) return;
+      trocar.disabled = true;
+      try {
+        const r = await api('ambiente.php', { metodo: 'POST', corpo: { producao_modelo_novo: !novo } });
+        desenhar(r.ambiente, r.mensagem);
+      } catch (e) {
+        retorno.replaceChildren(el('p', { class: 'erro' }, e.message));
+        trocar.disabled = false;
+      }
+    });
+    return el('div', { class: 'ambiente-modelo' },
+      el('strong', {}, 'Modelo da nota NFS-e Nacional na produção'),
+      el('p', {}, 'Agora: ', el('strong', {}, novo ? 'NOVO (de 20/10/2026, com finNFSe)' : 'ANTIGO (sem finNFSe)'),
+        '. A homologação já usa o modelo novo.'),
+      el('p', { class: 'suave' }, novo
+        ? 'Se as notas de produção voltarem com o erro E1235 recusando o finNFSe, a produção ainda está no modelo antigo: volte pelo botão abaixo.'
+        : 'Quando a Receita mudar a produção, as notas de produção voltam com o erro E1235 pedindo o finNFSe: aí é só clicar no botão abaixo e reenviar.'),
+      el('div', { class: 'acoes' }, trocar));
   }
 
   api('ambiente.php').then((a) => desenhar(a)).catch((e) => area.replaceChildren(el('p', { class: 'erro' }, e.message)));

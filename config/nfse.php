@@ -65,8 +65,9 @@ $cfg = [
         // Producao e Producao Restrita (homologacao) estao em leiautes
         // DIFERENTES: o XSD de 20/10/2026 (com finNFSe obrigatorio) so vale
         // na Producao Restrita. Pasta do XSD em schemas/nfse/nacional/ e se
-        // envia finNFSe. Quando a Receita virar a producao, troque o 1 para
-        // ['xsd' => '1.01', 'finNFSe' => true].
+        // envia finNFSe. Quando a Receita virar a producao, troque pelo PAINEL
+        // (Sistema > Ambiente de emissao > Modelo da nota na producao), que
+        // vale por cima daqui.
         'leiaute_por_ambiente' => [
             1 => ['xsd' => '1.01-producao', 'finNFSe' => false],
             2 => ['xsd' => '1.01', 'finNFSe' => true],
