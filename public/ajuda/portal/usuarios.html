@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usuários da empresa - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../portal/#usuarios"><i class="icone icone--p">manage_accounts</i> Ir para Usuários</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Portal do cliente</span> <span>›</span> <span>Usuários da empresa</span>
+    </nav>
+
+    <h1>Usuários da empresa</h1>
+    <p class="artigo__resumo">Dar acesso ao portal para outra pessoa, gerar senha nova e tirar o acesso de quem saiu.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">badge</i> Antes de começar: os dois papéis</h2>
+      <ul>
+        <li><span class="pilula pilula--info">Responsável</span> emite notas <b>e</b> cuida das pessoas: convida, gera senha nova e desativa.</li>
+        <li><span class="pilula pilula--neutro">Emissor</span> emite e cancela notas, mas não mexe nas pessoas.</li>
+        <li>Só um <b>Responsável</b> vê o botão <span class="botao-nome">Convidar pessoa</span>. Se você é Emissor, peça a ele.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra "Usuários"</h2>
+        <p>No menu, em <b>Conta</b>, clique em <span class="botao-nome">Usuários</span>. A lista mostra o papel, a situação e o último acesso de cada pessoa.</p>
+        <figure class="print">
+          <img src="../img/portal/usuarios-01-lista.png" alt="Lista de usuários com papel, situação, último acesso e as ações de cada pessoa" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Convide a pessoa</h2>
+        <p>Clique em <span class="botao-nome">Convidar pessoa</span>, preencha <b>nome</b> e <b>e-mail</b>. Marque <b>Também é responsável da empresa</b> só se ela for cuidar das pessoas. Clique em <span class="botao-nome">Criar acesso</span>.</p>
+        <figure class="print">
+          <img src="../img/portal/usuarios-02-convidar.png" alt="Janela Convidar pessoa com nome, e-mail e a opção Também é responsável da empresa" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Envie a mensagem com a senha provisória</h2>
+        <p>Aparece uma mensagem pronta com o endereço do portal, o e-mail e a senha provisória. Clique em <span class="botao-nome">Copiar mensagem</span> e mande para a pessoa por WhatsApp ou e-mail. <b>A senha aparece só uma vez.</b></p>
+        <figure class="print">
+          <img src="../img/portal/usuarios-03-acesso-pronto.png" alt="Janela Acesso criado com a mensagem pronta e o botão Copiar mensagem" loading="lazy">
+          <figcaption>No primeiro acesso, o portal pede para a pessoa criar a própria senha (veja <a href="primeiro-acesso.html">Primeiro acesso</a>).</figcaption>
+        </figure>
+      </li>
+    </ol>
+
+    <h2>Outras ações na linha da pessoa</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Botão</th><th>O que faz</th></tr></thead>
+        <tbody>
+          <tr><td><span class="botao-nome">Nova senha</span></td><td>Gera outra senha provisória. A senha antiga para de funcionar. Use quando a pessoa esqueceu e o e-mail não chega.</td></tr>
+          <tr><td><i class="icone">add_moderator</i> / <i class="icone">remove_moderator</i></td><td>Torna a pessoa Responsável, ou volta para Emissor.</td></tr>
+          <tr><td><i class="icone">person_off</i></td><td>Desativa: a pessoa não entra mais. Use quando alguém sai da empresa.</td></tr>
+          <tr><td><i class="icone">person_add_alt</i></td><td>Devolve o acesso de quem foi desativado.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:28px">O que cada situação quer dizer</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Situação</th><th>O que significa</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pilula pilula--ok">Ativo</span></td><td>Entra normalmente.</td></tr>
+          <tr><td><span class="pilula pilula--info">Aguardando 1º acesso</span></td><td>Recebeu a senha provisória e ainda não entrou.</td></tr>
+          <tr><td><span class="pilula pilula--alerta">Bloqueado por senha errada</span></td><td>Errou a senha 5 vezes. Libera sozinho em 15 minutos, ou gere uma <b>Nova senha</b>.</td></tr>
+          <tr><td><span class="pilula pilula--neutro">Desativado</span></td><td>Não entra mais no portal.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

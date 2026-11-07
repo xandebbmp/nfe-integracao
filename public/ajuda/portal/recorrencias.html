@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recorrências - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../portal/#recorrencias"><i class="icone icone--p">event_repeat</i> Ir para Recorrências</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Portal do cliente</span> <span>›</span> <span>Recorrências</span>
+    </nav>
+
+    <h1>Recorrências: a nota de todo mês</h1>
+    <p class="artigo__resumo">Para mensalidades e contratos: cadastre uma vez e a nota se repete todo mês.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">checklist</i> Antes de começar</h2>
+      <ul>
+        <li>O <b>tomador</b> e o <b>serviço</b> precisam estar cadastrados (veja <a href="tomadores-servicos.html">Tomadores e serviços</a>).</li>
+        <li>Decida se a nota deve <b>sair sozinha</b> ou <b>esperar você confirmar</b> (explicado no passo 2).</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra "Recorrências" e clique em "Nova recorrência"</h2>
+        <p>No menu, clique em <span class="botao-nome">Recorrências</span> e depois em <span class="botao-nome">+ Nova recorrência</span>.</p>
+      </li>
+
+      <li class="passo">
+        <h2>Preencha a recorrência</h2>
+        <ul>
+          <li><b>Nome</b>: para achar na lista (ex.: Mensalidade Clínica Vida).</li>
+          <li><b>Tomador</b> e <b>Serviço</b>: escolha na lista.</li>
+          <li><b>Descrição</b>: use <code>{mes}</code> para o mês mudar sozinho a cada nota.</li>
+          <li><b>Valor</b> e <b>Próxima nota em</b>: a data da primeira nota. Repete todo mês nesse dia (até o dia 28).</li>
+          <li><b>Última nota em</b>: deixe vazio se não tem data para acabar.</li>
+          <li><b>Mês de competência</b>: "o mês em que a nota sai" ou "o mês anterior", se você fatura o serviço já prestado.</li>
+        </ul>
+        <p>Em <b>Quando chegar o dia</b>, escolha:</p>
+        <ul>
+          <li><b>Me avisar para confirmar</b> (recomendado se o valor pode mudar): a nota fica pronta e só sai quando você clicar em <span class="botao-nome">Emitir agora</span>.</li>
+          <li><b>Emitir sozinha</b>: no dia, a nota vai para a prefeitura sem ninguém clicar. Se der problema, você é avisado.</li>
+        </ul>
+        <p>Clique em <span class="botao-nome">Salvar recorrência</span>.</p>
+        <figure class="print">
+          <img src="../img/portal/recorrencias-02-nova.png" alt="Janela Nova recorrência com nome, tomador, serviço, descrição, valor, datas, competência e a escolha entre confirmar ou emitir sozinha" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Quando o dia chegar</h2>
+        <p>Se a recorrência pede confirmação, o cartão fica amarelo com <span class="pilula pilula--alerta">Esperando você</span> e o menu mostra um número. Confira e clique em <span class="botao-nome">Emitir agora</span>, ou em <span class="botao-nome">Pular mês</span> se não houver nota neste mês.</p>
+        <figure class="print">
+          <img src="../img/portal/recorrencias-01-lista.png" alt="Três recorrências: uma esperando confirmação com Emitir agora e Pular mês, uma agendada e uma pausada" loading="lazy">
+          <figcaption>O botão <b>⏸</b> pausa a recorrência (o <b>▶</b> retoma) e a lixeira apaga. As notas já emitidas não são afetadas.</figcaption>
+        </figure>
+      </li>
+    </ol>
+
+    <h2>O que cada situação quer dizer</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Situação</th><th>O que significa</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pilula pilula--alerta">Esperando você</span></td><td>A nota do mês está pronta e espera você clicar em Emitir agora ou Pular mês.</td></tr>
+          <tr><td><span class="pilula pilula--info">Agendada</span></td><td>Tudo certo. Mostra a data da próxima nota.</td></tr>
+          <tr><td><span class="pilula pilula--neutro">Pausada</span></td><td>Não gera notas até você retomar.</td></tr>
+          <tr><td><span class="pilula pilula--neutro">Encerrada</span></td><td>Passou da "Última nota em". Não gera mais notas.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>O cartão mostra <b>"Não saiu sozinha"</b>.</td><td>Leia o motivo, corrija (no tomador, no serviço ou na recorrência) e clique em <b>Emitir agora</b>. Se não fizer nada, o sistema tenta de novo no dia seguinte.</td></tr>
+          <tr><td>O tomador não aparece na lista.</td><td>Cadastre em <b>Tomadores</b> e abra a recorrência de novo.</td></tr>
+          <tr><td>Quero mudar o valor a partir do próximo mês.</td><td>Clique em <b>Editar</b>, mude o valor e salve. As notas já emitidas não mudam.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

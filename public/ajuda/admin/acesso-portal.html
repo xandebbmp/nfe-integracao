@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acesso ao portal - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">mail</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Acesso ao portal</span>
+    </nav>
+
+    <h1>Dar acesso ao portal e enviar por e-mail</h1>
+    <p class="artigo__resumo">Crie o login de quem emite as notas na empresa cliente e mande os dados de acesso.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">checklist</i> Antes de começar</h2>
+      <ul>
+        <li>Tenha o <b>nome</b> e o <b>e-mail</b> da pessoa da empresa cliente.</li>
+        <li>A <b>primeira pessoa</b> cadastrada vira <b>Responsável da empresa</b>: ela mesma pode convidar colegas pelo portal depois.</li>
+        <li>Para mandar por e-mail automático, o <b>e-mail do sistema</b> precisa estar configurado (<a href="sistema.html">Sistema</a> › E-mail). Sem isso, dá para copiar e mandar pelo WhatsApp.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra a ficha da empresa e vá em "Portal do cliente"</h2>
+        <p>Clique na linha da empresa e desça até <b>Portal do cliente</b>.</p>
+
+      </li>
+      <li class="passo">
+        <h2>Preencha e clique em "Dar acesso ao portal"</h2>
+        <p>Digite <b>nome</b> e <b>e-mail</b>. Deixe marcado <b>Enviar os dados de acesso por e-mail</b> e clique em <span class="botao-nome">Dar acesso ao portal</span>.</p>
+        <figure class="print">
+          <img src="../img/admin/portal-01-dar-acesso.png" alt="Bloco Portal do cliente com nome e e-mail preenchidos" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Confira se o e-mail saiu</h2>
+        <p>Se o e-mail está configurado, aparece <b>"✓ E-mail enviado"</b>. Se não está, aparece um aviso: clique em <b>Copiar dados de acesso</b> e mande pelo WhatsApp, ou em <b>Configurar e-mail agora</b>.</p>
+        <figure class="print">
+          <img src="../img/admin/portal-02-acesso-pronto.png" alt="Acesso pronto com endereço do portal, e-mail e senha provisória, e o aviso de e-mail não configurado" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">Outras ações na linha da pessoa</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Botão</th><th>O que faz</th></tr></thead>
+        <tbody>
+          <tr><td><span class="botao-nome">✉ Enviar acesso por e-mail</span></td><td>Gera uma senha provisória nova e manda por e-mail num clique. A senha antiga para de funcionar.</td></tr>
+          <tr><td><span class="botao-nome">Nova senha</span></td><td>Gera uma senha provisória nova e mostra na tela para você copiar.</td></tr>
+          <tr><td><span class="botao-nome">Tornar responsável</span> / <span class="botao-nome">Tirar responsável</span></td><td>Responsável convida e desativa colegas pelo portal. Emissor só emite.</td></tr>
+          <tr><td><span class="botao-nome">Desativar</span></td><td>A pessoa não entra mais no portal.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>"O envio de e-mail ainda não foi configurado".</td><td>Configure uma vez em <b>Sistema › E-mail</b>, ou copie os dados e mande pelo WhatsApp.</td></tr>
+          <tr><td>A pessoa diz que o e-mail não chegou.</td><td>Peça para olhar o spam. Depois clique em <b>✉ Enviar acesso por e-mail</b> de novo.</td></tr>
+          <tr><td>A pessoa esqueceu a senha.</td><td>Ela pode usar "Esqueci minha senha" no portal, ou você clica em <b>✉ Enviar acesso por e-mail</b>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

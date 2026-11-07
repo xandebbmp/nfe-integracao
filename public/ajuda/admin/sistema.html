@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistema - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">settings</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Sistema</span>
+    </nav>
+
+    <h1>Sistema: worker, banco, diagnóstico e e-mail</h1>
+    <p class="artigo__resumo">Tudo o que mantém as notas saindo, controlado pelo painel, sem terminal.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">lightbulb</i> Antes de começar</h2>
+      <ul>
+        <li>Clique em <span class="botao-nome">Sistema</span> no topo do painel. A bolinha ao lado mostra a saúde: <b>verde</b> tudo ligado, <b>amarela</b> pausado, <b>vermelha</b> parado.</li>
+        <li>O <b>worker</b> é o programa que leva as notas da fila até a prefeitura e a SEFAZ. Sem ele ligado, as notas ficam "Na fila".</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Worker: ligue, pause ou reinicie</h2>
+        <p>O bloco <b>Worker</b> diz se ele está trabalhando. Os botões:</p>
+        <ul>
+          <li><span class="botao-nome">Ligar worker</span>: liga quando está parado.</li>
+          <li><span class="botao-nome">Pausar envios</span> / <span class="botao-nome">Retomar envios</span>: segura as notas na fila (ex.: prefeitura fora do ar).</li>
+          <li><span class="botao-nome">Reiniciar worker</span>: use depois de atualizar o sistema.</li>
+          <li><span class="botao-nome">Desligar worker</span>: termina a nota atual e para.</li>
+        </ul>
+        <p>No servidor de verdade o ideal é o worker ser instalado como serviço, para ligar sozinho quando o servidor reinicia (veja o manual de implantação).</p>
+        <figure class="print">
+          <img src="../img/admin/sistema-02-worker-parado.png" alt="Bloco Worker mostrando Worker parado e o botão Ligar worker" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Fila de envio: acompanhe</h2>
+        <p>Mostra quantas notas estão <b>esperando envio</b>, <b>enviando agora</b>, <b>agendadas</b> e quantas <b>falharam nas últimas 24 h</b>. Número parado em "esperando" com worker desligado = ligue o worker.</p>
+        <figure class="print">
+          <img src="../img/admin/sistema-03-fila.png" alt="Bloco Fila de envio com os quatro números" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Banco de dados: atualize depois de cada versão nova</h2>
+        <p>Quando o sistema é atualizado, pode vir um script novo de banco. O bloco <b>Banco de dados</b> avisa e mostra o botão <span class="botao-nome">Atualizar banco</span>. Faça backup antes, como sempre.</p>
+        <figure class="print">
+          <img src="../img/admin/sistema-04-banco.png" alt="Bloco Banco de dados dizendo que está em dia" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Diagnóstico: confira tudo de uma vez</h2>
+        <p>Clique em <span class="botao-nome">Rodar diagnóstico</span>. Ele confere servidor, configuração, banco, worker, certificados das empresas e o acesso à internet da prefeitura e da SEFAZ. <b>Não altera nada e não envia nota.</b> Cada problema vem com <b>Como resolver</b>. Mande o resultado para quem cuida do servidor quando o problema for de lá.</p>
+
+      </li>
+      <li class="passo">
+        <h2>E-mail: configure uma vez</h2>
+        <p>Usado para mandar o acesso ao portal e o "Esqueci a senha". Preencha <b>Servidor SMTP</b>, <b>Porta</b>, <b>Criptografia</b>, <b>Usuário</b>, <b>Senha</b>, <b>Remetente</b> e o <b>Endereço do portal</b>, e clique em <span class="botao-nome">Salvar e-mail</span>. Depois mande um <b>e-mail de teste</b> para você.</p>
+        <p>Os dados você pega com quem cuida do e-mail da empresa. A senha fica guardada criptografada.</p>
+        <figure class="print">
+          <img src="../img/admin/sistema-06-email.png" alt="Bloco E-mail com os campos de servidor, porta, criptografia, usuário, senha, remetente e endereço do portal" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Configurações e histórico</h2>
+        <p><b>Configurações</b> reúne ajustes do portal, do envio e da API, cada um com explicação. <b>Últimas ações nesta tela</b> mostra quem fez o quê e quando.</p>
+        <figure class="print">
+          <img src="../img/admin/sistema-07-configuracoes.png" alt="Bloco Configurações do sistema" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>Bolinha vermelha / "Worker parado".</td><td>Clique em <b>Ligar worker</b>. Se não ligar, rode o diagnóstico e mande o resultado para quem cuida do servidor.</td></tr>
+          <tr><td>Muitas notas em "falharam nas últimas 24 h".</td><td>Abra o <b>Monitor</b> e veja o motivo de cada uma. Rode o diagnóstico para ver se é internet ou certificado.</td></tr>
+          <tr><td>O diagnóstico diz que a prefeitura ou a SEFAZ "não respondeu".</td><td>Pode ser instabilidade deles ou bloqueio de internet do servidor. Tente de novo em alguns minutos; se continuar, fale com quem cuida do servidor.</td></tr>
+          <tr><td>"Ligar worker" pede confirmação de notas de PRODUÇÃO.</td><td>Há notas de produção esperando. Ao ligar, elas vão de verdade. Confira se é isso mesmo antes de confirmar.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

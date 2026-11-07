@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tomadores e serviços - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../portal/#tomadores"><i class="icone icone--p">groups</i> Ir para Tomadores</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Portal do cliente</span> <span>›</span> <span>Tomadores e serviços</span>
+    </nav>
+
+    <h1>Cadastrar tomadores e serviços</h1>
+    <p class="artigo__resumo">Cadastre uma vez e, na hora de emitir, é só escolher na lista.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">lightbulb</i> Antes de começar</h2>
+      <ul>
+        <li><b>Tomador</b> é quem contratou o seu serviço e recebe a nota.</li>
+        <li>Você <b>não precisa</b> cadastrar antes: o tomador é salvo sozinho na primeira nota, e o serviço também, se você deixar marcado "Salvar este serviço".</li>
+        <li>Para o serviço, tenha os <b>códigos fiscais</b> à mão: estão numa nota antiga da empresa ou com o seu contador.</li>
+      </ul>
+    </div>
+
+    <h2>Tomadores</h2>
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra "Tomadores"</h2>
+        <p>No menu, em <b>Cadastros</b>, clique em <span class="botao-nome">Tomadores</span>. Use a busca para achar pelo nome ou CPF/CNPJ. Em cada linha, <span class="botao-nome">Emitir nota</span> abre a nota já com o tomador preenchido.</p>
+        <figure class="print">
+          <img src="../img/portal/cadastros-01-tomadores.png" alt="Lista de tomadores com nome, CPF/CNPJ, e-mail, cidade, última nota e botão Emitir nota" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Cadastre um tomador novo</h2>
+        <p>Clique em <span class="botao-nome">Novo tomador</span>. Digite o <b>CPF ou CNPJ</b>: com CNPJ, nome e endereço vêm sozinhos. Com CPF, escreva o nome. Coloque o <b>e-mail</b> para ele receber as notas. O endereço completa sozinho pelo <b>CEP</b>. Clique em <span class="botao-nome">Salvar tomador</span>.</p>
+        <figure class="print">
+          <img src="../img/portal/cadastros-02-novo-tomador.png" alt="Janela Novo tomador com CPF, nome, e-mail, telefone e endereço" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2>Serviços</h2>
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra "Serviços"</h2>
+        <p>No menu, em <b>Cadastros</b>, clique em <span class="botao-nome">Serviços</span>. Cada cartão mostra os códigos e a alíquota. <span class="botao-nome">Usar na nota</span> abre a nota já com o serviço escolhido.</p>
+        <figure class="print">
+          <img src="../img/portal/cadastros-03-servicos.png" alt="Cartões dos serviços salvos com códigos, alíquota e botões Usar na nota e Editar" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Cadastre um serviço novo</h2>
+        <p>Clique em <span class="botao-nome">Novo serviço</span> e preencha:</p>
+        <ul>
+          <li><b>Nome para achar na lista</b>: um nome curto, só para você (ex.: Serralheria).</li>
+          <li><b>Descrição que vai na nota</b>: o texto que o tomador vai ler. <code>{mes}</code> vira o mês da nota (ex.: novembro/2026).</li>
+          <li><b>Código nacional</b>: 6 números. O <b>Item da LC 116</b> se preenche sozinho com o começo dele (141302 → 14.13).</li>
+          <li><b>Alíquota do ISS</b>: a porcentagem do seu serviço.</li>
+          <li><b>Valor de costume</b> (opcional): já vem preenchido na nota.</li>
+        </ul>
+        <p>Clique em <span class="botao-nome">Salvar serviço</span>.</p>
+        <figure class="print">
+          <img src="../img/portal/cadastros-04-novo-servico.png" alt="Janela Novo serviço com nome Serralheria, descrição, código nacional 141302, item 14.13 e alíquota 2%" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>O CNPJ não trouxe o nome e o endereço.</td><td>Confira os números. Se estiver certo, preencha manualmente.</td></tr>
+          <tr><td>O CEP não completou o endereço.</td><td>Confira o CEP. Um CEP errado faz a prefeitura rejeitar a nota.</td></tr>
+          <tr><td>Não sei o código nacional ou a alíquota.</td><td>Veja numa nota antiga da empresa ou pergunte ao seu contador. Código errado pode gerar imposto errado.</td></tr>
+          <tr><td>Um tomador está com dado errado.</td><td>Clique no lápis da linha, corrija e salve. As notas já emitidas não mudam; só as próximas.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>
