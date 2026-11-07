@@ -98,7 +98,8 @@ $assinaturaCadastro = '';
 $recarregar = static function () use ($pdo, $cfgArquivos, $workerId, &$cfg, &$processador, &$entregador, &$assinaturaCadastro): void {
     $novo = NfseConfig::comClientes($cfgArquivos, $pdo);
     // Empresas e configuracoes mudadas no painel (fila, salvador...).
-    $assinatura = md5(serialize([$novo['emitentes'], $novo['consumidores'], $novo['fila'], $novo['salvador']]));
+    // tpAmb e nacional: ambiente e modelo da nota trocados em Sistema.
+    $assinatura = md5(serialize([$novo['emitentes'], $novo['consumidores'], $novo['fila'], $novo['salvador'], $novo['tpAmb'], $novo['nacional']]));
     if ($assinatura === $assinaturaCadastro) {
         return;
     }

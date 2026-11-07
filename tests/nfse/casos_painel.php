@@ -12,6 +12,7 @@ use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\ConfiguracoesPainel;
 use Xande\NfeIntegracao\Nfse\Servico\PortalAcesso;
 use Xande\NfeIntegracao\Nfse\Servico\EnvioEmail;
+use Xande\NfeIntegracao\Nfse\Nacional\DpsXmlBuilder;
 use Xande\NfeIntegracao\Nfse\Servico\PainelAcesso;
 
 function testesPainelIntegracao(PDO $pdo, array $cfg): void
@@ -89,7 +90,18 @@ function testesPainelIntegracao(PDO $pdo, array $cfg): void
     // ---- Ambiente de emissao (so o painel troca) ----
     $arquivo = ['tpAmb' => 2] + $cfg;
     $config = new ConfiguracoesPainel($pdo, $arquivo);
-    Apoio::igual(['atual' => 2, 'arquivo' => 2, 'no_painel' => false], $config->ambiente(), 'ambiente: sem troca vale o arquivo');
+    Apoio::igual(['atual' => 2, 'arquivo' => 2, 'no_painel' => false, 'producao_modelo_novo' => false], $config->ambiente(), 'ambiente: sem troca vale o arquivo');
+
+    // Modelo da nota NFS-e Nacional na producao (a Receita troca um dia).
+    $leiauteProducao = fn () => DpsXmlBuilder::leiaute(['tpAmb' => 1] + NfseConfig::comClientes($arquivo, $pdo));
+    Apoio::igual(['xsd' => '1.01-producao', 'finNFSe' => false], $leiauteProducao(), 'modelo: producao comeca no antigo (do arquivo)');
+    $r = $config->trocarModeloProducao(true, 'ip');
+    Apoio::verificar($r['ok'] && $r['ambiente']['producao_modelo_novo'], 'modelo: painel passa a producao para o novo');
+    Apoio::igual(['xsd' => '1.01', 'finNFSe' => true], $leiauteProducao(), 'modelo: API e worker usam o XSD novo e enviam finNFSe');
+    Apoio::igual('AMBIENTE_MODELO_ALTERADO', $pdo->query("SELECT acao FROM fiscal_admin_log ORDER BY id DESC LIMIT 1")->fetchColumn(), 'modelo: troca fica no historico');
+    Apoio::verificar($config->trocarModeloProducao(false, 'ip')['ok'] && $leiauteProducao()['finNFSe'] === false, 'modelo: volta para o antigo');
+    Apoio::igual(['xsd' => '1.01', 'finNFSe' => true], DpsXmlBuilder::leiaute(['tpAmb' => 2] + NfseConfig::comClientes($arquivo, $pdo)), 'modelo: homologacao continua no novo');
+    $pdo->exec("DELETE FROM sistema_ajustes WHERE chave = 'nacional.producao_modelo_novo'");
     Apoio::igual('CONFIRMACAO_FALTANDO', $config->trocarAmbiente(1, 'sim', 'ip')['codigo'] ?? null, 'ambiente: producao sem digitar PRODUCAO nao troca');
     Apoio::igual(2, NfseConfig::comClientes($arquivo, $pdo)['tpAmb'], 'ambiente: continua homologacao');
     ClienteRepositorio::$autor = 'Ana Paula Lima <ana@empresa.com.br>';

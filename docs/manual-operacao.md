@@ -528,6 +528,11 @@ usa esta chave; usuários do portal (nem o responsável da empresa) não podem.
 - O que está no painel vale por cima do `tpAmb` do arquivo; o worker passa a
   usar o novo ambiente em até 1 minuto.
 - A troca fica no **histórico** com o nome de quem fez.
+- **Modelo da nota NFS-e Nacional na produção:** a Receita ainda usa o modelo
+  antigo na produção (sem `finNFSe`) e o novo, de 20/10/2026, na homologação.
+  Quando ela mudar a produção, as notas de produção voltam com **E1235** pedindo
+  o `finNFSe`: clique em **A Receita mudou: usar o modelo novo na produção** e
+  use **↻ Reenviar** nas notas recusadas. Dá para voltar pelo mesmo lugar.
 
 **Primeira vez:** entre com a chave de emergência, clique em **Atualizar
 banco** (Sistema), cadastre você em **Pessoas do painel**, saia e entre com
