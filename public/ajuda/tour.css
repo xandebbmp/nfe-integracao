@@ -1,8 +1,12 @@
 /*
- * Tour guiado (ajuda/tour.js). Usa as cores da tela onde esta:
+ * Ajuda guiada (ajuda/tour.js). Usa as cores da tela onde esta:
  * portal (--superficie, --primaria) ou painel admin (--cartao, --destaque).
+ * A camada nao cobre a tela: 4 "bloqueios" transparentes ficam em volta do
+ * destaque, para a pessoa conseguir clicar e digitar so no campo destacado.
  */
-.tour { position: fixed; inset: 0; z-index: 10000; }
+.tour { position: fixed; inset: 0; z-index: 10000; pointer-events: none; }
+.tour__bloqueio { position: fixed; pointer-events: auto; background: transparent; }
+.tour__caixa { pointer-events: auto; }
 
 /* Destaque: "buraco" claro em volta do elemento; a sombra gigante escurece o resto. */
 .tour__foco {
@@ -12,7 +16,7 @@
 }
 .tour__foco[hidden] { display: none; }
 /* Sem alvo (caixa no meio): escurece a tela inteira. */
-.tour:has(.tour__foco[hidden]) { background: rgba(15, 23, 42, .55); }
+.tour--sem-alvo .tour__bloqueio:first-child { background: rgba(15, 23, 42, .55); }
 
 .tour__caixa {
   position: fixed; width: min(360px, calc(100vw - 24px)); box-sizing: border-box;
@@ -34,15 +38,21 @@
 .tour__caixa--em-cima::before { bottom: -8px; border-left: 0; border-top: 0; }
 
 .tour__titulo { margin: 0 28px 6px 0; font-size: 16px; font-weight: 700; }
-.tour__texto { margin: 0 0 14px; color: var(--secundario, var(--suave, #475569)); }
+.tour__texto { margin: 0 0 12px; color: var(--secundario, var(--suave, #475569)); }
+.tour__contador { display: block; margin-bottom: 2px; }
+.tour__ok, .tour__falta, .tour__aguarde { margin: -4px 0 12px; font-size: 13px; font-weight: 600; }
+.tour__ok { color: var(--ok-texto, var(--st-autorizado, #15803d)); }
+.tour__falta { color: var(--erro-texto, var(--st-rejeitado, #b91c1c)); }
+.tour__aguarde { color: var(--primaria, var(--destaque, #1f6feb)); }
+.tour__ok[hidden], .tour__falta[hidden], .tour__aguarde[hidden] { display: none; }
 .tour__fechar {
   position: absolute; top: 8px; right: 8px; width: 30px; height: 30px;
   border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; font-size: 14px;
 }
 .tour__fechar:hover { background: var(--hover, var(--linha-hover, #f1f5f9)); }
-.tour__rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tour__rodape { display: flex; align-items: center; gap: 8px; }
+.tour__espaco { flex: 1; }
 .tour__contador { font-size: 12px; color: var(--apagado, var(--suave, #94a3b8)); }
-.tour__botoes { display: flex; gap: 8px; }
 .tour__botao {
   min-height: 36px; padding: 0 14px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 600;
   border: 1px solid var(--borda, #e2e8f0); background: transparent; color: inherit;
@@ -52,6 +62,7 @@
   border-color: transparent; color: var(--primaria-texto, #fff);
   background: var(--primaria, var(--destaque, #1f6feb));
 }
+.tour__botao--parado { opacity: .5; }
 .tour__botao:focus-visible, .tour__fechar:focus-visible { outline: 3px solid var(--primaria, var(--destaque, #1f6feb)); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) { .tour__foco { transition: none; } }

@@ -351,43 +351,7 @@
       telaSistema.hidden = false;
       if (!window.location.hash || window.location.hash === '#sair') { window.location.hash = PAGINA_INICIAL; }
       mostrarPagina();
-      // 1a vez neste navegador: mostra o tour guiado sozinho (depois, so pelo menu "Tour guiado").
-      if (window.Tour && !window.Tour.jaVisto(TOUR_PORTAL)) { window.setTimeout(iniciarTour, 600); }
     }, function () { mostrarLogin(''); });
-  }
-
-  // ===== Tour guiado do portal (ajuda/tour.js). Para mudar o texto, edite os passos abaixo. =====
-  // Trocou bastante o portal? Mude o nome (v2, v3...) para todo mundo ver o tour de novo.
-  var TOUR_PORTAL = 'portal-v1';
-
-  function iniciarTour() {
-    if (!window.Tour || telaSistema.hidden) { return; }
-    // No celular o menu fica escondido: abre a gaveta nos passos do menu e fecha no fim.
-    function abrirMenu() {
-      if (telaPequena.matches) { telaSistema.classList.add('menu-aberto'); atualizarBotaoMenu(); }
-    }
-    function passoMenu(seletor, titulo, texto) {
-      return { alvo: seletor, antes: abrirMenu, titulo: titulo, texto: texto };
-    }
-    window.Tour.iniciar({
-      id: TOUR_PORTAL,
-      aoTerminar: fecharMenuCelular,
-      passos: [
-        { alvo: null, antes: fecharMenuCelular, titulo: 'Bem-vindo ao portal',
-          texto: 'Em 1 minuto mostramos onde fica cada coisa. Use as setas do teclado ou os botões. Pode fechar quando quiser.' },
-        { alvo: '.empresa-atual', antes: fecharMenuCelular, titulo: 'Sua empresa',
-          texto: 'As notas saem no nome desta empresa. O selo "Homologação" aparece quando o sistema está em teste, sem valor fiscal.' },
-        passoMenu('.menu__item[href="#inicio"]', 'Início', 'Resumo do mês: notas emitidas, valor faturado, notas em andamento e quanto da franquia já foi usado.'),
-        passoMenu('.menu__item[href="#emitir"]', 'Emitir nota', 'Preencha tomador, serviço e valor. O sistema confere tudo antes de enviar para a prefeitura.'),
-        passoMenu('.menu__item[href="#notas"]', 'Minhas notas', 'Todas as notas, com a situação, o PDF e o XML. O número vermelho avisa nota que não foi autorizada.'),
-        passoMenu('.menu__item[href="#recorrencias"]', 'Recorrências', 'Para o cliente que paga todo mês: a nota sai sozinha no dia certo.'),
-        passoMenu('.menu__item[href="#guias"]', 'Guias do Simples', 'A guia DAS que a contabilidade preparou. Abra o PDF, copie o código de barras e marque "Já paguei".'),
-        passoMenu('nav[aria-label="Cadastros"]', 'Tomadores e serviços', 'Cadastre uma vez e só escolha na lista na hora de emitir.'),
-        passoMenu('.menu__item[href="#usuarios"]', 'Usuários', 'Convide outras pessoas da sua empresa para usar o portal.'),
-        passoMenu('.menu__item[href="../ajuda/"]', 'Ajuda', 'Passo a passo com as telas, para cada tarefa. Abre em outra aba.'),
-        passoMenu('#link-tour', 'Rever este tour', 'Quando quiser ver de novo, clique em "Tour guiado".'),
-      ],
-    });
   }
 
   function preencherTopo() {
@@ -487,7 +451,6 @@
     atualizarBotaoMenu();
   });
   el('cortina').addEventListener('click', fecharMenuCelular);
-  el('link-tour').addEventListener('click', function (evento) { evento.preventDefault(); iniciarTour(); });
   document.addEventListener('keydown', function (evento) { if (evento.key === 'Escape') { fecharMenuCelular(); } });
   telaPequena.addEventListener('change', fecharMenuCelular);
 

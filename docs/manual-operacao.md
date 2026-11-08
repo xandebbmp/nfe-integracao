@@ -981,25 +981,36 @@ Abra `http://127.0.0.1:8080/admin/`, `/monitor/` ou `/portal/`. Isso serve só p
 conferir a tela: o tempo real e os envios ao fisco precisam do worker e da
 configuração completa do servidor.
 
-### Central de Ajuda e tour guiado
+### Central de Ajuda e ajuda guiada
 
 - **Central de Ajuda** (`public/ajuda/`): artigos passo a passo com prints,
-  em HTML puro. Abre pelo botão **Ajuda** do painel e pelo menu **Ajuda** do
-  portal. Lista dos artigos em `public/ajuda/index.html`; modelo e regras de
-  escrita no comentário de `public/ajuda/portal/emitir-nfse.html`. Prints em
-  `public/ajuda/img/`.
-- **Tour guiado** (`public/ajuda/tour.js` + `tour.css`, JavaScript puro, no
-  estilo do Bootstrap Tour): destaca cada parte da tela com uma explicação e
-  os botões Voltar / Próximo (setas do teclado; Esc encerra). Aparece sozinho
-  na **primeira vez** em cada navegador (fica marcado no `localStorage` como
-  `tour_visto_<nome>`); depois, pelo botão **Tour guiado** (painel) ou pelo
-  item **Tour guiado** do menu (portal).
-  - Textos dos passos: `iniciarTourPainel()` em `public/admin/admin.js` e
-    `iniciarTour()` em `public/portal/portal.js`. Cada passo tem `alvo`
-    (seletor CSS), `titulo` e `texto`. Se o alvo não estiver na tela, a
-    caixa aparece no meio.
-  - Mudou bastante a tela? Troque o nome do tour (`painel-v1` → `painel-v2`,
-    `portal-v1` → `portal-v2`) para todo mundo ver de novo.
+  em HTML puro. Lista dos artigos em `public/ajuda/index.html`; modelo e
+  regras de escrita no comentário de `public/ajuda/portal/emitir-nfse.html`.
+  Prints em `public/ajuda/img/`.
+- **Ajuda guiada** (no estilo do Bootstrap Tour, JavaScript puro): a pessoa
+  abre a **Ajuda** (menu **Ajuda** do portal, botão **Ajuda** do painel),
+  escolhe uma tarefa e o guia leva **campo a campo na tela de verdade**:
+  destaca o campo, explica, espera preencher e só libera o **Próximo** quando
+  o campo está certo. No fim a tarefa está feita (nota emitida, tomador salvo,
+  guia anexada...). Não abre sozinho.
+  - Motor: `public/ajuda/tour.js` + `tour.css` (`Tour.iniciar`,
+    `Tour.encerrar`, `Tour.ativo`). O formato de cada passo está no
+    comentário do topo de `tour.js`: `alvo`, `titulo`, `texto`, `acao`
+    (`ler`, `preencher`, `clicar`, `esperar`), `pronto`, `falta`, `opcional`,
+    `pular`, `antes`, `pagina`, `aguarde`.
+  - Guias do portal: `public/portal/portal-guias.js` (emitir, tomador,
+    serviço, recorrência, cancelar, guia do Simples, convidar, senha,
+    conhecer). A lista da página **Ajuda** é montada a partir dele; o botão
+    **Me guie** da tela Emitir nota abre o guia de emitir.
+  - Guias do painel: `public/admin/admin-guias.js` (cadastrar empresa,
+    certificado, acesso ao portal, anexar guia DAS, conhecer o painel). Os
+    campos usados têm `id` fixo em `admin.js` (`cert-arquivo`, `acesso-nome`,
+    `guia-valor`, `botao-salvar-empresa`...).
+  - **Guia novo**: acrescente um item em `GUIAS` no arquivo do portal ou do
+    painel (`titulo`, `resumo`, `icone`, `passos`). Ele aparece sozinho na
+    lista. Mudou o `id` de um campo? Ajuste o seletor do passo.
+  - Janelas (`<dialog>`): o guia entra na janela aberta para continuar
+    clicável. Fora do destaque a tela fica bloqueada; **Esc** ou **✕** saem.
 
 ---
 
