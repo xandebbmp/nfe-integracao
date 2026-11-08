@@ -15,7 +15,7 @@
      email.php        tela Sistema: bloco E-mail (situacao e e-mail de teste)
      configuracoes.php tela Sistema: configuracoes editaveis (portal, envio, API)
      fechamento.php   fechamento do mes: receita por empresa para o DAS (JSON ou CSV)
-     guia_das.php     guia DAS do Simples: anexar/trocar/remover o PDF do mes, abrir o PDF
+     guia_das.php     guia DAS do Simples: anexar/trocar/remover o PDF do mes, abrir o PDF, marcar paga
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -44,6 +44,7 @@ const ACOES_HISTORICO = {
   PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou responsável da empresa no portal',
   PORTAL_ADMIN_RETIRADO: 'Deixou de ser responsável da empresa no portal',
   GUIA_DAS_ANEXADA: 'Guia DAS anexada', GUIA_DAS_TROCADA: 'Guia DAS trocada', GUIA_DAS_REMOVIDA: 'Guia DAS removida',
+  GUIA_DAS_PAGA: 'Guia DAS marcada como paga', GUIA_DAS_PAGAMENTO_DESFEITO: 'Guia DAS: "paga" desfeito',
 };
 
 const ACOES_SISTEMA = {
@@ -1184,7 +1185,7 @@ async function abrirFechamento(mes) {
             el('td', { class: 'num' }, moeda(l.receita_12_meses)),
             el('td', { class: 'num' }, l.percentual_simples === null ? '—' : `${String(l.percentual_simples).replace('.', ',')}%`),
             el('td', { class: 'num' }, l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado)),
-            r.guias_instalado ? el('td', {}, celulaGuia(l, mes)) : null))))),
+            r.guias_instalado ? el('td', {}, celulaGuia(l, mes, r.pagamento_instalado)) : null))))),
       semNotas > 0 ? el('p', { class: 'suave' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
       r.guias_instalado ? null : el('p', { class: 'aviso' }, 'Para anexar as guias DAS, falta atualizar o banco: botão Sistema > Atualizar banco.'),
       el('p', { class: 'suave' },
@@ -1200,17 +1201,49 @@ async function abrirFechamento(mes) {
 
 // ---- Guia DAS (script 0015) ----
 
-/** Celula "Guia DAS" de uma empresa: botao Anexar ou a guia ja anexada. */
-function celulaGuia(l, mes) {
+/** Celula "Guia DAS" de uma empresa: botao Anexar ou a guia ja anexada (paga ou nao). */
+function celulaGuia(l, mes, pagamentoInstalado) {
   if (!l.guia) {
     return el('button', { class: 'botao botao--pequeno', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Anexar guia');
   }
   const g = l.guia;
+  let pagamento = null;
+  if (g.pago_em) {
+    pagamento = el('span', { class: 'ok-texto', title: g.pago_marcado_por ? `Marcada por ${g.pago_marcado_por}` : '' }, `✓ Paga em ${dataCurta(g.pago_em)}`);
+  }
+  const acoes = [
+    el('button', { class: 'link-botao', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Trocar'),
+    el('button', { class: 'link-botao', type: 'button', onclick: () => removerGuia(g, l, mes) }, 'Remover'),
+  ];
+  if (pagamentoInstalado) {
+    acoes.unshift(g.pago_em
+      ? el('button', { class: 'link-botao', type: 'button', onclick: () => pagamentoGuia(g, mes, null) }, 'Desfazer pago')
+      : el('button', { class: 'link-botao', type: 'button', onclick: () => pagamentoGuia(g, mes, true) }, 'Marcar paga'));
+  }
   return el('div', { class: 'guia-celula' },
     el('button', { class: 'link-botao', type: 'button', title: 'Abrir o PDF', onclick: () => abrirPdfGuia(g.id) }, `${moeda(g.valor)} · vence ${dataCurta(g.vencimento)}`),
-    el('div', { class: 'guia-celula__acoes' },
-      el('button', { class: 'link-botao', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Trocar'),
-      el('button', { class: 'link-botao', type: 'button', onclick: () => removerGuia(g, l, mes) }, 'Remover')));
+    pagamento,
+    el('div', { class: 'guia-celula__acoes' }, ...acoes));
+}
+
+/** Marca como paga (pergunta a data; vazio = hoje) ou desfaz. O sistema nao confere na Receita. */
+async function pagamentoGuia(g, mes, pagar) {
+  let corpo = { acao: 'desfazer_pagamento', id: g.id };
+  if (pagar) {
+    const hoje = new Date();
+    const padrao = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
+    const resposta = prompt('Data em que a guia foi paga (dd/mm/aaaa):', padrao);
+    if (resposta === null) return;
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(resposta.trim());
+    if (!m) { alert('Use o formato dd/mm/aaaa.'); return; }
+    corpo = { acao: 'pagar', id: g.id, data: `${m[3]}-${m[2]}-${m[1]}` };
+  } else if (!confirm('Desfazer o "pago" desta guia? Ela volta a aparecer como a vencer ou vencida.')) {
+    return;
+  }
+  try {
+    await api('guia_das.php', { metodo: 'POST', corpo });
+    abrirFechamento(mes);
+  } catch (e) { alert(e.message); }
 }
 
 async function abrirPdfGuia(id) {

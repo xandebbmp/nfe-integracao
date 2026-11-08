@@ -137,9 +137,10 @@
         return ok({ usuarios: usuarios, pode_gerenciar: true });
       }
       if (rota === 'guias.php') {
-        return ok({ guias: [
+        if (metodo === 'POST') { return ok({ mensagem: 'Feito.' }); }
+        return ok({ pagamento_instalado: true, guias: [
           { id: 2, competencia: '2026-10', valor: 312.47, vencimento: '2026-11-20', linha_digitavel: '858100000032124703281926110700000000000000000000', situacao: 'A_VENCER' },
-          { id: 1, competencia: '2026-09', valor: 287.10, vencimento: '2026-10-20', linha_digitavel: null, situacao: 'VENCIDA' }
+          { id: 1, competencia: '2026-09', valor: 287.10, vencimento: '2026-10-20', linha_digitavel: null, situacao: 'PAGA', pago_em: '2026-10-18' }
         ] });
       }
       if (rota === 'recorrencias.php') {

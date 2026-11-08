@@ -56,6 +56,7 @@ final class FechamentoMes
         return [
             'mes' => $mes,
             'guias_instalado' => $guiasInstalado,
+            'pagamento_instalado' => $guiasInstalado && $repoGuias->temPagamento(), // script 0016: marcar como paga
             'empresas' => $linhas,
             'totais' => [
                 'notas' => array_sum(array_column($linhas, 'notas')),
