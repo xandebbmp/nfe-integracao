@@ -35,11 +35,12 @@ if (($_GET['formato'] ?? '') === 'csv') {
     $saida = fopen('php://output', 'w');
     fwrite($saida, "\xEF\xBB\xBF"); // BOM: Excel abre com acentos certos
     fputcsv($saida, ['CNPJ', 'Razao social', 'Simples', 'NFS-e (qtd)', 'NFS-e (valor)', 'NF-e (qtd)', 'NF-e (valor)',
-        'Canceladas', 'Receita do mes', 'Receita 12 meses anteriores', '% Simples', 'DAS estimado'], ';');
+        'Canceladas', 'Receita do mes', 'Receita 12 meses anteriores', '% Simples', 'DAS estimado', 'Guia DAS (valor)', 'Guia DAS (vencimento)'], ';');
     foreach ($fechamento['empresas'] as $l) {
         fputcsv($saida, [$l['cnpj'], $l['razao_social'], $l['simples'] ?? '', $l['nfse']['quantidade'], $n($l['nfse']['valor']),
             $l['nfe']['quantidade'], $n($l['nfe']['valor']), $l['canceladas'], $n($l['receita_mes']),
-            $n($l['receita_12_meses']), $n($l['percentual_simples']), $n($l['das_estimado'])], ';');
+            $n($l['receita_12_meses']), $n($l['percentual_simples']), $n($l['das_estimado']),
+            $l['guia'] !== null ? $n($l['guia']['valor']) : '', $l['guia']['vencimento'] ?? ''], ';');
     }
     exit;
 }

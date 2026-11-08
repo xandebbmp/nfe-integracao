@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\FechamentoMes;
+use Xande\NfeIntegracao\Nfse\Servico\GuiasDas;
 
 function testesFechamentoUnidade(): void
 {
@@ -70,4 +71,61 @@ function testesFechamentoIntegracao(PDO $pdo, array $cfgGeral): void
 
     $passado = array_values(array_filter((new FechamentoMes($pdo, $tpAmb))->montar($mesPassado->format('Y-m'))['empresas'], static fn($l) => $l['cnpj'] === $cnpj))[0] ?? [];
     Apoio::igual(300.0, $passado['receita_mes'] ?? null, 'mes passado: a nota emitida agora com competencia do mes passado entra la');
+
+    testesGuiasDas($pdo, $cfgGeral, $cnpj, $mes);
+}
+
+function testesGuiasDas(PDO $pdo, array $cfgGeral, string $cnpj, string $mes): void
+{
+    echo "\n[16] Guia DAS: contador anexa, cliente ve no portal\n";
+
+    $guias = new GuiasDas($pdo, $cfgGeral);
+    Apoio::verificar($guias->instalado(), 'script 0015: tabela fiscal_guias_das existe');
+
+    // Pessoas da empresa no portal: 2 ativas e 1 desativada (nao recebe e-mail).
+    $pdo->exec("INSERT INTO portal_usuarios (cnpj, nome, email, senha_hash, ativo) VALUES
+        ('{$cnpj}', 'Maria Souza', 'maria@fechamento.com.br', 'x', TRUE),
+        ('{$cnpj}', 'Joao Lima', 'joao@fechamento.com.br', 'x', TRUE),
+        ('{$cnpj}', 'Antigo', 'antigo@fechamento.com.br', 'x', FALSE)");
+
+    $pdf = "%PDF-1.4\n% guia de teste\n%%EOF";
+    $dados = ['cnpj' => $cnpj, 'competencia' => $mes, 'valor' => '1.234,56', 'vencimento' => '2030-01-20',
+        'linha_digitavel' => '85810000012 3 45670328192 6 61107000000 0 00000000000 0', 'avisar' => true];
+
+    $r = $guias->anexar(['valor' => '0', 'vencimento' => '2030-02-30', 'linha_digitavel' => '123'] + $dados, 'nao e pdf', 'x.txt', 'ip');
+    Apoio::igual('DADOS_INVALIDOS', $r['codigo'] ?? null, 'anexar: dados errados recusados');
+    Apoio::igual(4, count($r['erros'] ?? []), 'anexar: explica valor, vencimento, codigo de barras e arquivo');
+    Apoio::igual('EMPRESA_NAO_ENCONTRADA', $guias->anexar(['cnpj' => '99888777000155'] + $dados, $pdf, 'das.pdf', 'ip')['codigo'] ?? null,
+        'anexar: empresa fora do cadastro recusada');
+
+    $antesEmails = (int)$pdo->query('SELECT count(*) FROM sistema_emails')->fetchColumn();
+    $r = $guias->anexar($dados, $pdf, 'das.pdf', 'ip');
+    Apoio::verificar($r['ok'] && !$r['trocou'], 'anexar: guia gravada');
+    Apoio::igual([1234.56, '2030-01-20', '858100000123456703281926611070000000000000000000'],
+        [$r['guia']['valor'], $r['guia']['vencimento'], $r['guia']['linha_digitavel']], 'anexar: valor com virgula, vencimento e codigo so com numeros');
+    Apoio::igual(2, $r['avisados'], 'anexar: avisa por e-mail so as pessoas ATIVAS da empresa');
+    $email = $pdo->query("SELECT assunto, texto FROM sistema_emails ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    Apoio::verificar($antesEmails + 2 === (int)$pdo->query('SELECT count(*) FROM sistema_emails')->fetchColumn()
+        && str_contains($email['assunto'], 'DAS') && str_contains($email['texto'], 'R$ 1.234,56') && str_contains($email['texto'], '20/01/2030'),
+        'anexar: e-mail com valor e vencimento');
+    Apoio::igual($pdf, $guias->pdf($r['guia']['id']), 'pdf: o arquivo volta igual');
+
+    $r2 = $guias->anexar(['valor' => '1300', 'avisar' => false] + $dados, $pdf, 'das-retificado.pdf', 'ip');
+    Apoio::verificar($r2['ok'] && $r2['trocou'] && $r2['guia']['id'] === $r['guia']['id'] && $r2['avisados'] === 0,
+        'anexar de novo no mesmo mes: TROCA a guia (sem aviso quando desmarcado)');
+    Apoio::igual(1, (int)$pdo->query("SELECT count(*) FROM fiscal_guias_das WHERE cnpj = '{$cnpj}'")->fetchColumn(), 'uma guia por empresa e mes');
+
+    $linha = array_values(array_filter((new FechamentoMes($pdo, (int)$cfgGeral['tpAmb']))->montar($mes)['empresas'], static fn($l) => $l['cnpj'] === $cnpj))[0];
+    Apoio::igual(1300.0, $linha['guia']['valor'] ?? null, 'fechamento do mes: mostra a guia anexada');
+
+    $lista = $guias->daEmpresa($cnpj, '2030-01-20');
+    Apoio::igual([1, 'VENCE_HOJE'], [count($lista), $lista[0]['situacao'] ?? null], 'portal: lista a guia da empresa, com a situacao');
+    Apoio::igual(['A_VENCER', 'VENCIDA'], [$guias->daEmpresa($cnpj, '2030-01-19')[0]['situacao'], $guias->daEmpresa($cnpj, '2030-01-21')[0]['situacao']],
+        'portal: a vencer / vencida pela data');
+    Apoio::igual([], $guias->daEmpresa('41986662000160'), 'portal: outra empresa nao ve a guia');
+
+    $acoes = $pdo->query("SELECT acao FROM fiscal_admin_log WHERE cnpj = '{$cnpj}' AND acao LIKE 'GUIA_DAS%' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN);
+    Apoio::igual(['GUIA_DAS_ANEXADA', 'GUIA_DAS_TROCADA'], $acoes, 'historico: anexada e trocada');
+    Apoio::verificar($guias->remover($r['guia']['id'], 'ip')['ok'] && $guias->daEmpresa($cnpj) === [], 'remover: some do portal');
+    Apoio::igual('NAO_ENCONTRADA', $guias->remover($r['guia']['id'], 'ip')['codigo'] ?? null, 'remover: guia inexistente');
 }

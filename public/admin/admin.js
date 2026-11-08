@@ -15,6 +15,7 @@
      email.php        tela Sistema: bloco E-mail (situacao e e-mail de teste)
      configuracoes.php tela Sistema: configuracoes editaveis (portal, envio, API)
      fechamento.php   fechamento do mes: receita por empresa para o DAS (JSON ou CSV)
+     guia_das.php     guia DAS do Simples: anexar/trocar/remover o PDF do mes, abrir o PDF
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -42,6 +43,7 @@ const ACOES_HISTORICO = {
   PORTAL_ACESSO_ENVIADO: 'Acesso ao portal enviado por e-mail', PORTAL_USUARIO_ATIVADO: 'Acesso ao portal reativado',
   PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou responsável da empresa no portal',
   PORTAL_ADMIN_RETIRADO: 'Deixou de ser responsável da empresa no portal',
+  GUIA_DAS_ANEXADA: 'Guia DAS anexada', GUIA_DAS_TROCADA: 'Guia DAS trocada', GUIA_DAS_REMOVIDA: 'Guia DAS removida',
 };
 
 const ACOES_SISTEMA = {
@@ -1153,9 +1155,11 @@ async function abrirFechamento(mes) {
 
   try {
     const r = await api(`fechamento.php?mes=${mes}`);
-    const comNotas = r.empresas.filter((l) => l.notas > 0 || l.canceladas > 0);
+    // Aparecem: quem teve nota no mes, toda ME/EPP (paga DAS mesmo sem nota no sistema) e quem ja tem guia.
+    const comNotas = r.empresas.filter((l) => l.notas > 0 || l.canceladas > 0 || l.simples === 'ME/EPP' || l.guia);
     const semNotas = r.empresas.length - comNotas.length;
-    area.replaceChildren(
+    // filter(Boolean): tira os blocos que nao se aplicam (null), senao aparece "null" na tela.
+    area.replaceChildren(...[
       el('div', { class: 'numeros' },
         el('div', { class: 'numero' }, el('b', {}, moeda(r.totais.receita_mes)), el('span', {}, 'receita do mês (todas as empresas)')),
         el('div', { class: 'numero' }, el('b', {}, r.totais.notas), el('span', {}, 'notas autorizadas')),
@@ -1169,7 +1173,8 @@ async function abrirFechamento(mes) {
             el('th', { class: 'num' }, 'Notas'), el('th', { class: 'num', title: 'Canceladas não entram na receita' }, 'Canceladas'),
             el('th', { class: 'num' }, 'Receita do mês'), el('th', { class: 'num', title: 'Soma dos 12 meses anteriores (só notas do sistema)' }, '12 meses anteriores'),
             el('th', { class: 'num', title: 'Percentual aproximado do Simples, do cadastro da empresa' }, '% Simples'),
-            el('th', { class: 'num' }, 'DAS estimado'))),
+            el('th', { class: 'num' }, 'DAS estimado'),
+            r.guias_instalado ? el('th', {}, 'Guia DAS') : null)),
           el('tbody', {}, ...comNotas.map((l) => el('tr', {},
             el('td', {}, l.razao_social, el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj))),
             el('td', {}, l.simples || '—'),
@@ -1178,16 +1183,119 @@ async function abrirFechamento(mes) {
             el('td', { class: 'num' }, el('strong', {}, moeda(l.receita_mes))),
             el('td', { class: 'num' }, moeda(l.receita_12_meses)),
             el('td', { class: 'num' }, l.percentual_simples === null ? '—' : `${String(l.percentual_simples).replace('.', ',')}%`),
-            el('td', { class: 'num' }, l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado))))))),
-      semNotas > 0 ? el('p', { class: 'suave' }, `${semNotas} empresa(s) sem notas neste mês não aparecem na lista (estão na planilha).`) : null,
+            el('td', { class: 'num' }, l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado)),
+            r.guias_instalado ? el('td', {}, celulaGuia(l, mes)) : null))))),
+      semNotas > 0 ? el('p', { class: 'suave' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
+      r.guias_instalado ? null : el('p', { class: 'aviso' }, 'Para anexar as guias DAS, falta atualizar o banco: botão Sistema > Atualizar banco.'),
       el('p', { class: 'suave' },
-        'Como usar: confira a receita de cada empresa e faça a declaração no PGDAS-D, no site do Simples Nacional. ',
+        'Como usar: confira a receita de cada empresa, faça a declaração no PGDAS-D (site do Simples Nacional), gere o DAS ',
+        'e clique em "Anexar guia". O cliente vê a guia no portal e recebe um aviso por e-mail. ',
         'O DAS estimado é só uma referência (receita × % do Simples do cadastro). O valor certo é o do PGDAS-D, ',
         'que considera a faixa dos últimos 12 meses, o anexo da atividade e receitas que não passaram pelo sistema.'),
-    );
+    ].filter(Boolean));
   } catch (e) {
     area.replaceChildren(el('p', { class: 'erro' }, e.message));
   }
+}
+
+// ---- Guia DAS (script 0015) ----
+
+/** Celula "Guia DAS" de uma empresa: botao Anexar ou a guia ja anexada. */
+function celulaGuia(l, mes) {
+  if (!l.guia) {
+    return el('button', { class: 'botao botao--pequeno', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Anexar guia');
+  }
+  const g = l.guia;
+  return el('div', { class: 'guia-celula' },
+    el('button', { class: 'link-botao', type: 'button', title: 'Abrir o PDF', onclick: () => abrirPdfGuia(g.id) }, `${moeda(g.valor)} · vence ${dataCurta(g.vencimento)}`),
+    el('div', { class: 'guia-celula__acoes' },
+      el('button', { class: 'link-botao', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Trocar'),
+      el('button', { class: 'link-botao', type: 'button', onclick: () => removerGuia(g, l, mes) }, 'Remover')));
+}
+
+async function abrirPdfGuia(id) {
+  // O PDF precisa do login (cabecalho): baixa e abre numa aba nova.
+  const aba = window.open('', '_blank');
+  try {
+    const blob = await api(`guia_das.php?id=${id}`, { blob: true });
+    const url = URL.createObjectURL(blob);
+    if (aba) aba.location = url; else window.location = url;
+  } catch (e) {
+    if (aba) aba.close();
+    alert(`Não foi possível abrir a guia: ${e.message}`);
+  }
+}
+
+async function removerGuia(g, l, mes) {
+  if (!confirm(`Remover a guia de ${l.razao_social} (${moeda(g.valor)})? O cliente deixa de ver a guia no portal.`)) return;
+  try {
+    await api('guia_das.php', { metodo: 'POST', corpo: { acao: 'remover', id: g.id } });
+    abrirFechamento(mes);
+  } catch (e) { alert(e.message); }
+}
+
+/** O DAS vence no dia 20 do mes seguinte ao da receita. */
+function vencimentoPadraoDas(mes) {
+  const [a, m] = mes.split('-').map(Number);
+  const proximo = new Date(a, m, 20); // m ja e o mes seguinte (Date conta de 0)
+  return `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, '0')}-20`;
+}
+
+function abrirAnexarGuia(l, mes) {
+  const [ano, mm] = mes.split('-');
+  const g = l.guia;
+  const arquivo = el('input', { type: 'file', accept: 'application/pdf,.pdf', required: true });
+  const valor = el('input', { type: 'text', inputmode: 'decimal', placeholder: '0,00', required: true,
+    value: g ? g.valor.toFixed(2).replace('.', ',') : '' });
+  const vencimento = el('input', { type: 'date', required: true, value: g ? g.vencimento : vencimentoPadraoDas(mes) });
+  const linha = el('input', { type: 'text', inputmode: 'numeric', placeholder: 'Opcional: 48 números', value: g?.linha_digitavel || '' });
+  const avisar = el('input', { type: 'checkbox', checked: true });
+  const mensagem = el('p', { class: 'suave' });
+  const salvar = el('button', { class: 'botao botao--primario', type: 'submit' }, g ? 'Trocar guia' : 'Anexar guia');
+  const voltar = el('button', { class: 'botao', type: 'button', onclick: () => abrirFechamento(mes) }, 'Voltar');
+
+  const form = el('form', { class: 'form-guia' },
+    g ? el('p', { class: 'aviso' }, `Já existe guia deste mês (${moeda(g.valor)}). Ao salvar, a nova substitui a antiga.`) : null,
+    el('p', { class: 'suave' }, 'Gere o DAS no PGDAS-D (site do Simples Nacional), baixe o PDF e anexe aqui com o valor e o vencimento que estão na guia.'),
+    el('div', { class: 'campos' },
+      el('label', { class: 'largo' }, 'PDF da guia', arquivo),
+      el('label', {}, 'Valor total (R$)', valor),
+      el('label', {}, 'Vencimento', vencimento),
+      el('label', { class: 'largo' }, 'Código de barras (números)', linha),
+      el('label', { class: 'linha-check largo' }, avisar, ' Avisar o cliente por e-mail (todas as pessoas da empresa no portal)')),
+    l.das_estimado ? el('p', { class: 'suave' }, `Para conferir: o DAS estimado pelo sistema é ${moeda(l.das_estimado)}.`) : null,
+    mensagem,
+    el('div', { class: 'acoes' }, salvar, voltar));
+
+  form.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    if (!form.reportValidity()) return;
+    const dados = new FormData();
+    dados.append('cnpj', l.cnpj);
+    dados.append('competencia', mes);
+    dados.append('valor', valor.value);
+    dados.append('vencimento', vencimento.value);
+    dados.append('linha_digitavel', linha.value);
+    dados.append('avisar', avisar.checked ? '1' : '0');
+    dados.append('arquivo', arquivo.files[0]);
+    salvar.disabled = true;
+    mensagem.className = 'suave';
+    mensagem.textContent = 'Enviando...';
+    try {
+      const r = await api('guia_das.php', { metodo: 'POST', corpo: dados });
+      await abrirFechamento(mes);
+      if (avisar.checked) {
+        alert(r.avisados > 0 ? `Guia salva. ${r.avisados} pessoa(s) da empresa vão receber o aviso por e-mail.`
+          : 'Guia salva. Ninguém foi avisado por e-mail: a empresa não tem pessoas ativas no portal (ou o e-mail não está ligado).');
+      }
+    } catch (e) {
+      mensagem.className = 'erro';
+      mensagem.textContent = e.message;
+      salvar.disabled = false;
+    }
+  });
+
+  abrirModal(g ? 'Trocar guia DAS' : 'Anexar guia DAS', `${l.razao_social} · ${mm}/${ano}`, [form]);
 }
 
 /** Explica por que uma empresa ficou sem "DAS estimado". */

@@ -136,6 +136,12 @@
         }
         return ok({ usuarios: usuarios, pode_gerenciar: true });
       }
+      if (rota === 'guias.php') {
+        return ok({ guias: [
+          { id: 2, competencia: '2026-10', valor: 312.47, vencimento: '2026-11-20', linha_digitavel: '858100000032124703281926110700000000000000000000', situacao: 'A_VENCER' },
+          { id: 1, competencia: '2026-09', valor: 287.10, vencimento: '2026-10-20', linha_digitavel: null, situacao: 'VENCIDA' }
+        ] });
+      }
       if (rota === 'recorrencias.php') {
         if (metodo === 'POST') {
           var rec = recorrencias.filter(function (r) { return r.id === corpo.id; })[0];

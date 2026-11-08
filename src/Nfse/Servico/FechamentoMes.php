@@ -5,6 +5,7 @@ namespace Xande\NfeIntegracao\Nfse\Servico;
 
 use PDO;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
+use Xande\NfeIntegracao\Nfse\Repositorio\GuiaDasRepositorio;
 
 /**
  * Fechamento do mes (painel admin, botao "Fechamento do mes").
@@ -37,19 +38,24 @@ final class FechamentoMes
     {
         $clientes = new ClienteRepositorio($this->pdo);
         $receitas = $clientes->receitaPorMes($mes, $this->tpAmb);
+        // Guia DAS ja anexada pelo contador (script 0015; sem ele, nenhuma).
+        $repoGuias = new GuiaDasRepositorio($this->pdo);
+        $guiasInstalado = $repoGuias->existe();
+        $guias = $guiasInstalado ? $repoGuias->doMes($mes) : [];
 
         $linhas = [];
         foreach ($clientes->listar() as $c) {
             $linhas[] = self::linha($c['cnpj'], $c['razao_social'], (int)$c['opcao_simples_nacional'],
-                $c['percentual_tributos_simples'], $receitas[$c['cnpj']] ?? []);
+                $c['percentual_tributos_simples'], $receitas[$c['cnpj']] ?? []) + ['guia' => $guias[$c['cnpj']] ?? null];
             unset($receitas[$c['cnpj']]);
         }
         foreach ($receitas as $cnpj => $r) {
-            $linhas[] = self::linha((string)$cnpj, '(fora do cadastro)', null, null, $r);
+            $linhas[] = self::linha((string)$cnpj, '(fora do cadastro)', null, null, $r) + ['guia' => null];
         }
 
         return [
             'mes' => $mes,
+            'guias_instalado' => $guiasInstalado,
             'empresas' => $linhas,
             'totais' => [
                 'notas' => array_sum(array_column($linhas, 'notas')),

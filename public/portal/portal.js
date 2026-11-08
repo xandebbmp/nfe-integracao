@@ -420,6 +420,7 @@
     if (nome === 'empresa') { carregarEmpresa(); }
     if (nome === 'usuarios') { carregarUsuarios(); }
     if (nome === 'recorrencias') { carregarRecorrencias(); }
+    if (nome === 'guias') { carregarGuias(); }
 
     fecharMenuCelular();
     window.scrollTo(0, 0);
@@ -1887,6 +1888,64 @@
   function hojeIso() {
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // ------------------------------------------------------------------
+  // Guias do Simples (DAS): a contabilidade anexa no painel; aqui so ver e baixar.
+  // Rota: /v1/portal/guias.php
+  // ------------------------------------------------------------------
+  var SITUACAO_GUIA = {
+    A_VENCER: ['A vencer', 'info'],
+    VENCE_HOJE: ['Vence hoje', 'alerta'],
+    VENCIDA: ['Venceu', 'erro']
+  };
+
+  /** "2026-11" -> "11/2026" */
+  function mesBarraAno(competencia) {
+    var m = /^(\d{4})-(\d{2})$/.exec(String(competencia || ''));
+    return m ? m[2] + '/' + m[1] : competencia;
+  }
+
+  function carregarGuias() {
+    var corpo = el('guias-linhas');
+    corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">Carregando...</td></tr>';
+    api('GET', 'guias.php').then(function (r) {
+      var guias = r.guias || [];
+      if (!guias.length) {
+        corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">Nenhuma guia ainda. Quando a contabilidade anexar a guia do mês, ela aparece aqui e você recebe um aviso por e-mail.</td></tr>';
+        return;
+      }
+      corpo.innerHTML = guias.map(function (g) {
+        var s = SITUACAO_GUIA[g.situacao] || [g.situacao, 'neutro'];
+        var pdf = linkApi('/v1/portal/guias.php?id=' + g.id);
+        var copiar = g.linha_digitavel
+          ? '<button type="button" class="btn btn--secundario" data-copiar="' + escapar(g.linha_digitavel) + '"><i class="icone icone--p">content_copy</i> Copiar código</button>'
+          : '';
+        return '<tr>'
+          + '<td><b>' + escapar(mesBarraAno(g.competencia)) + '</b><span class="sub">Simples Nacional (DAS)</span></td>'
+          + '<td class="direita num">' + reais(g.valor) + '</td>'
+          + '<td class="num">' + escapar(dataCurta(g.vencimento)) + '</td>'
+          + '<td><span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span></td>'
+          + '<td class="acoes">' + copiar
+          + '<a class="btn btn--primario" href="' + escapar(pdf) + '" target="_blank" rel="noopener"><i class="icone icone--p">picture_as_pdf</i> Abrir guia</a></td>'
+          + '</tr>';
+      }).join('');
+      corpo.querySelectorAll('[data-copiar]').forEach(function (botao) {
+        botao.addEventListener('click', function () { copiarCodigo(botao.getAttribute('data-copiar')); });
+      });
+    }).catch(function (erro) {
+      corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">' + escapar(erro.message) + '</td></tr>';
+    });
+  }
+
+  function copiarCodigo(codigo) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(codigo).then(function () {
+        avisar('Código de barras copiado. Cole no app do banco para pagar.', 'content_copy');
+      }, function () { window.prompt('Copie o código de barras:', codigo); });
+      return;
+    }
+    window.prompt('Copie o código de barras:', codigo);
   }
 
   function carregarRecorrencias() {
