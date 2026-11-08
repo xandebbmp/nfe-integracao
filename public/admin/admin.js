@@ -197,7 +197,43 @@ async function entrar(token) {
   $('botao-eu').textContent = eu.pessoa ? '👤 ' + eu.pessoa.nome.split(' ')[0] : '';
   mostrarAvisoChave(eu);
   atualizarPontoSistema().catch(() => {});
+  // 1a vez neste navegador: mostra o tour guiado sozinho (depois, so pelo botao "Tour guiado").
+  if (window.Tour && !Tour.jaVisto(TOUR_PAINEL)) setTimeout(iniciarTourPainel, 500);
   return true;
+}
+
+// ===== Tour guiado do painel (ajuda/tour.js). Para mudar o texto, edite os passos abaixo. =====
+// Trocou bastante o painel? Mude o nome (v2, v3...) para todo mundo ver o tour de novo.
+const TOUR_PAINEL = 'painel-v1';
+
+function iniciarTourPainel() {
+  if (!window.Tour) return;
+  if ($('modal').open) $('modal').close();
+  Tour.iniciar({
+    id: TOUR_PAINEL,
+    passos: [
+      { alvo: null, titulo: 'Bem-vindo ao painel',
+        texto: 'Em 1 minuto mostramos onde fica cada coisa. Use as setas do teclado ou os botões. Pode fechar quando quiser.' },
+      { alvo: '#botao-sistema', titulo: 'Sistema',
+        texto: 'Worker (o robô que envia as notas), fila, atualizar banco, diagnóstico, e-mail, pessoas do painel e configurações. A bolinha verde quer dizer que está tudo rodando.' },
+      { alvo: '#contadores', titulo: 'Resumo',
+        texto: 'Quantas empresas estão liberadas, bloqueadas, vencidas ou no limite, e as notas autorizadas no mês.' },
+      { alvo: '.tabela-cartao', titulo: 'Empresas',
+        texto: 'Clique numa empresa para abrir a ficha: dados, certificado, plano, token da API e acesso ao portal.' },
+      { alvo: '#botao-nova', titulo: 'Nova empresa',
+        texto: 'Cadastre uma empresa cliente. Depois envie o certificado e dê o acesso ao portal.' },
+      { alvo: 'a[href="../monitor/"]', titulo: 'Notas (monitor)',
+        texto: 'Todas as notas de todas as empresas, em tempo real, com XML e PDF.' },
+      { alvo: '#botao-fechamento', titulo: 'Fechamento do mês',
+        texto: 'Receita de cada empresa no mês para a declaração do Simples. Aqui você anexa a guia DAS e o cliente vê no portal.' },
+      { alvo: '#botao-relatorio', titulo: 'Relatório de cobrança',
+        texto: 'Quantas notas cada empresa emitiu no mês, para cobrar o plano.' },
+      { alvo: 'a[href="../ajuda/#painel"]', titulo: 'Ajuda',
+        texto: 'Passo a passo com as telas, para cada tarefa. Abre em outra aba.' },
+      { alvo: '#botao-tour', titulo: 'Rever este tour',
+        texto: 'Quando quiser ver de novo, clique em "Tour guiado".' },
+    ],
+  });
 }
 
 // Quem entrou com a chave de emergencia ve um aviso para cadastrar as pessoas.
@@ -2103,6 +2139,7 @@ $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
 $('botao-fechamento').addEventListener('click', () => abrirFechamento());
+$('botao-tour').addEventListener('click', () => iniciarTourPainel());
 $('botao-sistema').addEventListener('click', () => abrirSistema());
 $('modal-fechar').addEventListener('click', fecharModal);
 $('modal').addEventListener('cancel', (e) => { if (!podeFecharModal()) e.preventDefault(); });

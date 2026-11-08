@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tour guiado - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../portal/portal.css">
+  <link rel="stylesheet" href="ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html
+       O tour em si fica em ajuda/tour.js; os textos de cada passo ficam em
+       portal/portal.js (iniciarTour) e admin/admin.js (iniciarTourPainel). -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="./"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../portal/"><i class="icone icone--p">arrow_back</i> Voltar ao portal</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="./">Central de Ajuda</a> <span>›</span> <span>Tour guiado</span>
+    </nav>
+
+    <h1>Tour guiado: conheça a tela em 1 minuto</h1>
+    <p class="artigo__resumo">Um passeio rápido em cima da própria tela: cada parte fica destacada, com uma explicação curta ao lado.</p>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Ele aparece sozinho na primeira vez</h2>
+        <p>Na primeira vez que você entra no portal ou no painel neste computador, o tour começa sozinho. Depois disso, só quando você pedir.</p>
+      </li>
+      <li class="passo">
+        <h2>Ande pelos passos</h2>
+        <p>Clique em <span class="botao-nome">Próximo</span> e <span class="botao-nome">Voltar</span>, ou use as <b>setas</b> do teclado. Para sair a qualquer momento, clique no <b>✕</b> ou aperte <b>Esc</b>. No último passo, clique em <span class="botao-nome">Concluir</span>.</p>
+        <figure class="print">
+          <img src="img/portal/tour-01-portal.png" alt="Tour guiado do portal destacando o menu Guias do Simples, com os botões Voltar e Próximo" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Veja de novo quando quiser</h2>
+        <ul>
+          <li><b>Portal do cliente</b>: no menu, em <b>Conta</b>, clique em <span class="botao-nome">Tour guiado</span>. No celular, abra o menu (☰) primeiro.</li>
+          <li><b>Painel do administrador</b>: no topo, clique em <span class="botao-nome">Tour guiado</span>.</li>
+        </ul>
+        <figure class="print">
+          <img src="img/admin/tour-01-painel.png" alt="Tour guiado do painel destacando o botão Sistema" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>O tour aparece toda vez que entro.</td><td>O navegador está apagando os dados do site (janela anônima ou limpeza automática). Feche com o ✕: ele não atrapalha o uso.</td></tr>
+          <tr><td>Um passo aparece no meio da tela, sem destacar nada.</td><td>Aquela parte não está visível nesta tela (por exemplo, no celular). A explicação continua valendo.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="./">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 08/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>
