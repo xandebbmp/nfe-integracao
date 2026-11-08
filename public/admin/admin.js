@@ -16,6 +16,7 @@
      configuracoes.php tela Sistema: configuracoes editaveis (portal, envio, API)
      fechamento.php   fechamento do mes: receita por empresa para o DAS (JSON ou CSV)
      guia_das.php     guia DAS do Simples: anexar/trocar/remover o PDF do mes, abrir o PDF, marcar paga
+     serpro_das.php   gerar o DAS pela Receita (SERPRO), por enquanto so no modo teste
 
    Sem build, sem biblioteca: HTML/CSS/JS puros (igual ao monitor).
    ========================================================================== */
@@ -44,7 +45,7 @@ const ACOES_HISTORICO = {
   PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou responsável da empresa no portal',
   PORTAL_ADMIN_RETIRADO: 'Deixou de ser responsável da empresa no portal',
   GUIA_DAS_ANEXADA: 'Guia DAS anexada', GUIA_DAS_TROCADA: 'Guia DAS trocada', GUIA_DAS_REMOVIDA: 'Guia DAS removida',
-  GUIA_DAS_PAGA: 'Guia DAS marcada como paga', GUIA_DAS_PAGAMENTO_DESFEITO: 'Guia DAS: "paga" desfeito',
+  SERPRO_DAS_TESTE: 'Teste de guia na Receita (SERPRO)', GUIA_DAS_PAGA: 'Guia DAS marcada como paga', GUIA_DAS_PAGAMENTO_DESFEITO: 'Guia DAS: "paga" desfeito',
 };
 
 const ACOES_SISTEMA = {
@@ -1185,7 +1186,9 @@ async function abrirFechamento(mes) {
             el('td', { class: 'num' }, moeda(l.receita_12_meses)),
             el('td', { class: 'num' }, l.percentual_simples === null ? '—' : `${String(l.percentual_simples).replace('.', ',')}%`),
             el('td', { class: 'num' }, l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado)),
-            r.guias_instalado ? el('td', {}, celulaGuia(l, mes, r.pagamento_instalado)) : null))))),
+            r.guias_instalado ? el('td', {}, celulaGuia(l, mes, r.pagamento_instalado),
+              r.serpro_modo === 'TESTE' ? el('button', { class: 'link-botao guia-serpro', type: 'button', title: 'Pede uma guia ao ambiente de teste do SERPRO (exemplo, sem custo)',
+                onclick: () => testarSerpro(l, mes) }, 'Testar Receita') : null) : null))))),
       semNotas > 0 ? el('p', { class: 'suave' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
       r.guias_instalado ? null : el('p', { class: 'aviso' }, 'Para anexar as guias DAS, falta atualizar o banco: botão Sistema > Atualizar banco.'),
       el('p', { class: 'suave' },
@@ -1329,6 +1332,32 @@ function abrirAnexarGuia(l, mes) {
   });
 
   abrirModal(g ? 'Trocar guia DAS' : 'Anexar guia DAS', `${l.razao_social} · ${mm}/${ano}`, [form]);
+}
+
+/**
+ * Integracao com a Receita (SERPRO), modo TESTE: pede um DAS ao ambiente de
+ * demonstracao e mostra o que voltou. A guia e de EXEMPLO: nao e salva.
+ */
+async function testarSerpro(l, mes) {
+  const [ano, mm] = mes.split('-');
+  const area = el('div', {}, el('p', { class: 'suave' }, 'Pedindo a guia ao SERPRO (ambiente de teste)...'));
+  const voltar = el('button', { class: 'botao', type: 'button', onclick: () => abrirFechamento(mes) }, 'Voltar');
+  abrirModal('Testar Receita (SERPRO)', `${l.razao_social} · ${mm}/${ano}`, [area, el('div', { class: 'acoes' }, voltar)]);
+  try {
+    const r = await api('serpro_das.php', { metodo: 'POST', corpo: { cnpj: l.cnpj, competencia: mes } });
+    const bytes = Uint8Array.from(atob(r.pdf_base64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    area.replaceChildren(
+      el('p', { class: 'aviso' }, 'Funcionou! Esta é uma guia de EXEMPLO do ambiente de teste do SERPRO: não é desta empresa e não foi salva.'),
+      el('dl', { class: 'grade' },
+        el('div', {}, el('dt', {}, 'Valor'), el('dd', {}, moeda(r.valor))),
+        el('div', {}, el('dt', {}, 'Vencimento'), el('dd', {}, dataCurta(r.vencimento))),
+        el('div', {}, el('dt', {}, 'Número do documento'), el('dd', { class: 'mono' }, r.numero_documento || '—'))),
+      el('p', {}, el('a', { class: 'botao', href: url, target: '_blank', rel: 'noopener' }, 'Abrir o PDF de exemplo')),
+      el('p', { class: 'suave' }, 'Na produção (depois do contrato com o SERPRO), este botão vai gerar a guia de verdade e anexar sozinho para o cliente.'));
+  } catch (e) {
+    area.replaceChildren(el('p', { class: 'erro' }, e.message));
+  }
 }
 
 /** Explica por que uma empresa ficou sem "DAS estimado". */
