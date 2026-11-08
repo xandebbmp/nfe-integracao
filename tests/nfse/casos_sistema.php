@@ -292,5 +292,18 @@ function testesSistemaIntegracao(PDO $pdo, array $cfg): void
     Apoio::igual('OK', $itensMonitor[0]['nivel'] ?? null, 'monitor: diagnostico ok depois de gerar');
     $r2 = $configMonitor->gerarSenhaMonitor(null);
     Apoio::verificar($r2['senha'] !== $r['senha'] && NfseConfig::comClientes($semMonitor, $pdo)['monitor_token_hash'] === hash('sha256', $r2['senha']), 'monitor: senha nova substitui a anterior');
+
+    // ---- Copia de seguranca dos XMLs ligada pelo painel ----
+    $semCopia = $cfg;
+    $semCopia['armazenamento']['tipo'] = 'nenhum';
+    $copia = fn(array $c) => array_values(array_filter(array_merge(...array_column((new Diagnostico($c, $pdo, dirname(__DIR__, 2)))->executar(false)['grupos'], 'itens')),
+        fn($i) => str_contains($i['texto'], 'XMLs')))[0] ?? [];
+    $item = $copia(NfseConfig::comClientes($semCopia, $pdo));
+    Apoio::verificar($item['nivel'] === 'ATENCAO' && str_contains($item['resolver'], 'Configurações'), 'copia dos XMLs: desligada, dica aponta o painel');
+    Apoio::verificar((new ConfiguracoesPainel($pdo, $semCopia))->salvar(['armazenamento.tipo' => 'local'], null)['ok'], 'copia dos XMLs: ligada pelo painel');
+    $ligada = NfseConfig::comClientes($semCopia, $pdo);
+    Apoio::igual('local', $ligada['armazenamento']['tipo'], 'copia dos XMLs: API e worker passam a usar a pasta');
+    Apoio::igual('OK', $copia($ligada)['nivel'] ?? null, 'copia dos XMLs: diagnostico ok depois de ligar');
+    Apoio::verificar(AjustesPainel::validar('armazenamento.tipo', 's3')[1] !== null, 'copia dos XMLs: nuvem (S3) nao e ligada pelo painel (precisa das chaves no servidor)');
     $pdo->exec('DELETE FROM sistema_ajustes');
 }

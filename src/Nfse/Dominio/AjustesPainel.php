@@ -68,6 +68,10 @@ final class AjustesPainel
                 'PRODUCAO' => 'Produção (Receita de verdade: declara e gera o DAS; cobrado pelo SERPRO)'],
             'ajuda' => 'Liga o "Declarar e gerar DAS" no Fechamento do mês. No teste tudo é exemplo e nada vai para o cliente. Produção precisa do contrato com o SERPRO e do acesso cadastrado logo abaixo.'],
 
+        'armazenamento.tipo' => ['grupo' => 'Cópia dos XMLs', 'rotulo' => 'Cópia de segurança dos XMLs', 'tipo' => 'opcao',
+            'opcoes' => ['nenhum' => 'Desligada (os XMLs ficam só no banco de dados)', 'local' => 'Ligada: copiar para a pasta storage/xml/nfse do servidor'],
+            'ajuda' => 'Além do banco, cada XML autorizado ou cancelado é salvo também como arquivo. Se o banco tiver problema, as notas continuam guardadas (a lei pede 5 anos).'],
+
         'salvador.url_visualizacao' => ['grupo' => 'Salvador', 'rotulo' => 'Link para ver a nota no site da prefeitura', 'tipo' => 'url',
             'ajuda' => 'Use {numero}, {inscricao} e {verificacao} no endereço. Vazio = sem link.'],
     ];

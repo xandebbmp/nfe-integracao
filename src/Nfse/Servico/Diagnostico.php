@@ -264,7 +264,8 @@ final class Diagnostico
         }
         $tipo = $this->cfg['armazenamento']['tipo'] ?? 'nenhum';
         if ($tipo === 'nenhum') {
-            $this->item('ATENCAO', 'Cópia dos XMLs fora do banco desligada.', 'Configure "local" ou "s3" em armazenamento (config/nfse.local.php). Enquanto isso, mantenha o backup diário do banco.');
+            $this->item('ATENCAO', 'Cópia de segurança dos XMLs desligada: os XMLs ficam só no banco de dados.',
+                'Na tela Sistema, em Configurações > "Cópia de segurança dos XMLs", escolha "Ligada" e salve.');
             return;
         }
         try {
@@ -272,9 +273,10 @@ final class Diagnostico
             if ($tipo === 'local') {
                 $armazenamento->salvar('_verificacao/teste.txt', 'ok ' . date(DATE_ATOM), 'text/plain');
             }
-            $this->item('OK', "Cópia dos XMLs: {$tipo}" . ($tipo === 'local' ? ' (gravação de teste ok)' : ''));
+            $this->item('OK', $tipo === 'local' ? 'Cópia de segurança dos XMLs ligada (pasta storage/xml/nfse, gravação de teste ok)' : "Cópia de segurança dos XMLs ligada ({$tipo})");
         } catch (Throwable $e) {
-            $this->item('ERRO', "Cópia dos XMLs ({$tipo}): " . $e->getMessage(), "Revise o bloco 'armazenamento' em config/nfse.local.php.");
+            $this->item('ERRO', "Cópia dos XMLs ({$tipo}): " . $e->getMessage(),
+                $tipo === 'local' ? 'Peça a quem cuida do servidor para liberar a gravação na pasta da cópia dos XMLs.' : "Revise o bloco 'armazenamento' em config/nfse.local.php.");
         }
     }
 

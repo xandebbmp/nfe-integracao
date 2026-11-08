@@ -103,7 +103,7 @@ comentários estão em `config/nfse.php`):
 | `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas. Opcional: quem entra no painel admin já abre o monitor sem ele. **Prefira gerar pelo painel** (Sistema > **Senha do Monitor**), que vale junto com este | `openssl rand -hex 32` |
 | `consumidores` | Sistemas internos com token fixo no arquivo, que emitem por vários CNPJs (opcional; as empresas clientes ficam no painel) | ver `config/nfse.local.php.example` |
 | `emitentes` | Empresas configuradas por arquivo (opcional; prefira o painel) | idem |
-| `armazenamento` | Cópia dos XMLs: `local` (pasta) ou `s3` (AWS S3, MinIO, Wasabi...) | `['tipo' => 's3', ...]` |
+| `armazenamento` | Cópia dos XMLs: `local` (pasta) ou `s3` (AWS S3, MinIO, Wasabi...). A cópia numa pasta pode ser ligada pelo painel (Sistema > Configurações > **Cópia de segurança dos XMLs**) | `['tipo' => 's3', ...]` |
 | `api.max_documentos_por_lote` | Máximo de notas por chamada | `50` |
 | `api.max_aguardar_segundos` | Máximo que a API espera quando o cliente usa `?aguardar=` | `60` |
 | `fila.max_tentativas` | Tentativas antes de virar `ERRO` | `5` |
