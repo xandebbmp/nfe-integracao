@@ -310,3 +310,41 @@ details summary { cursor: pointer; margin-top: 10px; }
 .historico__selo { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 11px;
   background: #fdede3; color: #9a3412; font-size: 12px; font-weight: 500; }
 .historico__detalhe { font-size: 13px; color: var(--suave); margin-top: 2px; overflow-wrap: anywhere; }
+
+/* Lista de pessoas com acesso (portal do cliente e painel) */
+.pessoas { list-style: none; margin: 12px 0 0; padding: 0; border: 1px solid var(--divisoria); border-radius: var(--raio); overflow: hidden; }
+.pessoa { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 12px 16px;
+  border-bottom: 1px solid var(--divisoria); background: color-mix(in srgb, var(--cor) 7%, var(--cartao));
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--cor) 55%, transparent); }
+.pessoa:last-child { border-bottom: 0; }
+.pessoa__avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--destaque-suave); color: var(--destaque); font-size: 13px; font-weight: 600; }
+.pessoa__dados { flex: 1 1 260px; min-width: 0; display: grid; gap: 2px; }
+.pessoa__nome { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 14px; }
+.pessoa__nome strong { font-weight: 600; }
+.pessoa__papel { font-size: 12px; font-weight: 500; padding: 1px 8px; border-radius: 99px; background: var(--destaque-suave); color: var(--destaque); }
+.pessoa__email { font-size: 13px; color: var(--texto); overflow-wrap: anywhere; }
+.pessoa__meta { font-size: 12px; color: var(--suave); }
+.pessoa__situacao { font-weight: 500; color: var(--texto); }
+.pessoa__acoes { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pessoa__acoes .botao .icone, .novo-acesso .botao .icone { font-size: 18px; vertical-align: -4px; }
+.botao--icone { display: inline-grid; place-items: center; width: 36px; height: 36px; min-height: 36px; padding: 0; border-color: transparent; background: transparent; color: var(--suave); }
+.botao--icone:hover { background: var(--linha-hover); color: var(--texto); border-color: transparent; }
+.botao--icone.botao--perigo { color: var(--st-rejeitado); }
+.botao--icone .icone { font-size: 20px; }
+
+/* Dica (data-dica) nos botoes so com icone */
+[data-dica] { position: relative; }
+[data-dica]::after { content: attr(data-dica); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  padding: 4px 8px; border-radius: 4px; background: #14202e; color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity .12s; z-index: 5; }
+[data-dica]:hover::after, [data-dica]:focus-visible::after { opacity: 1; }
+
+/* Formulario "Dar acesso a uma pessoa" numa linha */
+.novo-acesso { margin-top: 16px; padding: 16px; border-radius: var(--raio); background: var(--fundo); display: grid; gap: 10px; }
+.novo-acesso__titulo { margin: 0; font-size: 13px; font-weight: 600; color: var(--texto); }
+.novo-acesso__linha { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.novo-acesso__linha label { flex: 1 1 200px; display: grid; gap: 4px; font-size: 13px; color: var(--suave); }
+.novo-acesso__linha .botao { min-height: 36px; }
+.novo-acesso .opcao-linha { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.novo-acesso .opcao-linha input { width: auto; min-height: 0; }

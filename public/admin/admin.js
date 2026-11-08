@@ -814,6 +814,31 @@ function secaoToken(c) {
 }
 
 // ---- Portal do cliente (usuarios que entram com e-mail e senha) ----
+/**
+ * Uma pessoa numa lista de acessos (portal do cliente ou painel): iniciais, nome, papel,
+ * e-mail, situacao e ultimo acesso; acoes em botoes compactos com dica.
+ * tom: ok | info | rejeicao | neutro (mesma legenda das listas).
+ */
+function linhaPessoa({ nome, eu, papel, email, situacao, tom, ultimo, acoes }) {
+  const iniciais = String(nome || '?').trim().split(/\s+/).filter(Boolean);
+  const sigla = ((iniciais[0] || '?')[0] + (iniciais.length > 1 ? iniciais[iniciais.length - 1][0] : '')).toUpperCase();
+  return el('li', { class: `pessoa linha-status linha-status--${tom}` },
+    el('span', { class: 'pessoa__avatar', 'aria-hidden': 'true' }, sigla),
+    el('div', { class: 'pessoa__dados' },
+      el('div', { class: 'pessoa__nome' }, el('strong', {}, nome), eu ? el('span', { class: 'suave' }, ' (você)') : null,
+        papel ? el('span', { class: 'pessoa__papel' }, papel) : null),
+      el('div', { class: 'pessoa__email' }, email),
+      el('div', { class: 'pessoa__meta' }, el('span', { class: `pessoa__situacao pessoa__situacao--${tom}` }, situacao), ' · ',
+        ultimo ? `último acesso ${dataHora(ultimo)}` : 'nunca entrou')),
+    el('div', { class: 'pessoa__acoes' }, ...acoes.filter(Boolean)));
+}
+
+/** Botao so com icone (Material Icons) e dica; rotulo vai no aria-label. */
+function botaoIcone(icone, rotulo, onclick, perigo) {
+  return el('button', { class: 'botao botao--icone' + (perigo ? ' botao--perigo' : ''), type: 'button', 'aria-label': rotulo, 'data-dica': rotulo, onclick },
+    el('i', { class: 'icone', 'aria-hidden': 'true' }, icone));
+}
+
 function secaoPortal(c) {
   const lista = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   // ids usados pela ajuda guiada (admin-guias.js)
@@ -924,25 +949,24 @@ function secaoPortal(c) {
         lista.replaceChildren(el('p', { class: 'suave' }, 'Ninguém desta empresa tem acesso ao portal ainda.'));
         return;
       }
-      lista.replaceChildren(el('table', { class: 'mini' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Papel'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
-        el('tbody', {}, ...r.usuarios.map((u) => el('tr', {},
-          el('td', {}, u.nome),
-          el('td', {}, u.email),
-          // Responsavel da empresa (campo administrador) convida e desativa colegas pela tela Usuarios do portal.
-          el('td', {}, u.administrador ? 'Responsável da empresa' : 'Emissor'),
-          el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
-          el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
-          el('td', {},
-            u.ativo ? el('button', { class: 'botao botao--forte', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail para a pessoa',
-              onclick: () => enviarAcessoDaLinha(u) }, '✉ Enviar acesso por e-mail') : null, ' ',
-            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
-            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id }) },
-              u.administrador ? 'Tirar responsável' : 'Tornar responsável'), ' ',
-            el('button', { class: 'botao' + (u.ativo ? ' botao--perigo' : ''), type: 'button',
-              onclick: () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null) },
-            u.ativo ? 'Desativar' : 'Reativar'))))),
-      ));
+      // Responsavel da empresa (campo administrador) convida e desativa colegas pela tela Usuarios do portal.
+      lista.replaceChildren(el('ul', { class: 'pessoas' }, ...r.usuarios.map((u) => linhaPessoa({
+        nome: u.nome,
+        papel: u.administrador ? 'Responsável' : 'Emissor',
+        email: u.email,
+        situacao: !u.ativo ? 'Desativado' : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo'),
+        tom: !u.ativo ? 'neutro' : (u.trocar_senha ? 'info' : 'ok'),
+        ultimo: u.ultimo_acesso,
+        acoes: [
+          u.ativo ? el('button', { class: 'botao', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail para a pessoa',
+            onclick: () => enviarAcessoDaLinha(u) }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'mail'), ' Enviar acesso') : null,
+          botaoIcone('key', 'Nova senha provisória', () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`)),
+          botaoIcone(u.administrador ? 'remove_moderator' : 'add_moderator', u.administrador ? 'Tirar responsável' : 'Tornar responsável',
+            () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id })),
+          botaoIcone(u.ativo ? 'person_off' : 'person_add', u.ativo ? 'Desativar acesso' : 'Reativar acesso',
+            () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null), u.ativo),
+        ],
+      }))));
     } catch (e) {
       lista.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
@@ -967,11 +991,14 @@ function secaoPortal(c) {
   recarregar();
   return el('section', { class: 'secao' },
     el('h3', {}, 'Portal do cliente'),
-    el('p', { class: 'suave' }, `Pessoas desta empresa que emitem NFS-e pelo formulário em ${linkPortal}`),
+    el('p', { class: 'suave' }, 'Pessoas desta empresa que emitem NFS-e em ', el('a', { href: linkPortal, target: '_blank', rel: 'noopener' }, linkPortal)),
     lista,
-    el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
-    el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
-    el('div', { class: 'acoes' }, botao, mensagem),
+    el('div', { class: 'novo-acesso' },
+      el('h4', { class: 'novo-acesso__titulo' }, 'Dar acesso a uma pessoa'),
+      el('div', { class: 'novo-acesso__linha' },
+        el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email), botao),
+      el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
+      mensagem),
     area,
   );
 }
@@ -2323,21 +2350,23 @@ function secaoPessoasPainel() {
         lista.replaceChildren(el('p', { class: 'aviso' }, 'Ninguém cadastrado ainda: hoje só a chave de emergência entra. Cadastre você primeiro.'));
         return;
       }
-      lista.replaceChildren(el('table', { class: 'mini' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
-        el('tbody', {}, ...r.pessoas.map((p) => el('tr', {},
-          el('td', {}, p.nome, p.id === r.eu ? el('span', { class: 'suave' }, ' (você)') : null),
-          el('td', {}, p.email),
-          el('td', {}, p.ultimo_acesso ? dataHora(p.ultimo_acesso) : 'nunca entrou'),
-          el('td', {}, !p.ativo ? el('span', { class: 'ruim' }, 'Desativada') : (p.bloqueado ? el('span', { class: 'aviso' }, 'Bloqueada (senhas erradas)')
-            : (p.trocar_senha ? 'Aguardando 1º acesso' : 'Ativa'))),
-          el('td', {},
-            p.ativo && p.id !== r.eu ? el('button', { class: 'botao botao--forte', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail',
+      lista.replaceChildren(el('ul', { class: 'pessoas' }, ...r.pessoas.map((p) => linhaPessoa({
+        nome: p.nome,
+        eu: p.id === r.eu,
+        email: p.email,
+        situacao: !p.ativo ? 'Desativada' : (p.bloqueado ? 'Bloqueada (senhas erradas)' : (p.trocar_senha ? 'Aguardando 1º acesso' : 'Ativa')),
+        tom: !p.ativo ? 'neutro' : (p.bloqueado ? 'rejeicao' : (p.trocar_senha ? 'info' : 'ok')),
+        ultimo: p.ultimo_acesso,
+        acoes: p.id === r.eu
+          ? [el('button', { class: 'botao', type: 'button', onclick: () => abrirMinhaSenha() }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'key'), ' Trocar minha senha')]
+          : [
+            p.ativo ? el('button', { class: 'botao', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail',
               onclick: () => acao({ acao: 'redefinir_senha', id: p.id }, `Enviar o acesso ao painel para ${p.email}?\n\nO sistema gera uma senha provisória nova e manda por e-mail. A senha atual dessa pessoa para de funcionar.`, true) },
-            '✉ Enviar acesso por e-mail') : null, ' ',
-            p.id !== r.eu ? el('button', { class: 'botao' + (p.ativo ? ' botao--perigo' : ''), type: 'button',
-              onclick: () => acao({ acao: p.ativo ? 'desativar' : 'ativar', id: p.id }, p.ativo ? `Desativar o acesso de ${p.email} ao painel?` : null) },
-            p.ativo ? 'Desativar' : 'Reativar') : el('button', { class: 'botao', type: 'button', onclick: () => abrirMinhaSenha() }, 'Trocar minha senha')))))));
+            el('i', { class: 'icone', 'aria-hidden': 'true' }, 'mail'), ' Enviar acesso') : null,
+            botaoIcone(p.ativo ? 'person_off' : 'person_add', p.ativo ? 'Desativar acesso' : 'Reativar acesso',
+              () => acao({ acao: p.ativo ? 'desativar' : 'ativar', id: p.id }, p.ativo ? `Desativar o acesso de ${p.email} ao painel?` : null), p.ativo),
+          ],
+      }))));
     } catch (e) {
       lista.replaceChildren(el('p', { class: e.message.includes('Atualizar banco') ? 'aviso' : 'erro' }, e.message));
     }
