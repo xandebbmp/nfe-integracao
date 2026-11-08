@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>E-mail não chegou - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo "Problemas comuns": sintoma -> o cliente faz -> o suporte faz. Modelo geral: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Problemas comuns</span> <span>›</span> <span>E-mail não chegou</span>
+    </nav>
+
+    <h1>O e-mail não chegou</h1>
+    <p class="artigo__resumo">Vale para o acesso ao portal, o acesso ao painel e o "Esqueci a senha".</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">search</i> Como reconhecer</h2>
+    <ul>
+      <li>A pessoa diz que não recebeu a senha provisória ou o link de "Esqueci a senha".</li>
+      <li>No painel aparece <b>"O envio de e-mail ainda não foi configurado"</b>.</li>
+    </ul>
+
+    </div>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">storefront</i> O que o cliente faz</h2>
+    <ul>
+      <li>Olhe a caixa de <b>spam</b> ou <b>lixo eletrônico</b>. Procure pelo assunto "Criar uma senha nova no portal" ou pelo nome do remetente.</li>
+      <li>Espere alguns minutos: quem envia é o worker, pela fila.</li>
+      <li>O link de "Esqueci a senha" vale <b>1 hora</b>. Se venceu, peça outro.</li>
+      <li>Se mesmo assim não chegar, peça ao responsável da sua empresa uma <b>Nova senha</b> (tela Usuários) ou fale com o suporte.</li>
+    </ul>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">support_agent</i> O que o suporte faz</h2>
+    <ul>
+      <li>Abra <span class="botao-nome">Sistema</span> › <b>E-mail</b>. Se aparece <b>E-mail não configurado</b>, preencha o que falta e clique em <b>Salvar e-mail</b>.</li>
+      <li>Mande um <b>e-mail de teste</b> para você mesmo. Se der erro, a mensagem diz o motivo (senha errada, porta errada...).</li>
+      <li>Confira se o <b>worker está ligado</b>: sem ele, os e-mails ficam na fila.</li>
+      <li>Enquanto isso, na ficha da empresa use <b>Copiar dados de acesso</b> e mande pelo WhatsApp.</li>
+    </ul>
+    <figure class="print">
+      <img src="../img/admin/sistema-06-email.png" alt="Bloco E-mail do Sistema com os campos de servidor, porta, usuário, senha e remetente" loading="lazy">
+    </figure>
+
+    <h2 style="margin-top:28px">Erros comuns ao configurar</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Situação</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>Falha de login no servidor de e-mail.</td><td>Confira usuário e senha. No Gmail, use uma "senha de app".</td></tr>
+          <tr><td>Não conecta.</td><td>Porta 465 combina com "TLS direto"; porta 587 com "STARTTLS". Confira com o provedor.</td></tr>
+          <tr><td>O e-mail cai sempre no spam.</td><td>Use um remetente do mesmo domínio da conta e peça a quem cuida do domínio para configurar SPF/DKIM.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 08/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

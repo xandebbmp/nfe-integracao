@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Certificado vencido - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo "Problemas comuns": sintoma -> o cliente faz -> o suporte faz. Modelo geral: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Problemas comuns</span> <span>›</span> <span>Certificado vencido</span>
+    </nav>
+
+    <h1>Certificado vencido ou perto de vencer</h1>
+    <p class="artigo__resumo">Sem certificado válido, a empresa não emite. O sistema avisa 30 dias antes.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">search</i> Como reconhecer</h2>
+    <ul>
+      <li>No portal, o selo do canto inferior do menu fica amarelo (<b>vence em X dias</b>) ou vermelho (<b>Certificado vencido</b>).</li>
+      <li>Na tela inicial do portal aparece o aviso em "Precisa da sua atenção".</li>
+      <li>No painel, a coluna <b>Certificado</b> mostra a data de vencimento, e o "Pronta para emitir?" da empresa avisa.</li>
+    </ul>
+
+    </div>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">storefront</i> O que o cliente faz</h2>
+    <ul>
+      <li>Renove o certificado <b>A1</b> com a sua certificadora (ou com o seu contador) <b>antes</b> de vencer.</li>
+      <li>Mande o arquivo novo (<code>.pfx</code>) e a senha para o suporte, por um canal seguro.</li>
+    </ul>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">support_agent</i> O que o suporte faz</h2>
+    <ul>
+      <li>Abra a ficha da empresa no painel, bloco <b>Certificado digital</b>.</li>
+      <li>Escolha o arquivo novo, digite a senha e clique em <span class="botao-nome">Enviar certificado</span>. O novo substitui o antigo na hora.</li>
+      <li>Confira se aparece em verde a validade nova. Notas que tinham falhado por certificado podem ser reenviadas.</li>
+      <li>Passo a passo completo: <a href="../admin/certificado-pronta.html">Certificado e "pronta para emitir"</a>.</li>
+    </ul>
+    <figure class="print">
+      <img src="../img/admin/certificado-03-aceito.png" alt="Certificado aceito com a nova validade, em verde" loading="lazy">
+    </figure>
+
+    <h2 style="margin-top:28px">Erros ao enviar o certificado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Mensagem</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>Senha incorreta ou o arquivo não é um certificado A1.</td><td>Confira a senha com o cliente e se o arquivo é .pfx ou .p12.</td></tr>
+          <tr><td>Este certificado é do CNPJ ..., que não é desta empresa.</td><td>O cliente mandou o de outra empresa. Peça o certo.</td></tr>
+          <tr><td>Certificado vencido.</td><td>O arquivo enviado é o antigo. Peça o renovado.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 08/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

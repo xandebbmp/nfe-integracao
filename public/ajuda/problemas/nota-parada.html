@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nota parada - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo "Problemas comuns": sintoma -> o cliente faz -> o suporte faz. Modelo geral: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Problemas comuns</span> <span>›</span> <span>Nota parada</span>
+    </nav>
+
+    <h1>A nota ficou parada "Na fila" ou "Processando"</h1>
+    <p class="artigo__resumo">Normalmente a nota sai em segundos. Se ficou parada, quase sempre é o worker desligado ou a prefeitura lenta.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">search</i> Como reconhecer</h2>
+    <ul>
+      <li>Em <b>Minhas notas</b>, a nota continua <span class="pilula pilula--info">Na fila</span> ou <span class="pilula pilula--info">Processando</span> por muitos minutos.</li>
+      <li>No painel, o botão <b>Sistema</b> está com a bolinha <b>vermelha</b> ou <b>amarela</b>.</li>
+    </ul>
+
+    </div>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">storefront</i> O que o cliente faz</h2>
+    <ul>
+      <li><b>Não emita de novo.</b> A nota já está na fila: emitir outra pode gerar nota em dobro.</li>
+      <li>Espere alguns minutos. A lista se atualiza sozinha.</li>
+      <li>Se passar de <b>1 hora</b>, avise o suporte com o número da DPS (aparece na coluna Número).</li>
+    </ul>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">support_agent</i> O que o suporte faz</h2>
+    <ul>
+      <li>Abra o painel e clique em <span class="botao-nome">Sistema</span>. Veja o bloco <b>Worker</b>:</li>
+      <li><b>Worker parado</b>: clique em <b>Ligar worker</b>. As notas da fila saem sozinhas em seguida.</li>
+      <li><b>Pausado</b>: alguém pausou os envios. Se não há motivo para continuar pausado, clique em <b>Retomar envios</b>.</li>
+      <li><b>Ligado</b>, mas a fila não anda: clique em <b>Rodar diagnóstico</b>. Se aparecer "não respondeu" para a prefeitura ou a SEFAZ, o problema é de fora (instabilidade deles ou internet do servidor). O worker tenta de novo sozinho, com espera cada vez maior.</li>
+      <li>Confira no <b>Monitor</b> a <b>Última ação</b> da nota: ela diz o que o sistema está esperando.</li>
+    </ul>
+    <figure class="print">
+      <img src="../img/admin/sistema-02-worker-parado.png" alt="Bloco Worker mostrando Worker parado e o botão Ligar worker" loading="lazy">
+      <figcaption>Worker parado: é só clicar em "Ligar worker".</figcaption>
+    </figure>
+    <figure class="print">
+      <img src="../img/admin/sistema-03-fila.png" alt="Bloco Fila de envio com os números de esperando, enviando, agendados e falhas" loading="lazy">
+    </figure>
+
+    <h2 style="margin-top:28px">Ainda não resolveu?</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Situação</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>"Ligar worker" não liga.</td><td>Rode o diagnóstico e mande o resultado para quem cuida do servidor.</td></tr>
+          <tr><td>Muitas notas em "falharam nas últimas 24 h".</td><td>Abra cada uma no Monitor e veja a mensagem. Se for certificado, veja <a href="certificado-vencido.html">Certificado vencido</a>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 08/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>
