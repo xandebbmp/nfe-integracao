@@ -12,6 +12,7 @@ namespace Xande\NfeIntegracao\Nfse\Dominio;
  *
  * Ficam FORA de proposito (so no arquivo config/nfse.local.php):
  *   - senhas e tokens (admin_token, monitor_token, chave_certificados, S3);
+ *     a senha do Monitor pode ser gerada no painel (ConfiguracoesPainel);
  *     a senha do e-mail tem campo proprio, criptografado (ConfiguracoesPainel);
  *   - tpAmb (homologacao/producao): tem tela propria, com confirmacao
  *     (ConfiguracoesPainel::trocarAmbiente).

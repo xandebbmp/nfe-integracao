@@ -166,6 +166,7 @@ final class NfseConfig
         $cfg = AjustesPainel::aplicar($cfg, $ajustes);
         $cfg = ConfiguracoesPainel::aplicarSenhaEmail($cfg, $ajustes);
         $cfg = ConfiguracoesPainel::aplicarAmbiente($cfg, $ajustes);
+        $cfg = ConfiguracoesPainel::aplicarSenhaMonitor($cfg, $ajustes);
 
         $repositorio = new ClienteRepositorio($pdo);
         if (!$repositorio->existe()) {
@@ -195,6 +196,7 @@ final class NfseConfig
                 'regime_especial_tributacao' => (int)$c['regime_especial_tributacao'],
                 'incentivador_cultural' => (bool)$c['incentivador_cultural'],
                 'regime_especial_abrasf' => $c['regime_especial_abrasf'] ?? null,
+                'padroes_permitidos' => $c['padroes_permitidos'] ?? [],
             ]);
             if ($c['certificado_cifrado'] !== null) {
                 $emitente['certificado'] = ['cifrado' => $c['certificado_cifrado']];

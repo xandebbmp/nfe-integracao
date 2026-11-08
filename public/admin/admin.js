@@ -13,6 +13,7 @@
      banco.php        tela Sistema: scripts do banco pendentes; botao Atualizar banco
      diagnostico.php  tela Sistema: botao Diagnostico (confere tudo, nao altera nada)
      email.php        tela Sistema: bloco E-mail (situacao e e-mail de teste)
+     monitor_senha.php tela Sistema: senha do Monitor (gerar nova; aparece uma vez)
      configuracoes.php tela Sistema: configuracoes editaveis (portal, envio, API)
      fechamento.php   fechamento do mes: receita por empresa para o DAS (JSON ou CSV)
      guia_das.php     guia DAS do Simples: anexar/trocar/remover o PDF do mes, abrir o PDF, marcar paga
@@ -1544,6 +1545,47 @@ async function abrirPdfDeclaracao(id, qual) {
   }
 }
 
+/**
+ * Sistema > "Senha do Monitor": gerada aqui, como o token das empresas.
+ * Aparece uma vez so; o banco guarda apenas o hash.
+ */
+function secaoSenhaMonitor() {
+  const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const novaArea = el('div', { 'aria-live': 'polite' });
+  const linkMonitor = new URL('../monitor/', window.location.href).href;
+
+  function desenhar(s) {
+    const gerar = el('button', { class: 'botao', type: 'button' }, s.definida ? 'Gerar senha nova' : 'Gerar senha');
+    gerar.addEventListener('click', async () => {
+      if (s.definida && !confirm('Gerar uma senha nova? A senha atual do Monitor para de funcionar na hora.')) return;
+      gerar.disabled = true;
+      try {
+        const r = await api('monitor_senha.php', { metodo: 'POST' });
+        const copiar = el('button', { class: 'botao', type: 'button', onclick: async () => {
+          try { await navigator.clipboard.writeText(r.senha); copiar.textContent = 'Copiado!'; } catch { copiar.textContent = 'Selecione e copie'; }
+        } }, 'Copiar');
+        desenhar(r.situacao);
+        novaArea.replaceChildren(el('div', { class: 'token-box' },
+          el('strong', {}, 'Senha nova do Monitor — copie agora, ela não será mostrada de novo:'), el('br'),
+          el('code', { class: 'mono' }, r.senha), el('div', { class: 'acoes' }, copiar)));
+      } catch (e) {
+        novaArea.replaceChildren(el('p', { class: 'erro' }, e.message));
+        gerar.disabled = false;
+      }
+    });
+    area.replaceChildren(
+      el('p', { class: 'suave' }, 'O Monitor mostra as notas de todas as empresas ao vivo. Quem entra neste painel já abre o Monitor sem senha. ',
+        'A senha serve para abrir ', el('a', { href: linkMonitor, target: '_blank', rel: 'noopener' }, 'o Monitor'), ' numa tela separada, por exemplo numa TV da equipe.'),
+      el('p', {}, s.no_painel ? `Senha ativa, gerada em ${dataHora(s.gerada_em)}.`
+        : s.definida ? 'Senha ativa (definida no arquivo de configuração do servidor). Gere uma aqui para passar a controlar pelo painel.'
+          : 'Nenhuma senha gerada ainda.'),
+      el('div', { class: 'acoes' }, gerar));
+  }
+
+  api('monitor_senha.php').then(desenhar).catch((e) => area.replaceChildren(el('p', { class: 'erro' }, e.message)));
+  return el('section', { class: 'secao', id: 'secao-monitor' }, el('h3', {}, 'Senha do Monitor'), area, novaArea);
+}
+
 /** Sistema > "Integração com a Receita (SERPRO)": chaves do contrato e certificado do escritório. */
 function secaoSerpro() {
   const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
@@ -2012,6 +2054,7 @@ function abrirSistema(opcoes = {}) {
     el('section', { class: 'secao', id: 'secao-banco' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
     el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
     secaoPessoasPainel(),
+    secaoSenhaMonitor(),
     el('section', { class: 'secao', id: 'secao-email' }, el('h3', {}, 'E-mail'), emailArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
     secaoSerpro(),
@@ -2021,7 +2064,7 @@ function abrirSistema(opcoes = {}) {
   carregarBanco();
   carregarConfiguracoes();
   carregarEmail();
-  const focos = { email: 'secao-email', pessoas: 'secao-pessoas', banco: 'secao-banco', serpro: 'secao-serpro' };
+  const focos = { monitor: 'secao-monitor', email: 'secao-email', pessoas: 'secao-pessoas', banco: 'secao-banco', serpro: 'secao-serpro' };
   if (focos[opcoes.focar]) setTimeout(() => $(focos[opcoes.focar])?.scrollIntoView({ block: 'start' }), 50);
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);

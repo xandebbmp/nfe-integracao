@@ -25,6 +25,9 @@ use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
  *   salvarSenhaEmail()  senha do SMTP digitada no painel: vai CRIPTOGRAFADA
  *             para sistema_ajustes ('email.senha_cifrada'), com a mesma chave
  *             dos certificados. Nunca volta para a tela.
+ *   gerarSenhaMonitor()  senha do Monitor (/monitor/), gerada pelo painel
+ *             como o token das empresas: aparece UMA vez e o banco guarda so
+ *             o sha256 ('monitor.senha'). Substitui o monitor_token do arquivo.
  *
  * Os valores passam a valer na proxima requisicao da API/portal. O worker
  * rele a cada minuto.
@@ -32,6 +35,8 @@ use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
 final class ConfiguracoesPainel
 {
     public const CHAVE_SENHA_EMAIL = 'email.senha_cifrada';
+    /** Senha do Monitor gerada no painel: ['hash' => sha256, 'gerada_em' => data]. */
+    public const CHAVE_SENHA_MONITOR = 'monitor.senha';
     /** Ambiente de emissao escolhido no painel (1 = producao, 2 = homologacao). */
     public const CHAVE_AMBIENTE = 'sistema.tpAmb';
 
@@ -164,6 +169,52 @@ final class ConfiguracoesPainel
             // Chave mudou ou sumiu: vale a senha do arquivo (se houver).
         }
         return $cfg;
+    }
+
+    // =====================================================================
+    // Senha do Monitor
+    // =====================================================================
+
+    /** @return array{definida: bool, no_painel: bool, gerada_em: ?string} */
+    public function senhaMonitor(): array
+    {
+        $salva = $this->sistema->ajustes()[self::CHAVE_SENHA_MONITOR] ?? null;
+        $noPainel = is_array($salva) && !empty($salva['hash']);
+        return [
+            'definida' => $noPainel || self::monitorTokenForte((string)($this->cfgArquivo['monitor_token'] ?? '')),
+            'no_painel' => $noPainel,
+            'gerada_em' => $noPainel ? (string)($salva['gerada_em'] ?? '') : null,
+        ];
+    }
+
+    /** Gera uma senha nova para o Monitor. A anterior para de funcionar na hora. */
+    public function gerarSenhaMonitor(?string $ip): array
+    {
+        $senha = bin2hex(random_bytes(24));
+        $this->sistema->salvarAjuste(self::CHAVE_SENHA_MONITOR, ['hash' => hash('sha256', $senha), 'gerada_em' => date('c')]);
+        (new ClienteRepositorio($this->pdo))->registrarLog(null, 'CONFIG_ALTERADA', ['monitor.senha' => 'gerada no painel'], $ip);
+        return [
+            'ok' => true,
+            'senha' => $senha,
+            'mensagem' => 'Senha do Monitor gerada. Copie agora: ela não será mostrada de novo. A senha anterior parou de funcionar.',
+            'situacao' => $this->senhaMonitor(),
+        ];
+    }
+
+    /** Usa na config a senha do Monitor gerada no painel (so o hash). */
+    public static function aplicarSenhaMonitor(array $cfg, array $ajustes): array
+    {
+        $salva = $ajustes[self::CHAVE_SENHA_MONITOR] ?? null;
+        if (is_array($salva) && is_string($salva['hash'] ?? null) && strlen($salva['hash']) === 64) {
+            $cfg['monitor_token_hash'] = $salva['hash'];
+        }
+        return $cfg;
+    }
+
+    /** Senha do monitor do arquivo serve? (vazia, curta ou de exemplo nao) */
+    public static function monitorTokenForte(string $token): bool
+    {
+        return strlen($token) >= 24 && !str_contains(strtoupper($token), 'TOKEN');
     }
 
     // =====================================================================
