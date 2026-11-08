@@ -197,43 +197,7 @@ async function entrar(token) {
   $('botao-eu').textContent = eu.pessoa ? '👤 ' + eu.pessoa.nome.split(' ')[0] : '';
   mostrarAvisoChave(eu);
   atualizarPontoSistema().catch(() => {});
-  // 1a vez neste navegador: mostra o tour guiado sozinho (depois, so pelo botao "Tour guiado").
-  if (window.Tour && !Tour.jaVisto(TOUR_PAINEL)) setTimeout(iniciarTourPainel, 500);
   return true;
-}
-
-// ===== Tour guiado do painel (ajuda/tour.js). Para mudar o texto, edite os passos abaixo. =====
-// Trocou bastante o painel? Mude o nome (v2, v3...) para todo mundo ver o tour de novo.
-const TOUR_PAINEL = 'painel-v1';
-
-function iniciarTourPainel() {
-  if (!window.Tour) return;
-  if ($('modal').open) $('modal').close();
-  Tour.iniciar({
-    id: TOUR_PAINEL,
-    passos: [
-      { alvo: null, titulo: 'Bem-vindo ao painel',
-        texto: 'Em 1 minuto mostramos onde fica cada coisa. Use as setas do teclado ou os botões. Pode fechar quando quiser.' },
-      { alvo: '#botao-sistema', titulo: 'Sistema',
-        texto: 'Worker (o robô que envia as notas), fila, atualizar banco, diagnóstico, e-mail, pessoas do painel e configurações. A bolinha verde quer dizer que está tudo rodando.' },
-      { alvo: '#contadores', titulo: 'Resumo',
-        texto: 'Quantas empresas estão liberadas, bloqueadas, vencidas ou no limite, e as notas autorizadas no mês.' },
-      { alvo: '.tabela-cartao', titulo: 'Empresas',
-        texto: 'Clique numa empresa para abrir a ficha: dados, certificado, plano, token da API e acesso ao portal.' },
-      { alvo: '#botao-nova', titulo: 'Nova empresa',
-        texto: 'Cadastre uma empresa cliente. Depois envie o certificado e dê o acesso ao portal.' },
-      { alvo: 'a[href="../monitor/"]', titulo: 'Notas (monitor)',
-        texto: 'Todas as notas de todas as empresas, em tempo real, com XML e PDF.' },
-      { alvo: '#botao-fechamento', titulo: 'Fechamento do mês',
-        texto: 'Receita de cada empresa no mês para a declaração do Simples. Aqui você anexa a guia DAS e o cliente vê no portal.' },
-      { alvo: '#botao-relatorio', titulo: 'Relatório de cobrança',
-        texto: 'Quantas notas cada empresa emitiu no mês, para cobrar o plano.' },
-      { alvo: 'a[href="../ajuda/#painel"]', titulo: 'Ajuda',
-        texto: 'Passo a passo com as telas, para cada tarefa. Abre em outra aba.' },
-      { alvo: '#botao-tour', titulo: 'Rever este tour',
-        texto: 'Quando quiser ver de novo, clique em "Tour guiado".' },
-    ],
-  });
 }
 
 // Quem entrou com a chave de emergencia ve um aviso para cadastrar as pessoas.
@@ -528,8 +492,8 @@ function desenharCliente(c) {
   const form = formularioEmpresa(c, novo);
 
   // ---- Botao salvar (barra fixa embaixo da janela) ----
-  const mensagemSalvar = el('span', { class: 'rodape__mensagem', role: 'status' });
-  const botaoSalvar = el('button', { class: 'botao botao--forte', type: 'button' }, novo ? 'Cadastrar empresa' : 'Salvar alterações');
+  const mensagemSalvar = el('span', { id: 'empresa-mensagem', class: 'rodape__mensagem', role: 'status' });
+  const botaoSalvar = el('button', { id: 'botao-salvar-empresa', class: 'botao botao--forte', type: 'button' }, novo ? 'Cadastrar empresa' : 'Salvar alterações');
   form.addEventListener('input', () => { $('modal').dataset.sujo = '1'; mensagemSalvar.className = 'rodape__mensagem aviso'; mensagemSalvar.textContent = 'Alterações não salvas'; });
   botaoSalvar.addEventListener('click', async () => {
     const corpo = lerFormulario(form);
@@ -759,10 +723,11 @@ function lerFormulario(form) {
 
 // ---- Certificado ----
 function secaoCertificado(c) {
-  const arquivo = el('input', { type: 'file', accept: '.pfx,.p12' });
-  const senha = el('input', { type: 'password', autocomplete: 'new-password' });
-  const mensagem = el('span', {});
-  const botao = el('button', { class: 'botao', type: 'button' }, 'Enviar certificado');
+  // ids usados pela ajuda guiada (admin-guias.js)
+  const arquivo = el('input', { id: 'cert-arquivo', type: 'file', accept: '.pfx,.p12' });
+  const senha = el('input', { id: 'cert-senha', type: 'password', autocomplete: 'new-password' });
+  const mensagem = el('span', { id: 'cert-mensagem' });
+  const botao = el('button', { id: 'botao-enviar-certificado', class: 'botao', type: 'button' }, 'Enviar certificado');
   botao.addEventListener('click', async () => {
     if (!arquivo.files[0]) { mensagem.className = 'erro'; mensagem.textContent = 'Escolha o arquivo .pfx.'; return; }
     const dados = new FormData();
@@ -838,10 +803,11 @@ function secaoToken(c) {
 // ---- Portal do cliente (usuarios que entram com e-mail e senha) ----
 function secaoPortal(c) {
   const lista = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
-  const area = el('div', {});
-  const nome = el('input', { type: 'text', placeholder: 'Nome da pessoa', autocomplete: 'off' });
-  const email = el('input', { type: 'email', placeholder: 'email@empresa.com.br', autocomplete: 'off' });
-  const mensagem = el('span', {});
+  // ids usados pela ajuda guiada (admin-guias.js)
+  const area = el('div', { id: 'acesso-area' });
+  const nome = el('input', { id: 'acesso-nome', type: 'text', placeholder: 'Nome da pessoa', autocomplete: 'off' });
+  const email = el('input', { id: 'acesso-email', type: 'email', placeholder: 'email@empresa.com.br', autocomplete: 'off' });
+  const mensagem = el('span', { id: 'acesso-mensagem' });
   const linkPortal = new URL('../portal/', window.location.href).href;
 
   // Aviso quando o e-mail do sistema ainda nao foi configurado.
@@ -969,8 +935,8 @@ function secaoPortal(c) {
     }
   }
 
-  const porEmail = el('input', { type: 'checkbox', checked: true });
-  const botao = el('button', { class: 'botao botao--forte', type: 'button' }, 'Dar acesso ao portal');
+  const porEmail = el('input', { id: 'acesso-por-email', type: 'checkbox', checked: true });
+  const botao = el('button', { id: 'botao-dar-acesso', class: 'botao botao--forte', type: 'button' }, 'Dar acesso ao portal');
   botao.addEventListener('click', async () => {
     mensagem.textContent = '';
     if (nome.value.trim().length < 2 || !email.checkValidity() || !email.value) {
@@ -1205,7 +1171,7 @@ async function abrirFechamento(mes) {
       r.ambiente !== 'PRODUCAO' ? el('p', { class: 'aviso' }, 'Ambiente de homologação: estas notas são de teste, sem valor fiscal.') : null,
       comNotas.length === 0
         ? el('p', { class: 'suave' }, 'Nenhuma empresa emitiu nota neste mês.')
-        : el('div', { class: 'tabela-rolagem' }, el('table', { class: 'mini' },
+        : el('div', { id: 'fechamento-tabela', class: 'tabela-rolagem' }, el('table', { class: 'mini' },
           el('thead', {}, el('tr', {},
             el('th', {}, 'Empresa'), el('th', {}, 'Simples'),
             el('th', { class: 'num' }, 'Notas'), el('th', { class: 'num', title: 'Canceladas não entram na receita' }, 'Canceladas'),
@@ -1316,17 +1282,18 @@ function vencimentoPadraoDas(mes) {
 function abrirAnexarGuia(l, mes) {
   const [ano, mm] = mes.split('-');
   const g = l.guia;
-  const arquivo = el('input', { type: 'file', accept: 'application/pdf,.pdf', required: true });
-  const valor = el('input', { type: 'text', inputmode: 'decimal', placeholder: '0,00', required: true,
+  // ids usados pela ajuda guiada (admin-guias.js)
+  const arquivo = el('input', { id: 'guia-arquivo', type: 'file', accept: 'application/pdf,.pdf', required: true });
+  const valor = el('input', { id: 'guia-valor', type: 'text', inputmode: 'decimal', placeholder: '0,00', required: true,
     value: g ? g.valor.toFixed(2).replace('.', ',') : '' });
-  const vencimento = el('input', { type: 'date', required: true, value: g ? g.vencimento : vencimentoPadraoDas(mes) });
-  const linha = el('input', { type: 'text', inputmode: 'numeric', placeholder: 'Opcional: 48 números', value: g?.linha_digitavel || '' });
-  const avisar = el('input', { type: 'checkbox', checked: true });
-  const mensagem = el('p', { class: 'suave' });
-  const salvar = el('button', { class: 'botao botao--primario', type: 'submit' }, g ? 'Trocar guia' : 'Anexar guia');
+  const vencimento = el('input', { id: 'guia-vencimento', type: 'date', required: true, value: g ? g.vencimento : vencimentoPadraoDas(mes) });
+  const linha = el('input', { id: 'guia-linha', type: 'text', inputmode: 'numeric', placeholder: 'Opcional: 48 números', value: g?.linha_digitavel || '' });
+  const avisar = el('input', { id: 'guia-avisar', type: 'checkbox', checked: true });
+  const mensagem = el('p', { id: 'guia-mensagem', class: 'suave' });
+  const salvar = el('button', { id: 'botao-salvar-guia', class: 'botao botao--primario', type: 'submit' }, g ? 'Trocar guia' : 'Anexar guia');
   const voltar = el('button', { class: 'botao', type: 'button', onclick: () => abrirFechamento(mes) }, 'Voltar');
 
-  const form = el('form', { class: 'form-guia' },
+  const form = el('form', { id: 'form-guia', class: 'form-guia' },
     g ? el('p', { class: 'aviso' }, `Já existe guia deste mês (${moeda(g.valor)}). Ao salvar, a nova substitui a antiga.`) : null,
     el('p', { class: 'suave' }, 'Gere o DAS no PGDAS-D (site do Simples Nacional), baixe o PDF e anexe aqui com o valor e o vencimento que estão na guia.'),
     el('div', { class: 'campos' },
@@ -2139,7 +2106,6 @@ $('botao-sair').addEventListener('click', () => sair());
 $('botao-nova').addEventListener('click', novaEmpresa);
 $('botao-relatorio').addEventListener('click', () => abrirRelatorio());
 $('botao-fechamento').addEventListener('click', () => abrirFechamento());
-$('botao-tour').addEventListener('click', () => iniciarTourPainel());
 $('botao-sistema').addEventListener('click', () => abrirSistema());
 $('modal-fechar').addEventListener('click', fecharModal);
 $('modal').addEventListener('cancel', (e) => { if (!podeFecharModal()) e.preventDefault(); });

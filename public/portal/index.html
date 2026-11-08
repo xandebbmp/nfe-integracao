@@ -8,9 +8,9 @@
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261108b">
-  <!-- Tour guiado (menu "Tour guiado"): o mesmo do painel admin -->
-  <link rel="stylesheet" href="../ajuda/tour.css?v=20261108a">
+  <link rel="stylesheet" href="portal.css?v=20261108c">
+  <!-- Ajuda guiada (menu "Ajuda"): o mesmo motor do painel admin -->
+  <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
 </head>
 <body>
 
@@ -223,8 +223,7 @@
             <div class="menu__titulo">Conta</div>
             <a class="menu__item" href="#empresa"><i class="icone">business</i><span>Minha empresa</span></a>
             <a class="menu__item" href="#usuarios"><i class="icone">manage_accounts</i><span>Usuários</span></a>
-            <a class="menu__item" href="../ajuda/" target="_blank" rel="noopener"><i class="icone">help_outline</i><span>Ajuda</span></a>
-            <a class="menu__item" href="#tour" id="link-tour"><i class="icone">tour</i><span>Tour guiado</span></a>
+            <a class="menu__item" href="#ajuda"><i class="icone">help_outline</i><span>Ajuda</span></a>
             <a class="menu__item" href="#sair" id="link-sair"><i class="icone">logout</i><span>Sair</span></a>
           </nav>
         </div>
@@ -312,7 +311,7 @@
                   <p class="secundario">Preencha o tomador, o serviço e o valor. O resto vem do cadastro da sua empresa.</p>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  <a class="btn btn--secundario" href="../ajuda/portal/emitir-nfse.html" target="_blank" rel="noopener" title="Abre o passo a passo em outra aba, sem perder o que você preencheu"><i class="icone icone--p">help_outline</i> Como preencher?</a>
+                  <button type="button" class="btn btn--secundario" id="botao-guia-emitir" title="O guia mostra campo a campo, nesta tela"><i class="icone icone--p">play_circle</i> Me guie</button>
                   <span class="pilula pilula--neutro" id="emitir-padrao"></span>
                 </div>
               </div>
@@ -452,6 +451,19 @@
                 </aside>
               </div>
             </form>
+          </section>
+          <!-- ===== Ajuda: guias campo a campo (lista montada por portal-guias.js) ===== -->
+          <section data-pagina="ajuda" data-titulo="Ajuda" hidden>
+            <div class="pagina-lista">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Ajuda</h1>
+                  <p class="secundario">Escolha o que você quer fazer. O guia mostra campo a campo, aqui mesmo na tela, até terminar.</p>
+                </div>
+                <a class="btn btn--secundario" href="../ajuda/" target="_blank" rel="noopener" title="Artigos com as telas, em outra aba"><i class="icone icone--p">menu_book</i> Central de Ajuda</a>
+              </div>
+              <div class="guias-ajuda" id="guias-ajuda"></div>
+            </div>
           </section>
           <!-- ===== Minhas notas ===== -->
           <section data-pagina="notas" data-titulo="Minhas notas" hidden>
@@ -847,7 +859,8 @@
     </form>
   </dialog>
 
-  <script src="../ajuda/tour.js?v=20261108a"></script>
-  <script src="portal.js?v=20261108c"></script>
+  <script src="../ajuda/tour.js?v=20261108c"></script>
+  <script src="portal.js?v=20261108d"></script>
+  <script src="portal-guias.js?v=20261108a"></script>
 </body>
 </html>
