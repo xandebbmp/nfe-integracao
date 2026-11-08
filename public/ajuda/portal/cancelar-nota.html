@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cancelar uma nota - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../portal/#notas"><i class="icone icone--p">receipt_long</i> Ir para Minhas notas</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Portal do cliente</span> <span>›</span> <span>Cancelar uma nota</span>
+    </nav>
+
+    <h1>Cancelar uma nota</h1>
+    <p class="artigo__resumo">Para quando a nota saiu com erro ou o serviço não aconteceu. O cancelamento não pode ser desfeito.</p>
+
+    <div class="caixa caixa--alerta">
+      <h2><i class="icone">warning</i> Antes de começar</h2>
+      <ul>
+        <li><b>Não dá para desfazer.</b> A nota deixa de valer para você e para o tomador.</li>
+        <li>Para <b>corrigir</b> uma nota, o caminho é: cancelar a errada e emitir uma nova com os dados certos.</li>
+        <li>Só dá para cancelar nota <span class="pilula pilula--ok">Autorizada</span>. Nota rejeitada não precisa ser cancelada, porque ela nunca valeu.</li>
+        <li>Qualquer usuário da empresa pode cancelar. O sistema guarda quem pediu.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra a nota</h2>
+        <p>Em <span class="botao-nome">Minhas notas</span>, ache a nota (use a busca ou o filtro <span class="botao-nome">Autorizadas</span>) e clique na linha dela.</p>
+      </li>
+
+      <li class="passo">
+        <h2>Clique em "Cancelar nota"</h2>
+        <p>O botão vermelho fica junto dos botões de PDF e XML.</p>
+        <figure class="print">
+          <img src="../img/portal/notas-04-detalhe.png" alt="Detalhe de uma nota autorizada com o botão Cancelar nota em vermelho" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Escolha o motivo e explique</h2>
+        <ul>
+          <li><b>Erro na emissão:</b> valor, tomador ou descrição errados.</li>
+          <li><b>Serviço não prestado:</b> o serviço não aconteceu.</li>
+          <li><b>Outro motivo:</b> qualquer outro caso.</li>
+        </ul>
+        <p>Escreva uma frase curta (mínimo 15 letras), por exemplo: <i>"Valor errado, será emitida outra nota com o valor certo."</i></p>
+        <p>Marque <b>Entendi que o cancelamento não pode ser desfeito</b>. Só então o botão <span class="botao-nome">Cancelar nota</span> é liberado.</p>
+        <figure class="print">
+          <img src="../img/portal/cancelar-02-preenchida.png" alt="Janela Cancelar nota com o motivo Erro na emissão escolhido, explicação preenchida e confirmação marcada" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Aguarde a prefeitura confirmar</h2>
+        <p>Depois de clicar, o pedido vai para a prefeitura. No detalhe da nota aparece <b>"Cancelamento pedido"</b>. A nota <b>continua valendo</b> até a prefeitura confirmar; quando confirmar, o status muda para <span class="pilula pilula--neutro">Cancelada</span>.</p>
+        <figure class="print">
+          <img src="../img/portal/cancelar-03-pedido.png" alt="Detalhe da nota com o aviso azul Cancelamento pedido, esperando a prefeitura confirmar" loading="lazy">
+        </figure>
+      </li>
+
+      <li class="passo">
+        <h2>Se era para corrigir, emita a nota nova</h2>
+        <p>No detalhe, clique em <span class="botao-nome">Nova nota para este tomador</span>. O tomador já vem preenchido; ajuste o que estava errado e emita. Veja <a href="emitir-nfse.html">Emitir uma NFS-e</a>.</p>
+      </li>
+    </ol>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">location_city</i> Notas emitidas pelo sistema da Prefeitura de Salvador</h2>
+      <p>Em Salvador, o cancelamento não é feito pelo portal, e sim no <b>site da NFS-e de Salvador</b> (Cancelamento › Gerar pedido). Quando a prefeitura aceitar, volte aqui, clique em <span class="botao-nome">Registrar cancelamento</span> e informe o <b>número do protocolo</b>. A nota passa a aparecer como cancelada. Notas do <b>Padrão Nacional</b> seguem os passos acima.</p>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>Não aparece o botão <b>Cancelar nota</b>.</td><td>A nota não está <b>Autorizada</b>, ou já existe um pedido de cancelamento esperando a prefeitura.</td></tr>
+          <tr><td>O botão <b>Cancelar nota</b> da janela está cinza.</td><td>Escolha um motivo, escreva pelo menos 15 letras e marque "Entendi que...".</td></tr>
+          <tr><td>Apareceu <b>"A prefeitura não aceitou o cancelamento"</b>.</td><td>A nota continua autorizada. Leia o "Como resolver", corrija e peça de novo. Se não entender, mande um print para o suporte.</td></tr>
+          <tr><td>O pedido está há muito tempo esperando.</td><td>A prefeitura pode estar lenta. Espere alguns minutos. Se passar de 1 hora, fale com o suporte.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

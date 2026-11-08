@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acesso ao painel - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">admin_panel_settings</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Acesso ao painel</span>
+    </nav>
+
+    <h1>Entrar no painel e cadastrar a equipe</h1>
+    <p class="artigo__resumo">Cada pessoa da equipe entra com o próprio e-mail e senha. A chave de emergência é só para o começo ou para quando ninguém consegue entrar.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">checklist</i> Antes de começar</h2>
+      <ul>
+        <li>O painel fica no endereço do sistema terminado em <code>/admin/</code>.</li>
+        <li>Quem entra no painel é <b>administrador da plataforma</b>: vê todas as empresas e pode trocar o ambiente. Nenhum cliente deve ter acesso ao painel.</li>
+        <li>A <b>chave de emergência</b> é o <code>admin_token</code> do arquivo de configuração do servidor. Guarde em lugar seguro.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Primeira vez: entre com a chave de emergência</h2>
+        <p>Quando ninguém foi cadastrado ainda, a tela já abre pedindo a <b>chave de emergência</b>. Cole a chave e clique em <span class="botao-nome">Entrar</span>. Um aviso amarelo lembra de cadastrar as pessoas.</p>
+        <figure class="print print--estreito">
+          <img src="../img/admin/acesso-01-chave.png" alt="Tela de acesso do painel pedindo a chave de emergência" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Cadastre você e a equipe</h2>
+        <p>Clique em <span class="botao-nome">Sistema</span> (no topo) e desça até <b>Pessoas do painel</b>. Preencha <b>nome</b> e <b>e-mail</b> e clique em <span class="botao-nome">Cadastrar pessoa</span>.</p>
+        <p>Deixe marcado <b>Enviar os dados de acesso por e-mail</b> se o e-mail do sistema já estiver configurado. Se não, desmarque e use <b>Copiar dados de acesso</b> para mandar pelo WhatsApp.</p>
+        <figure class="print">
+          <img src="../img/admin/acesso-02-pessoas.png" alt="Bloco Pessoas do painel com nome e e-mail preenchidos" loading="lazy">
+        </figure>
+        <figure class="print">
+          <img src="../img/admin/acesso-03-acesso-pronto.png" alt="Acesso pronto: endereço do painel, e-mail e senha provisória, com botões Enviar por e-mail e Copiar" loading="lazy">
+          <figcaption>A senha provisória aparece só agora. Depois, só gerando outra.</figcaption>
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Entre com e-mail e senha</h2>
+        <p>A partir daí, cada pessoa entra com o <b>próprio e-mail</b> e a senha. No primeiro acesso o painel pede para criar a senha (mínimo de 8 caracteres, com letras e números).</p>
+        <figure class="print print--estreito">
+          <img src="../img/admin/acesso-04-login.png" alt="Tela de acesso do painel com e-mail e senha" loading="lazy">
+        </figure>
+        <figure class="print print--estreito">
+          <img src="../img/admin/acesso-05-criar-senha.png" alt="Tela Crie a sua senha no primeiro acesso do painel" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">Outras ações em "Pessoas do painel"</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Botão</th><th>O que faz</th></tr></thead>
+        <tbody>
+          <tr><td><span class="botao-nome">✉ Enviar acesso por e-mail</span></td><td>Gera uma senha provisória nova e manda por e-mail. A senha antiga para de funcionar.</td></tr>
+          <tr><td><span class="botao-nome">Desativar</span></td><td>A pessoa não entra mais no painel. Use quando alguém sai da equipe.</td></tr>
+          <tr><td><span class="botao-nome">Trocar minha senha</span></td><td>Na sua própria linha (ou no botão com o seu nome, no topo).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>Esqueci a minha senha do painel.</td><td>Peça a outra pessoa da equipe para clicar em <b>✉ Enviar acesso por e-mail</b> na sua linha. Se ninguém consegue entrar, use a chave de emergência.</td></tr>
+          <tr><td>"Sessão encerrada. Entre de novo".</td><td>O login venceu. Entre de novo com e-mail e senha.</td></tr>
+          <tr><td>A pessoa aparece como <b>Bloqueada (senhas erradas)</b>.</td><td>Espere alguns minutos ou envie um acesso novo para ela.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

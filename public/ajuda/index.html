@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Central de Ajuda - Gestão Fiscal</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../portal/portal.css">
+  <link rel="stylesheet" href="ajuda.css">
+</head>
+<body>
+  <!--
+    Central de Ajuda: lista de todos os artigos.
+    Artigo pronto = <a href="...">. Artigo ainda nao escrito = <span class="em-breve">.
+    Ao terminar um artigo, troque o <span class="em-breve"> por <a href="pasta/arquivo.html">.
+  -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="./"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../portal/"><i class="icone icone--p">arrow_back</i> Voltar ao portal</a>
+  </header>
+
+  <main class="ajuda">
+    <div class="capa">
+      <h1>Como podemos ajudar?</h1>
+      <p>Passo a passo, com as telas do sistema, para as tarefas do dia a dia.</p>
+    </div>
+
+    <!-- ===== Para o cliente (portal) ===== -->
+    <section class="grupo-ajuda">
+      <h2><i class="icone">storefront</i> Portal do cliente</h2>
+      <p>Para quem emite as notas da empresa.</p>
+      <ul class="lista-artigos">
+        <li><a href="portal/emitir-nfse.html"><i class="icone">post_add</i><span><b>Emitir uma NFS-e</b><small>Tomador, serviço, valor e acompanhar a nota</small></span></a></li>
+        <li><a href="portal/primeiro-acesso.html"><i class="icone">login</i><span><b>Primeiro acesso e "esqueci a senha"</b><small>Entrar, criar a senha e recuperar o acesso</small></span></a></li>
+        <li><a href="portal/minhas-notas.html"><i class="icone">receipt_long</i><span><b>Minhas notas: status, PDF e XML</b><small>Achar uma nota, baixar arquivos e resolver rejeição</small></span></a></li>
+        <li><a href="portal/cancelar-nota.html"><i class="icone">block</i><span><b>Cancelar uma nota</b><small>Motivo, confirmação da prefeitura e emitir a nota certa</small></span></a></li>
+        <li><a href="portal/tomadores-servicos.html"><i class="icone">groups</i><span><b>Cadastrar tomadores e serviços</b><small>Cadastre uma vez, escolha na lista na hora de emitir</small></span></a></li>
+        <li><a href="portal/recorrencias.html"><i class="icone">event_repeat</i><span><b>Recorrências (nota todo mês)</b><small>Sair sozinha ou esperar a sua confirmação</small></span></a></li>
+        <li><a href="portal/usuarios.html"><i class="icone">manage_accounts</i><span><b>Usuários da empresa</b><small>Convidar, nova senha e desativar</small></span></a></li>
+      </ul>
+    </section>
+
+    <!-- ===== Para o administrador (painel) ===== -->
+    <section class="grupo-ajuda" id="painel">
+      <h2><i class="icone">admin_panel_settings</i> Painel do administrador</h2>
+      <p>Para quem cadastra as empresas e cuida da plataforma.</p>
+      <ul class="lista-artigos">
+        <li><a href="admin/acesso-painel.html"><i class="icone">badge</i><span><b>Entrar no painel e cadastrar a equipe</b><small>Chave de emergência, pessoas do painel e senha</small></span></a></li>
+        <li><a href="admin/nova-empresa.html"><i class="icone">domain_add</i><span><b>Cadastrar uma nova empresa</b><small>Dados, impostos, plano, limite e token da API</small></span></a></li>
+        <li><a href="admin/certificado-pronta.html"><i class="icone">verified_user</i><span><b>Certificado e "pronta para emitir"</b><small>Enviar o .pfx e resolver o que falta</small></span></a></li>
+        <li><a href="admin/acesso-portal.html"><i class="icone">mail</i><span><b>Dar acesso ao portal e enviar por e-mail</b><small>Login de quem emite na empresa cliente</small></span></a></li>
+        <li><a href="admin/monitor-cobranca.html"><i class="icone">monitor_heart</i><span><b>Monitor de notas e relatório de cobrança</b><small>Notas em tempo real e uso do mês</small></span></a></li>
+        <li><a href="admin/sistema.html"><i class="icone">settings</i><span><b>Sistema: worker, banco, diagnóstico e e-mail</b><small>O que mantém as notas saindo</small></span></a></li>
+        <li><a href="admin/ambiente.html"><i class="icone">swap_horiz</i><span><b>Trocar homologação e produção</b><small>Só o administrador da plataforma</small></span></a></li>
+      </ul>
+    </section>
+
+    <!-- ===== Problemas comuns ===== -->
+    <section class="grupo-ajuda">
+      <h2><i class="icone">build</i> Problemas comuns</h2>
+      <p>O que fazer quando algo não sai como esperado.</p>
+      <ul class="lista-artigos">
+        <li><a href="problemas/nota-parada.html"><i class="icone">hourglass_top</i><span><b>A nota ficou parada "Na fila" ou "Processando"</b><small>Worker, fila e quando reenviar</small></span></a></li>
+        <li><a href="problemas/nota-rejeitada.html"><i class="icone">error</i><span><b>A prefeitura rejeitou a nota</b><small>Ler o motivo, corrigir e emitir de novo</small></span></a></li>
+        <li><a href="problemas/email-nao-chegou.html"><i class="icone">mark_email_unread</i><span><b>O e-mail não chegou</b><small>Spam, endereço errado e configuração de e-mail</small></span></a></li>
+        <li><a href="problemas/certificado-vencido.html"><i class="icone">event_busy</i><span><b>Certificado vencido ou perto de vencer</b><small>Aviso de 30 dias e troca do .pfx</small></span></a></li>
+        <li><a href="problemas/emissao-bloqueada.html"><i class="icone">lock</i><span><b>Emissão bloqueada, vencida ou limite atingido</b><small>Quando a empresa não consegue emitir</small></span></a></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

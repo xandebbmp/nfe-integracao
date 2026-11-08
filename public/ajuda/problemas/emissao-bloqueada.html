@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emissão bloqueada - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo "Problemas comuns": sintoma -> o cliente faz -> o suporte faz. Modelo geral: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Problemas comuns</span> <span>›</span> <span>Emissão bloqueada</span>
+    </nav>
+
+    <h1>Emissão bloqueada, vencida ou limite atingido</h1>
+    <p class="artigo__resumo">O sistema recusa a nota antes de mandar para a prefeitura quando o cadastro da empresa não permite emitir.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">search</i> Como reconhecer</h2>
+    <ul>
+      <li>Ao emitir, aparece <b>"Emissão bloqueada"</b>, <b>"Período de uso vencido"</b> ou <b>"Limite mensal de N notas atingido"</b>.</li>
+      <li>No painel, a empresa aparece como <b>Bloqueada</b>, <b>Vencida</b> ou <b>Limite atingido</b>.</li>
+    </ul>
+
+    </div>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">storefront</i> O que o cliente faz</h2>
+    <ul>
+      <li>Fale com o suporte. A mensagem mostra o motivo do bloqueio, quando houver.</li>
+      <li>Depois de liberado, reenvie a nota (botão <b>Reenviar</b> em Minhas notas) ou emita de novo.</li>
+    </ul>
+
+    <h2 style="margin-top:28px;display:flex;align-items:center;gap:8px"><i class="icone">support_agent</i> O que o suporte faz</h2>
+    <ul>
+      <li>Abra a ficha da empresa e, em <b>Mais opções</b>:</li>
+      <li><b>Bloqueada</b>: marque <b>Emissão liberada</b>.</li>
+      <li><b>Vencida</b>: ajuste <b>Liberado até</b> (vazio = sem vencimento).</li>
+      <li><b>Limite atingido</b>: aumente o <b>Limite de notas por mês</b> (vazio = sem limite), ou espere o mês virar.</li>
+      <li>Clique em <b>Salvar alterações</b>. A liberação vale na hora.</li>
+    </ul>
+    <figure class="print">
+      <img src="../img/admin/empresa-02-mais-opcoes.png" alt="Bloco Mais opções com Emissão liberada, Liberado até, Plano e Limite de notas por mês" loading="lazy">
+    </figure>
+
+    <h2 style="margin-top:28px">Bom saber</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>Pergunta</th><th>Resposta</th></tr></thead>
+        <tbody>
+          <tr><td>O que conta para o limite do mês?</td><td>As notas autorizadas no mês e as que ainda estão na prefeitura.</td></tr>
+          <tr><td>O cliente vê o motivo do bloqueio?</td><td>Sim, o texto de "Motivo do bloqueio" aparece para ele.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 08/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

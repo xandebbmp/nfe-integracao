@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Homologação e produção - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">swap_horiz</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Homologação e produção</span>
+    </nav>
+
+    <h1>Trocar homologação e produção</h1>
+    <p class="artigo__resumo">Homologação é teste, sem valor fiscal. Produção é para valer. Só o administrador da plataforma troca, pelo painel.</p>
+
+    <div class="caixa caixa--alerta">
+      <h2><i class="icone">warning</i> Antes de começar</h2>
+      <ul>
+        <li><b>Só administrador da plataforma</b> (quem entra no painel) troca o ambiente. Nenhum cliente consegue.</li>
+        <li>A troca vale para <b>o sistema todo</b>: NF-e e NFS-e, API, portal e worker, para todas as empresas.</li>
+        <li>Homologação e produção têm <b>numeração separada</b>.</li>
+        <li>Antes de ligar a produção, confira se as empresas liberadas já têm <b>certificado</b>: o painel avisa quais faltam.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra Sistema › Ambiente de emissão</h2>
+        <p>Clique em <span class="botao-nome">Sistema</span>. O primeiro bloco mostra o ambiente de agora: <b>2 - Homologação</b> ou <b>1 - Produção</b>. No topo do painel também aparece o selo do ambiente.</p>
+        <figure class="print">
+          <img src="../img/admin/sistema-01-ambiente.png" alt="Bloco Ambiente de emissão mostrando 2 - Homologação" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Para ligar a produção, digite PRODUÇÃO</h2>
+        <p>No quadro vermelho <b>Passar para produção</b>, digite a palavra <b>PRODUÇÃO</b>. Só então o botão <span class="botao-nome">Ligar produção</span> é liberado. Clique nele.</p>
+        <p>A partir daí, <b>toda nota emitida vale de verdade</b>. O painel mostra a faixa <b>PRODUÇÃO LIGADA</b> no topo.</p>
+        <figure class="print">
+          <img src="../img/admin/ambiente-01-confirmar.png" alt="Quadro Passar para produção com a palavra PRODUÇÃO digitada e o botão Ligar produção" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Para voltar aos testes</h2>
+        <p>Com a produção ligada, o bloco mostra <span class="botao-nome">Voltar para homologação (testes)</span>. Clique e confirme. As próximas notas serão só de teste.</p>
+
+      </li>
+    </ol>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">info</i> Modelo da nota NFS-e Nacional na produção</h2>
+      <p>A Receita está trocando o modelo da NFS-e Nacional. A homologação já usa o modelo novo; a produção ainda usa o antigo. Quando a Receita mudar a produção, as notas de produção vão voltar com o erro <b>E1235</b> pedindo o <code>finNFSe</code>. Aí é só clicar em <span class="botao-nome">A Receita mudou: usar o modelo novo na produção</span> e reenviar as notas.</p>
+    </div>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>O botão <b>Ligar produção</b> não libera.</td><td>Digite exatamente PRODUÇÃO (com ou sem acento).</td></tr>
+          <tr><td>Liguei a produção sem querer.</td><td>Volte para homologação na hora. Notas que já saíram em produção valem: se for o caso, cancele-as.</td></tr>
+          <tr><td>Notas de produção voltam com E1235 (finNFSe).</td><td>Use o botão do modelo novo, descrito acima, e reenvie.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 07/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>
