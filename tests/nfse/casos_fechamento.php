@@ -126,6 +126,27 @@ function testesGuiasDas(PDO $pdo, array $cfgGeral, string $cnpj, string $mes): v
 
     $acoes = $pdo->query("SELECT acao FROM fiscal_admin_log WHERE cnpj = '{$cnpj}' AND acao LIKE 'GUIA_DAS%' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN);
     Apoio::igual(['GUIA_DAS_ANEXADA', 'GUIA_DAS_TROCADA'], $acoes, 'historico: anexada e trocada');
+    // ---- Marcar como paga (script 0016) ----
+    $id = $r['guia']['id'];
+    Apoio::verificar($guias->pagamentoInstalado(), 'script 0016: da para marcar como paga');
+    Apoio::igual('NAO_ENCONTRADA', $guias->definirPagamento($id, '', 'Portal: X', 'ip', '41986662000160')['codigo'] ?? null,
+        'pagar: portal de outra empresa nao mexe na guia');
+    Apoio::igual('DATA_INVALIDA', $guias->definirPagamento($id, '2999-01-01', 'Ana', 'ip')['codigo'] ?? null, 'pagar: data no futuro recusada');
+    $p = $guias->definirPagamento($id, '2026-01-15', 'Portal: Maria Souza <maria@fechamento.com.br>', 'ip', $cnpj);
+    Apoio::igual(['2026-01-15', 'Portal: Maria Souza <maria@fechamento.com.br>'], [$p['guia']['pago_em'] ?? null, $p['guia']['pago_marcado_por'] ?? null],
+        'pagar: cliente marca pelo portal (guarda data e quem marcou)');
+    Apoio::igual('PAGA', $guias->daEmpresa($cnpj, '2031-01-01')[0]['situacao'], 'portal: paga nao aparece como vencida');
+    $hoje = (new DateTimeImmutable('now', new DateTimeZone('America/Bahia')))->format('Y-m-d');
+    Apoio::igual($hoje, $guias->definirPagamento($id, '', 'Ana', 'ip')['guia']['pago_em'] ?? null, 'pagar: data vazia = hoje');
+    $d = $guias->definirPagamento($id, null, 'Ana', 'ip');
+    Apoio::igual([null, null, 'VENCIDA'], [$d['guia']['pago_em'], $d['guia']['pago_marcado_por'], $guias->daEmpresa($cnpj, '2031-01-01')[0]['situacao']],
+        'desfazer: volta a nao paga');
+    $guias->definirPagamento($id, '', 'Ana', 'ip');
+    $guias->anexar(['avisar' => false] + $dados, $pdf, 'das-nova.pdf', 'ip');
+    Apoio::igual(null, $guias->buscar($id)['pago_em'], 'trocar a guia: a nova volta a "nao paga"');
+    Apoio::igual(3, (int)$pdo->query("SELECT count(*) FROM fiscal_admin_log WHERE cnpj = '{$cnpj}' AND acao = 'GUIA_DAS_PAGA'")->fetchColumn(),
+        'historico: cada "pago" registrado');
+
     Apoio::verificar($guias->remover($r['guia']['id'], 'ip')['ok'] && $guias->daEmpresa($cnpj) === [], 'remover: some do portal');
     Apoio::igual('NAO_ENCONTRADA', $guias->remover($r['guia']['id'], 'ip')['codigo'] ?? null, 'remover: guia inexistente');
 }

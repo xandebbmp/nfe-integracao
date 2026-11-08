@@ -1895,6 +1895,7 @@
   // Rota: /v1/portal/guias.php
   // ------------------------------------------------------------------
   var SITUACAO_GUIA = {
+    PAGA: ['Paga', 'ok'],
     A_VENCER: ['A vencer', 'info'],
     VENCE_HOJE: ['Vence hoje', 'alerta'],
     VENCIDA: ['Venceu', 'erro']
@@ -1918,24 +1919,51 @@
       corpo.innerHTML = guias.map(function (g) {
         var s = SITUACAO_GUIA[g.situacao] || [g.situacao, 'neutro'];
         var pdf = linkApi('/v1/portal/guias.php?id=' + g.id);
-        var copiar = g.linha_digitavel
+        var paga = g.situacao === 'PAGA';
+        var copiar = g.linha_digitavel && !paga
           ? '<button type="button" class="btn btn--secundario" data-copiar="' + escapar(g.linha_digitavel) + '"><i class="icone icone--p">content_copy</i> Copiar código</button>'
           : '';
+        // "Ja paguei" so existe com o banco atualizado (script 0016).
+        var pagar = !r.pagamento_instalado ? ''
+          : (paga
+            ? '<button type="button" class="btn btn--secundario" data-desfazer="' + g.id + '" title="Desfazer o pago">Desfazer</button>'
+            : '<button type="button" class="btn btn--secundario" data-pagar="' + g.id + '" data-mes="' + escapar(mesBarraAno(g.competencia)) + '"><i class="icone icone--p">check_circle</i> Já paguei</button>');
         return '<tr>'
           + '<td><b>' + escapar(mesBarraAno(g.competencia)) + '</b><span class="sub">Simples Nacional (DAS)</span></td>'
           + '<td class="direita num">' + reais(g.valor) + '</td>'
           + '<td class="num">' + escapar(dataCurta(g.vencimento)) + '</td>'
-          + '<td><span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span></td>'
-          + '<td class="acoes">' + copiar
+          + '<td><span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span>'
+          + (paga && g.pago_em ? '<span class="sub">em ' + escapar(dataCurta(g.pago_em)) + '</span>' : '') + '</td>'
+          + '<td class="acoes">' + pagar + copiar
           + '<a class="btn btn--primario" href="' + escapar(pdf) + '" target="_blank" rel="noopener"><i class="icone icone--p">picture_as_pdf</i> Abrir guia</a></td>'
           + '</tr>';
       }).join('');
       corpo.querySelectorAll('[data-copiar]').forEach(function (botao) {
         botao.addEventListener('click', function () { copiarCodigo(botao.getAttribute('data-copiar')); });
       });
+      corpo.querySelectorAll('[data-pagar]').forEach(function (botao) {
+        botao.addEventListener('click', function () {
+          if (!window.confirm('Confirma que a guia de ' + botao.getAttribute('data-mes') + ' já foi paga (hoje)?')) { return; }
+          pagamentoGuia({ acao: 'pagar', id: Number(botao.getAttribute('data-pagar')), data: '' }, 'Guia marcada como paga.');
+        });
+      });
+      corpo.querySelectorAll('[data-desfazer]').forEach(function (botao) {
+        botao.addEventListener('click', function () {
+          if (!window.confirm('Desfazer o "pago" desta guia?')) { return; }
+          pagamentoGuia({ acao: 'desfazer_pagamento', id: Number(botao.getAttribute('data-desfazer')) }, 'Pronto: a guia voltou para "não paga".');
+        });
+      });
     }).catch(function (erro) {
       corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">' + escapar(erro.message) + '</td></tr>';
     });
+  }
+
+  /** "Ja paguei" / desfazer. O sistema nao confere na Receita: so registra. */
+  function pagamentoGuia(corpo, mensagem) {
+    api('POST', 'guias.php', corpo).then(function () {
+      avisar(escapar(mensagem), 'check_circle');
+      carregarGuias();
+    }).catch(function (erro) { avisar(escapar(erro.message), 'error_outline'); });
   }
 
   function copiarCodigo(codigo) {

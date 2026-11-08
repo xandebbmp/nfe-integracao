@@ -9,10 +9,13 @@ declare(strict_types=1);
  *      cnpj, competencia=AAAA-MM, valor, vencimento=AAAA-MM-DD,
  *      linha_digitavel (opcional), avisar=1 (e-mail para o cliente), arquivo=@das.pdf
  * POST /v1/admin/guia_das.php   (JSON) {"acao": "remover", "id": 12}
+ * POST /v1/admin/guia_das.php   (JSON) {"acao": "pagar", "id": 12, "data": "2026-12-18"}  (data vazia = hoje)
+ * POST /v1/admin/guia_das.php   (JSON) {"acao": "desfazer_pagamento", "id": 12}
  * GET  /v1/admin/guia_das.php?id=12   abre o PDF
  */
 
 use Xande\NfeIntegracao\Nfse\Api\Api;
+use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\GuiasDas;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -38,14 +41,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // Remover (JSON)
 if (str_starts_with((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
     $corpo = $api->corpoJson();
-    if (($corpo['acao'] ?? '') !== 'remover') {
-        $api->erro(422, 'ACAO_INVALIDA', 'Ação desconhecida.');
-    }
-    $r = $guias->remover((int)($corpo['id'] ?? 0), Api::ip());
+    $id = (int)($corpo['id'] ?? 0);
+    $r = match ($corpo['acao'] ?? '') {
+        'remover' => $guias->remover($id, Api::ip()),
+        'pagar' => $guias->definirPagamento($id, (string)($corpo['data'] ?? ''), (string)ClienteRepositorio::$autor, Api::ip()),
+        'desfazer_pagamento' => $guias->definirPagamento($id, null, (string)ClienteRepositorio::$autor, Api::ip()),
+        default => $api->erro(422, 'ACAO_INVALIDA', 'Ação desconhecida.'),
+    };
     if (!$r['ok']) {
         $api->erro($r['http'], $r['codigo'], $r['mensagem']);
     }
-    $api->responder(200, ['mensagem' => 'Guia removida.']);
+    $api->responder(200, ['mensagem' => 'Feito.', 'guia' => $r['guia'] ?? null]);
 }
 
 // Anexar (multipart)

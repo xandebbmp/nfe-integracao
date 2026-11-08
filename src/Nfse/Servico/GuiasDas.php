@@ -17,6 +17,8 @@ use Xande\NfeIntegracao\Nfse\Repositorio\PortalRepositorio;
  *   Painel admin (Fechamento do mes): o contador anexa o PDF do DAS que
  *   gerou no site da Receita, com valor e vencimento. Pode trocar ou remover.
  *   Portal (menu "Guias do Simples"): o cliente ve e baixa as guias dele.
+ *   Os dois lados podem marcar a guia como PAGA (script 0016). O sistema nao
+ *   confere na Receita: e so um registro para nao mostrar "Venceu" a toa.
  *
  * Ao anexar, as pessoas ativas da empresa no portal recebem um e-mail
  * (fila sistema_emails; quem envia e o worker).
@@ -39,6 +41,12 @@ final class GuiasDas
     public function instalado(): bool
     {
         return $this->guias->existe();
+    }
+
+    /** Script 0016 aplicado (da para marcar como paga)? */
+    public function pagamentoInstalado(): bool
+    {
+        return $this->instalado() && $this->guias->temPagamento();
     }
 
     /**
@@ -96,7 +104,8 @@ final class GuiasDas
             $avisados = $this->avisarCliente($cnpj, $competencia, (float)$valor, $vencimento);
         }
 
-        return ['ok' => true, 'http' => 200, 'guia' => $this->guias->buscar($id), 'trocou' => $trocou, 'avisados' => $avisados];
+        return ['ok' => true, 'http' => 200, 'guia' => $this->guias->buscar($id), 'trocou' => $trocou, 'avisados' => $avisados,
+            'pagamento_instalado' => $this->guias->temPagamento()];
     }
 
     public function remover(int $id, string $ip): array
@@ -109,6 +118,39 @@ final class GuiasDas
         (new ClienteRepositorio($this->pdo))->registrarLog($guia['cnpj'], 'GUIA_DAS_REMOVIDA',
             ['competencia' => $guia['competencia'], 'valor' => $guia['valor']], $ip);
         return ['ok' => true, 'http' => 200];
+    }
+
+    /**
+     * Marca a guia como paga ou desmarca.
+     *
+     * @param ?string $data      AAAA-MM-DD (vazio = hoje) ou null para desmarcar
+     * @param string  $quem      quem marcou (vai para o registro)
+     * @param ?string $cnpjPortal no portal: CNPJ do usuario logado (so mexe nas guias da empresa dele)
+     */
+    public function definirPagamento(int $id, ?string $data, string $quem, string $ip, ?string $cnpjPortal = null): array
+    {
+        $guia = $this->instalado() ? $this->guias->buscar($id) : null;
+        if ($guia === null || ($cnpjPortal !== null && $guia['cnpj'] !== $cnpjPortal)) {
+            return self::falha(404, 'NAO_ENCONTRADA', 'Guia não encontrada.');
+        }
+        if (!$this->guias->temPagamento()) {
+            return self::falha(503, 'BANCO_DESATUALIZADO', 'Falta atualizar o banco (script 0016). Abra Sistema > Atualizar banco.');
+        }
+        if ($data !== null) {
+            $hoje = (new DateTimeImmutable('now', new \DateTimeZone('America/Bahia')))->format('Y-m-d');
+            $data = trim($data) === '' ? $hoje : trim($data);
+            $d = DateTimeImmutable::createFromFormat('!Y-m-d', $data);
+            if ($d === false || $d->format('Y-m-d') !== $data) {
+                return self::falha(422, 'DATA_INVALIDA', 'Data do pagamento inválida.');
+            }
+            if ($data > $hoje) {
+                return self::falha(422, 'DATA_INVALIDA', 'A data do pagamento não pode ser no futuro.');
+            }
+        }
+        $this->guias->definirPagamento($id, $data, $quem);
+        (new ClienteRepositorio($this->pdo))->registrarLog($guia['cnpj'], $data !== null ? 'GUIA_DAS_PAGA' : 'GUIA_DAS_PAGAMENTO_DESFEITO',
+            ['competencia' => $guia['competencia'], 'pago_em' => $data, 'quem' => $quem], $ip);
+        return ['ok' => true, 'http' => 200, 'guia' => $this->guias->buscar($id)];
     }
 
     /** Guia (sem o PDF) ou null. */
@@ -129,8 +171,8 @@ final class GuiasDas
     }
 
     /**
-     * Guias da empresa para o portal, com a situacao de cada uma
-     * (A_VENCER, VENCE_HOJE ou VENCIDA), pela data de hoje.
+     * Guias da empresa para o portal, com a situacao de cada uma:
+     * PAGA (marcada), ou pela data de hoje A_VENCER, VENCE_HOJE ou VENCIDA.
      */
     public function daEmpresa(string $cnpj, ?string $hoje = null): array
     {
@@ -139,7 +181,7 @@ final class GuiasDas
         }
         $hoje ??= (new DateTimeImmutable('now', new \DateTimeZone('America/Bahia')))->format('Y-m-d');
         return array_map(static function (array $g) use ($hoje): array {
-            $g['situacao'] = $g['vencimento'] > $hoje ? 'A_VENCER' : ($g['vencimento'] === $hoje ? 'VENCE_HOJE' : 'VENCIDA');
+            $g['situacao'] = $g['pago_em'] !== null ? 'PAGA' : ($g['vencimento'] > $hoje ? 'A_VENCER' : ($g['vencimento'] === $hoje ? 'VENCE_HOJE' : 'VENCIDA'));
             return $g;
         }, $this->guias->daEmpresa($cnpj));
     }

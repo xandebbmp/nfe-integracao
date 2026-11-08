@@ -13,9 +13,36 @@ use PDO;
 final class GuiaDasRepositorio
 {
     private const COLUNAS = 'id, cnpj, competencia, valor, vencimento, linha_digitavel, nome_arquivo, enviado_por, enviado_em';
+    /** Colunas do script 0016 (pagamento). Sem ele, voltam vazias. */
+    private const COLUNAS_PAGAMENTO = ', pago_em, pago_marcado_por';
+    private const SEM_PAGAMENTO = ', NULL::date AS pago_em, NULL::text AS pago_marcado_por';
+
+    /** @var array<int, bool> cache por conexao: o script 0016 ja foi aplicado? */
+    private static array $temPagamento = [];
 
     public function __construct(private PDO $pdo)
     {
+    }
+
+    /** O script 0016 (marcar como paga) ja foi aplicado? */
+    public function temPagamento(): bool
+    {
+        return self::$temPagamento[spl_object_id($this->pdo)] ??= (bool)$this->pdo->query(
+            "SELECT 1 FROM information_schema.columns WHERE table_name = 'fiscal_guias_das' AND column_name = 'pago_em'"
+        )->fetchColumn();
+    }
+
+    /** Colunas das listas (sem o PDF), com ou sem as do pagamento. */
+    private function colunas(): string
+    {
+        return self::COLUNAS . ($this->temPagamento() ? self::COLUNAS_PAGAMENTO : self::SEM_PAGAMENTO);
+    }
+
+    /** Marca como paga ($data AAAA-MM-DD) ou desmarca ($data = null). */
+    public function definirPagamento(int $id, ?string $data, ?string $quem): void
+    {
+        $this->pdo->prepare('UPDATE fiscal_guias_das SET pago_em = :data, pago_marcado_por = :quem WHERE id = :id')
+            ->execute([':data' => $data, ':quem' => $data === null ? null : $quem, ':id' => $id]);
     }
 
     /** O script 0015 ja foi aplicado? */
@@ -38,8 +65,10 @@ final class GuiaDasRepositorio
              ON CONFLICT (cnpj, competencia) DO UPDATE
                 SET valor = EXCLUDED.valor, vencimento = EXCLUDED.vencimento, linha_digitavel = EXCLUDED.linha_digitavel,
                     pdf = EXCLUDED.pdf, nome_arquivo = EXCLUDED.nome_arquivo, enviado_por = EXCLUDED.enviado_por,
-                    enviado_em = CURRENT_TIMESTAMP
-             RETURNING id'
+                    enviado_em = CURRENT_TIMESTAMP'
+            // Guia trocada (ex.: declaracao retificada) e outra guia: volta a "nao paga".
+            . ($this->temPagamento() ? ', pago_em = NULL, pago_marcado_por = NULL' : '')
+            . ' RETURNING id'
         );
         $stmt->bindValue(':cnpj', $cnpj);
         $stmt->bindValue(':competencia', $competencia);
@@ -55,7 +84,7 @@ final class GuiaDasRepositorio
 
     public function buscar(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT ' . self::COLUNAS . ' FROM fiscal_guias_das WHERE id = :id');
+        $stmt = $this->pdo->prepare('SELECT ' . $this->colunas() . ' FROM fiscal_guias_das WHERE id = :id');
         $stmt->execute([':id' => $id]);
         $linha = $stmt->fetch(PDO::FETCH_ASSOC);
         return $linha === false ? null : self::formatar($linha);
@@ -86,7 +115,7 @@ final class GuiaDasRepositorio
      */
     public function doMes(string $competencia): array
     {
-        $stmt = $this->pdo->prepare('SELECT ' . self::COLUNAS . ' FROM fiscal_guias_das WHERE competencia = :c');
+        $stmt = $this->pdo->prepare('SELECT ' . $this->colunas() . ' FROM fiscal_guias_das WHERE competencia = :c');
         $stmt->execute([':c' => $competencia]);
         $saida = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $l) {
@@ -102,7 +131,7 @@ final class GuiaDasRepositorio
      */
     public function daEmpresa(string $cnpj, int $limite = 24): array
     {
-        $stmt = $this->pdo->prepare('SELECT ' . self::COLUNAS . ' FROM fiscal_guias_das WHERE cnpj = :cnpj ORDER BY competencia DESC LIMIT :limite');
+        $stmt = $this->pdo->prepare('SELECT ' . $this->colunas() . ' FROM fiscal_guias_das WHERE cnpj = :cnpj ORDER BY competencia DESC LIMIT :limite');
         $stmt->bindValue(':cnpj', $cnpj);
         $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
         $stmt->execute();
