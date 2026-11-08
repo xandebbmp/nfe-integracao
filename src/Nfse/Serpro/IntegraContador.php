@@ -89,6 +89,9 @@ final class IntegraContador
     private TransporteHttp $http;
     private ?array $tokens = null;
 
+    /** Segundos de espera quando o SERPRO responde 429 (testes usam 0). */
+    public int $esperaSeLimite = 5;
+
     /**
      * @param string     $modo         'TESTE' ou 'PRODUCAO'
      * @param array|null $credenciais  so na PRODUCAO: AcessoSerpro::credenciais()
@@ -288,12 +291,20 @@ final class IntegraContador
                 'dados' => json_encode($dados, JSON_PRESERVE_ZERO_FRACTION), // a API pede o "dados" como TEXTO com JSON dentro
             ],
         ];
-        $resposta = $this->http->enviar('POST', ($this->teste() ? self::URL_TESTE : self::URL_PRODUCAO) . $rota, [
-            'Authorization' => 'Bearer ' . $tokens['access'],
-            'jwt_token' => $tokens['jwt'],
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ], (string)json_encode($corpo));
+        // HTTP 429 = muitas chamadas seguidas (acontece logo depois de transmitir a declaracao).
+        // Espera um pouco e tenta de novo, ate 2 vezes.
+        for ($tentativa = 0; ; $tentativa++) {
+            $resposta = $this->http->enviar('POST', ($this->teste() ? self::URL_TESTE : self::URL_PRODUCAO) . $rota, [
+                'Authorization' => 'Bearer ' . $tokens['access'],
+                'jwt_token' => $tokens['jwt'],
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ], (string)json_encode($corpo));
+            if ($resposta->status !== 429 || $tentativa >= 2) {
+                break;
+            }
+            sleep($this->esperaSeLimite * ($tentativa + 1));
+        }
 
         if ($resposta->status === 0) {
             return self::falha('Sem resposta do SERPRO (' . ($resposta->erroRede ?? 'rede') . '). Confira a internet e tente de novo.');

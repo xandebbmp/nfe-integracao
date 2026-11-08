@@ -84,6 +84,18 @@ function testesSerproUnidade(): void
         [$r['ok'], $r['valor_devido'] ?? null, $r['numero_declaracao'] ?? null, $r['recibo_pdf'] ?? null, $r['avisos'] ?? null],
         'declaracao: soma os tributos, numero, recibo em PDF e avisos (multa) separados do sucesso');
 
+    // 429 (limite de chamadas, visto no SERPRO logo depois de transmitir): espera e tenta de novo.
+    $http = (new TransporteFalso())->responder(429, '')->responder(200, $respDeclaracao);
+    $cli = new IntegraContador('TESTE', null, $http);
+    $cli->esperaSeLimite = 0;
+    $r = $cli->declarar('33444555000101', '2026-10', [], false);
+    Apoio::igual([true, 2], [$r['ok'], count($http->requisicoes)], 'limite de chamadas (429): tenta de novo sozinho');
+    $http = (new TransporteFalso())->responder(429, '')->responder(429, '')->responder(429, '');
+    $cli = new IntegraContador('TESTE', null, $http);
+    $cli->esperaSeLimite = 0;
+    $r = $cli->declarar('33444555000101', '2026-10', [], false);
+    Apoio::igual([false, 3], [$r['ok'], count($http->requisicoes)], 'limite de chamadas (429): desiste depois de 3 tentativas');
+
     // Producao: login com chaves + certificado, depois a chamada com os tokens.
     $cred = ['key' => 'chave-123456', 'secret' => 'segredo-123456', 'cnpj' => '41986662000160',
         'certificado' => new \Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente(Apoio::certificado())];
