@@ -82,24 +82,40 @@
       </li>
     </ol>
 
-    <h2 style="margin-top:28px">Gerar o DAS pela Receita (SERPRO) — em teste</h2>
+    <h2 style="margin-top:28px">Declarar e gerar o DAS pela Receita (SERPRO)</h2>
+    <p>Em vez de ir ao site do Simples, o sistema faz a declaração do mês e gera o DAS pela API do SERPRO (Integra Contador). A guia é anexada sozinha para o cliente.</p>
     <div class="caixa caixa--alerta">
-      <p>Por enquanto só existe o <b>modo teste</b>, gratuito. Ele chama o ambiente de demonstração do SERPRO e mostra sempre a <b>mesma guia de exemplo</b> (de 2018), que <b>não é da empresa e não é salva</b>. Serve para conferir que a ligação com a Receita funciona.</p>
+      <p><b>Modo Teste</b> (grátis): o SERPRO de demonstração responde sempre com dados de <b>exemplo</b> (de outra empresa). Serve para ver o caminho inteiro. Nada vai para a Receita nem para o cliente.</p>
+      <p><b>Modo Produção</b>: declara de verdade, em nome do cliente. Precisa do contrato com o SERPRO (cobrado por chamada), do certificado e-CNPJ do escritório e da procuração eletrônica de cada cliente no e-CAC.</p>
     </div>
     <ol class="passos">
       <li class="passo">
-        <h2>Ligue o modo teste</h2>
-        <p>Em <span class="botao-nome">Sistema</span> › <b>Configurações do sistema</b>, mude <b>Gerar DAS pela Receita</b> para <b>Teste</b> e salve.</p>
+        <h2>Ligue a integração</h2>
+        <p>Em <span class="botao-nome">Sistema</span> › <b>Configurações</b>, mude <b>Gerar DAS pela Receita</b> para <b>Teste</b> ou <b>Produção</b> e salve. Na Produção, preencha também o bloco <b>Integração com a Receita (SERPRO): acesso de produção</b>: Consumer Key e Consumer Secret (da Área do Cliente do SERPRO) e o certificado e-CNPJ de quem contratou. Clique em <span class="botao-nome">Testar login no SERPRO</span> para conferir.</p>
+        <figure class="print">
+          <img src="../img/admin/fechamento-06-acesso-serpro.png" alt="Bloco de acesso de produção do SERPRO na tela Sistema" loading="lazy">
+        </figure>
       </li>
       <li class="passo">
-        <h2>Teste numa empresa</h2>
-        <p>No Fechamento do mês aparece o link <span class="botao-nome">Testar Receita</span> na coluna Guia DAS. Clique: se a ligação funcionar, aparece <b>Funcionou!</b> com o valor, o vencimento, o número do documento e o botão para abrir o PDF de exemplo.</p>
+        <h2>Confira a receita</h2>
+        <p>No Fechamento do mês, na linha da empresa (ME/EPP), clique em <span class="botao-nome">Declarar e gerar DAS</span> (no teste: <span class="botao-nome">Testar Receita</span>). A receita vem das notas, já separada em serviços <b>sem</b> e <b>com retenção de ISS</b> e venda de mercadorias. Recebeu algo fora do sistema? Some no campo. Confira a <b>atividade</b> (na dúvida, pergunte ao contador) e a <b>folha de salários</b> dos 12 meses anteriores (obrigatória a partir de 11/2026; sem funcionário nem pró-labore, deixe 0,00).</p>
         <figure class="print">
-          <img src="../img/admin/fechamento-04-testar-receita.png" alt="Resultado do Testar Receita com a guia de exemplo do SERPRO" loading="lazy">
+          <img src="../img/admin/fechamento-05-declarar.png" alt="Tela de conferência da declaração com a receita separada por retenção de ISS" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Calcule (não envia nada)</h2>
+        <p>Clique em <span class="botao-nome">Calcular (não envia nada)</span>. A Receita devolve quanto dá cada imposto e o total do DAS. Mudou algum campo? Calcule de novo.</p>
+      </li>
+      <li class="passo">
+        <h2>Transmita</h2>
+        <p>Conferiu? Marque a confirmação e clique em <span class="botao-nome">Transmitir declaração e gerar DAS</span>. A declaração oficial vai para a Receita (se ela calcular um centavo diferente do que você conferiu, recusa e nada é enviado). Em seguida o DAS é gerado e anexado para o cliente, com aviso por e-mail. Os PDFs do <b>recibo</b> e da <b>declaração</b> ficam guardados.</p>
+        <figure class="print">
+          <img src="../img/admin/fechamento-07-transmitida.png" alt="Declaração transmitida com os impostos, o recibo e o DAS" loading="lazy">
         </figure>
       </li>
     </ol>
-    <p>A guia de verdade, gerada sozinha para cada cliente, depende do contrato com o SERPRO, do certificado e-CNPJ do escritório e da procuração eletrônica de cada cliente.</p>
+    <p>Precisa corrigir um mês já enviado? Faça de novo escolhendo <b>Retificadora</b>.</p>
 
     <h2 style="margin-top:28px">Se der errado</h2>
     <div class="rolagem">
@@ -112,8 +128,11 @@
           <tr><td>A receita está diferente do PGDAS-D.</td><td>O sistema só conhece as notas emitidas por ele. Some as receitas de fora (outros sistemas, vendas sem nota) na declaração.</td></tr>
           <tr><td>"Código de barras" recusado.</td><td>Digite só os <b>48 números</b> da linha digitável, sem pontos nem espaços.</td></tr>
           <tr><td>O cliente não recebeu o e-mail.</td><td>Veja <a href="../problemas/email-nao-chegou.html">O e-mail não chegou</a>. A guia fica no portal mesmo sem o e-mail.</td></tr>
-          <tr><td>Testar Receita: "O SERPRO recusou o pedido" ou "quota".</td><td>O ambiente de teste do SERPRO limita o número de chamadas. Espere alguns minutos e tente de novo.</td></tr>
-          <tr><td>Testar Receita: "Sem resposta do SERPRO".</td><td>O servidor não alcançou a internet do SERPRO. Rode o diagnóstico em <b>Sistema</b>.</td></tr>
+          <tr><td>"O SERPRO recusou o pedido" ou "quota" no teste.</td><td>O ambiente de teste do SERPRO limita o número de chamadas. Espere alguns minutos e tente de novo.</td></tr>
+          <tr><td>"Sem resposta do SERPRO".</td><td>O servidor não alcançou a internet do SERPRO. Rode o diagnóstico em <b>Sistema</b>.</td></tr>
+          <tr><td>"O SERPRO recusou o login".</td><td>Confira a Consumer Key, o Consumer Secret e se o certificado é o e-CNPJ de quem contratou (Sistema › acesso de produção).</td></tr>
+          <tr><td>A Receita recusou a declaração (procuração).</td><td>O cliente precisa dar procuração eletrônica no e-CAC para o CNPJ do escritório, com o serviço do Simples Nacional.</td></tr>
+          <tr><td>"Valores diferentes do calculado".</td><td>Algo mudou entre o cálculo e o envio. Clique em Calcular de novo, confira e transmita.</td></tr>
         </tbody>
       </table>
     </div>

@@ -9,6 +9,7 @@ declare(strict_types=1);
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\FechamentoMes;
 use Xande\NfeIntegracao\Nfse\Servico\GuiasDas;
+use Xande\NfeIntegracao\Nfse\Servico\DeclaracaoSimples;
 use Xande\NfeIntegracao\Nfse\Serpro\IntegraContador;
 use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
 
@@ -39,7 +40,7 @@ function testesSerproUnidade(): void
             'valores' => ['principal' => 1032.58, 'multa' => 0, 'juros' => 0, 'total' => 1032.58]],
     ]];
     $http = (new TransporteFalso())->responder(200, json_encode(['status' => 200, 'mensagens' => [['codigo' => 'Sucesso-PGDASD', 'texto' => '']], 'dados' => json_encode($das)]));
-    $r = (new IntegraContador($http))->gerarDasTeste('33444555000101', '2026-11');
+    $r = (new IntegraContador('TESTE', null, $http))->gerarDasTeste('33444555000101', '2026-11');
     Apoio::igual([true, 1032.58, '2021-02-22', '07202136999997159', $pdf],
         [$r['ok'], $r['valor'] ?? null, $r['vencimento'] ?? null, $r['numero_documento'] ?? null, $r['pdf'] ?? null],
         'gerar DAS (teste): le valor, vencimento AAAAMMDD, numero e o PDF em base64');
@@ -55,16 +56,74 @@ function testesSerproUnidade(): void
         [$corpo['contratante'], $corpo['autorPedidoDados'], $corpo['contribuinte']['tipo']],
         'envelope: no teste contratante, autor e contribuinte sao o CNPJ do cenario do SERPRO');
 
-    $erro = (new IntegraContador((new TransporteFalso())->responder(400, json_encode(['status' => 400, 'mensagens' => [['codigo' => 'Erro-PGDASD-001', 'texto' => 'Nao existe declaracao']]]))))
+    $erro = (new IntegraContador('TESTE', null, (new TransporteFalso())->responder(400, json_encode(['status' => 400, 'mensagens' => [['codigo' => 'Erro-PGDASD-001', 'texto' => 'Nao existe declaracao']]]))))
         ->gerarDasTeste('33444555000101', '2026-11');
     Apoio::verificar(!$erro['ok'] && str_contains($erro['mensagem'], 'HTTP 400') && str_contains($erro['mensagem'], 'Nao existe declaracao'), 'erro do SERPRO: mostra o codigo e o texto');
-    $semRede = (new IntegraContador((new TransporteFalso())->responder(0, '')))->gerarDasTeste('33444555000101', '2026-11');
+    $semRede = (new IntegraContador('TESTE', null, (new TransporteFalso())->responder(0, '')))->gerarDasTeste('33444555000101', '2026-11');
     Apoio::verificar(!$semRede['ok'] && str_contains($semRede['mensagem'], 'Sem resposta'), 'sem internet: explica');
-    $semPdf = (new IntegraContador((new TransporteFalso())->responder(200, json_encode(['status' => 200, 'mensagens' => [], 'dados' => '[]']))))->gerarDasTeste('33444555000101', '2026-11');
+    $semPdf = (new IntegraContador('TESTE', null, (new TransporteFalso())->responder(200, json_encode(['status' => 200, 'mensagens' => [], 'dados' => '[]']))))->gerarDasTeste('33444555000101', '2026-11');
     Apoio::verificar(!$semPdf['ok'] && str_contains($semPdf['mensagem'], 'sem a guia'), 'resposta sem guia: explica');
 
     Apoio::igual(['TESTE', null], AjustesPainel::validar('serpro.modo', 'TESTE'), 'painel: modo teste pode ser ligado');
-    Apoio::verificar(AjustesPainel::validar('serpro.modo', 'PRODUCAO')[1] !== null, 'painel: producao ainda nao existe (depende de contrato)');
+    Apoio::igual(['PRODUCAO', null], AjustesPainel::validar('serpro.modo', 'PRODUCAO'), 'painel: producao pode ser ligada');
+
+    echo "\n[15c] Integra Contador: declaracao e producao\n";
+    // Resposta como a do SERPRO de verdade: chaves com maiuscula, status em texto, codigo entre colchetes, dados em texto.
+    $respDeclaracao = json_encode(['Contratante' => [], 'status' => '200', 'mensagens' => [
+        ['codigo' => '[Sucesso-PGDASD]', 'texto' => 'Requisição efetuada com sucesso.'],
+        ['codigo' => 'Aviso-PGDASD-MSG_ISN_034', 'texto' => 'Entregue fora do prazo: multa.'],
+    ], 'dados' => json_encode(['idDeclaracao' => '00000000202104001', 'dataHoraTransmissao' => '20220803044803',
+        'valoresDevidos' => [['codigoTributo' => 1001, 'valor' => 44.0], ['codigoTributo' => 1010, 'valor' => 28.5]],
+        'declaracao' => base64_encode('%PDF-1.5 declaracao'), 'recibo' => base64_encode('%PDF-1.5 recibo'), 'darf' => null])]);
+    $http = (new TransporteFalso())->responder(200, $respDeclaracao);
+    $r = (new IntegraContador('TESTE', null, $http))->declarar('33444555000101', '2026-10', ['qualquer' => 1], false);
+    $enviado = json_decode(json_decode($http->requisicoes[0]['corpo'], true)['pedidoDados']['dados'], true);
+    Apoio::igual([IntegraContador::URL_TESTE . '/Declarar', IntegraContador::DADOS_DECLARACAO_TESTE], [$http->requisicoes[0]['url'], $enviado],
+        'teste: manda o pedido de exemplo do SERPRO (o unico que ele aceita)');
+    Apoio::igual([true, 72.5, '00000000202104001', '%PDF-1.5 recibo', ['Entregue fora do prazo: multa.']],
+        [$r['ok'], $r['valor_devido'] ?? null, $r['numero_declaracao'] ?? null, $r['recibo_pdf'] ?? null, $r['avisos'] ?? null],
+        'declaracao: soma os tributos, numero, recibo em PDF e avisos (multa) separados do sucesso');
+
+    // 429 (limite de chamadas, visto no SERPRO logo depois de transmitir): espera e tenta de novo.
+    $http = (new TransporteFalso())->responder(429, '')->responder(200, $respDeclaracao);
+    $cli = new IntegraContador('TESTE', null, $http);
+    $cli->esperaSeLimite = 0;
+    $r = $cli->declarar('33444555000101', '2026-10', [], false);
+    Apoio::igual([true, 2], [$r['ok'], count($http->requisicoes)], 'limite de chamadas (429): tenta de novo sozinho');
+    $http = (new TransporteFalso())->responder(429, '')->responder(429, '')->responder(429, '');
+    $cli = new IntegraContador('TESTE', null, $http);
+    $cli->esperaSeLimite = 0;
+    $r = $cli->declarar('33444555000101', '2026-10', [], false);
+    Apoio::igual([false, 3], [$r['ok'], count($http->requisicoes)], 'limite de chamadas (429): desiste depois de 3 tentativas');
+
+    // Producao: login com chaves + certificado, depois a chamada com os tokens.
+    $cred = ['key' => 'chave-123456', 'secret' => 'segredo-123456', 'cnpj' => '41986662000160',
+        'certificado' => new \Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente(Apoio::certificado())];
+    $http = (new TransporteFalso())->responder(200, json_encode(['access_token' => 'AT', 'jwt_token' => 'JWT', 'expires_in' => 2008]))
+        ->responder(200, $respDeclaracao)->responder(200, $respDeclaracao);
+    $prod = new IntegraContador('PRODUCAO', $cred, $http);
+    $conferidos = [['codigo' => 1001, 'valor' => 44.0]];
+    $prod->declarar('33444555000101', '2026-10', ['tipoDeclaracao' => 1], false);
+    $prod->declarar('33444555000101', '2026-10', ['tipoDeclaracao' => 1], true, $conferidos);
+    [$login, $calc, $trans] = $http->requisicoes;
+    Apoio::igual([IntegraContador::URL_LOGIN, 'Basic ' . base64_encode('chave-123456:segredo-123456'), 'TERCEIROS', 'grant_type=client_credentials'],
+        [$login['url'], $login['cabecalhos']['Authorization'], $login['cabecalhos']['role-type'], $login['corpo']], 'producao: login OAuth2 com role-type TERCEIROS');
+    $corpoCalc = json_decode($calc['corpo'], true);
+    $dadosCalc = json_decode($corpoCalc['pedidoDados']['dados'], true);
+    Apoio::igual([IntegraContador::URL_PRODUCAO . '/Declarar', 'Bearer AT', 'JWT', '41986662000160', '33444555000101', 202610, false, false],
+        [$calc['url'], $calc['cabecalhos']['Authorization'], $calc['cabecalhos']['jwt_token'], $corpoCalc['contratante']['numero'],
+            $corpoCalc['contribuinte']['numero'], $dadosCalc['pa'], $dadosCalc['indicadorTransmissao'], $dadosCalc['indicadorComparacao']],
+        'producao: calcular usa os tokens, o escritorio como contratante e NAO transmite');
+    $dadosTrans = json_decode(json_decode($trans['corpo'], true)['pedidoDados']['dados'], true);
+    Apoio::igual([true, true, [['codigoTributo' => 1001, 'valor' => 44.0]]],
+        [$dadosTrans['indicadorTransmissao'], $dadosTrans['indicadorComparacao'], $dadosTrans['valoresParaComparacao']],
+        'producao: transmitir manda os valores conferidos para a Receita comparar (login feito uma vez so)');
+
+    $semAcesso = (new IntegraContador('PRODUCAO', null, new TransporteFalso()))->gerarDas('33444555000101', '2026-10');
+    Apoio::verificar(!$semAcesso['ok'] && str_contains($semAcesso['mensagem'], 'Falta cadastrar'), 'producao sem chaves: explica e nao chama o SERPRO');
+    $recusado = (new IntegraContador('PRODUCAO', $cred, (new TransporteFalso())->responder(401, '{"error":"invalid_client"}')))->testarLogin();
+    Apoio::verificar(!$recusado['ok'] && str_contains($recusado['mensagem'], 'Consumer Key'), 'login recusado (401): diz o que conferir');
+
 }
 
 function testesFechamentoIntegracao(PDO $pdo, array $cfgGeral): void
@@ -191,4 +250,85 @@ function testesGuiasDas(PDO $pdo, array $cfgGeral, string $cnpj, string $mes): v
 
     Apoio::verificar($guias->remover($r['guia']['id'], 'ip')['ok'] && $guias->daEmpresa($cnpj) === [], 'remover: some do portal');
     Apoio::igual('NAO_ENCONTRADA', $guias->remover($r['guia']['id'], 'ip')['codigo'] ?? null, 'remover: guia inexistente');
+
+    testesDeclaracaoSimples($pdo, $cfgGeral, $cnpj, $mes);
+}
+
+function testesDeclaracaoSimples(PDO $pdo, array $cfgGeral, string $cnpj, string $mes): void
+{
+    echo "\n[16b] Declaracao do Simples e DAS pelo SERPRO\n";
+
+    $desligado = (new DeclaracaoSimples($pdo, ['serpro' => ['modo' => '']] + $cfgGeral))->preparar($cnpj, $mes);
+    Apoio::igual('SERPRO_DESLIGADO', $desligado['codigo'] ?? null, 'desligado: nao prepara');
+
+    // Uma nota com ISS retido no mes (as do caso 15 sao sem retencao).
+    $lote = $pdo->query("INSERT INTO nfse_lotes (consumidor, quantidade_documentos) VALUES ('TESTE', 1) RETURNING id")->fetchColumn();
+    $pdo->prepare("INSERT INTO nfse_documentos (lote_id, consumidor, padrao, tp_amb, emitente_cnpj, referencia, status, payload, serie, numero, data_autorizacao)
+                   VALUES (:lote, 'TESTE', 'NACIONAL', :amb, :cnpj, 'DECL-1', 'AUTORIZADO', :payload, '1', 900, now())")
+        ->execute([':lote' => $lote, ':amb' => (int)$cfgGeral['tpAmb'], ':cnpj' => $cnpj,
+            ':payload' => json_encode(['competencia' => "{$mes}-15", 'valores' => ['valor_servicos' => 400.00, 'iss_retido' => true]])]);
+
+    $cfg = ['serpro' => ['modo' => 'TESTE']] + $cfgGeral;
+    $p = (new DeclaracaoSimples($pdo, $cfg))->preparar($cnpj, $mes);
+    Apoio::igual([1250.5, 400.0, 749.5, 1, 'ANEXO_III', 12], [$p['receita']['servicos_sem_retencao'] ?? null, $p['receita']['servicos_com_retencao'] ?? null,
+        $p['receita']['mercadorias'] ?? null, $p['sugestao']['tipo_declaracao'] ?? null, $p['sugestao']['servico'] ?? null, count($p['sugestao']['folhas'] ?? [])],
+        'preparar: receita separada (com e sem retencao de ISS, mercadorias), original, Anexo III e 12 meses de folha');
+
+    // Folha: R$ 1.500,00 no penultimo mes da lista (entra tambem na lista do mes anterior).
+    $meses = array_map('strval', array_keys($p['sugestao']['folhas']));
+    $folhas = array_fill_keys($meses, '0');
+    $folhas[$meses[10]] = '1.500,00';
+    $entrada = ['cnpj' => $cnpj, 'competencia' => $mes, 'tipo_declaracao' => 1, 'servico' => 'ANEXO_III',
+        'servicos_sem_retencao' => '1.250,50', 'servicos_com_retencao' => '400,00', 'mercadoria' => 4, 'mercadorias' => '749,50',
+        'folhas' => $folhas];
+    $servico = new DeclaracaoSimples($pdo, $cfg);
+    $copia = $entrada;
+    [$decl] = $servico->montar($copia);
+    $atividades = $decl['estabelecimentos'][0]['atividades'];
+    Apoio::igual([2400.0, [14, 15, 4], [1250.5, 400.0, 749.5], 1500.0, 12],
+        [$decl['receitaPaCompetenciaInterno'], array_column($atividades, 'idAtividade'), array_column($atividades, 'valorAtividade'),
+            $decl['folhasSalario'][10]['valor'], count($decl['folhasSalario'])],
+        'montar: Anexo III sem retencao = 14, com retencao = 15, industrializada = 4; folha dos 12 meses');
+    $ruim = ['servicos_sem_retencao' => '-5', 'servico' => 'XYZ'] + $entrada;
+    Apoio::igual('DADOS_INVALIDOS', $servico->montar($ruim)[1]['codigo'] ?? null, 'montar: valor negativo e atividade desconhecida recusados');
+
+    $respDecl = json_encode(['status' => '200', 'mensagens' => [['codigo' => '[Sucesso-PGDASD]', 'texto' => 'ok']],
+        'dados' => json_encode(['idDeclaracao' => '00000000202611001', 'dataHoraTransmissao' => '20261201100000',
+            'valoresDevidos' => [['codigoTributo' => 1006, 'valor' => 100.0], ['codigoTributo' => 1010, 'valor' => 44.0]],
+            'recibo' => base64_encode('%PDF-1.5 recibo'), 'declaracao' => base64_encode('%PDF-1.5 decl')])]);
+    $respDas = json_encode(['status' => '200', 'mensagens' => [], 'dados' => json_encode([['pdf' => base64_encode('%PDF-1.4 das'),
+        'detalhamentoDas' => ['numeroDocumento' => '07202600000000001', 'dataVencimento' => '20261220', 'valores' => ['total' => 144.0]]]])]);
+
+    // Producao (SERPRO falso): transmite, guarda o recibo e anexa a guia para o cliente.
+    $cred = ['key' => 'k-12345678', 'secret' => 's-12345678', 'cnpj' => '41986662000160',
+        'certificado' => new \Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente(Apoio::certificado())];
+    $http = (new TransporteFalso())->responder(200, '{"access_token":"A","jwt_token":"J","expires_in":10}')
+        ->responder(200, $respDecl)->responder(200, $respDas);
+    $prod = new DeclaracaoSimples($pdo, ['serpro' => ['modo' => 'PRODUCAO']] + $cfgGeral, new IntegraContador('PRODUCAO', $cred, $http));
+    $mesFechado = (new DateTimeImmutable($mes . '-01'))->modify('-1 month')->format('Y-m');
+    $aberto = $prod->calcular(['competencia' => $mes] + $entrada);
+    Apoio::igual('MES_ABERTO', $aberto['codigo'] ?? null, 'producao: mes que ainda nao terminou nao declara');
+    $t = $prod->transmitir(['competencia' => $mesFechado] + $entrada, [['codigo' => 1006, 'valor' => 100.0], ['codigo' => 1010, 'valor' => 44.0]], false, 'ip');
+    Apoio::igual([true, false, '00000000202611001', 144.0, true, 144.0, '2026-12-20'],
+        [$t['ok'], $t['teste'] ?? null, $t['declaracao']['numero'] ?? null, $t['declaracao']['valor_devido'] ?? null,
+            $t['das']['anexada'] ?? null, $t['das']['valor'] ?? null, $t['das']['vencimento'] ?? null],
+        'transmitir: declaracao guardada, DAS gerado e anexado para o cliente');
+    $guia = (new GuiasDas($pdo, $cfgGeral))->doMes($mesFechado)[$cnpj] ?? null;
+    Apoio::igual([144.0, '2026-12-20'], [$guia['valor'] ?? null, $guia['vencimento'] ?? null], 'a guia aparece no Fechamento e no portal');
+    $repo = new \Xande\NfeIntegracao\Nfse\Repositorio\DeclaracaoSimplesRepositorio($pdo);
+    $salva = $repo->doMes($cnpj, $mesFechado)[0] ?? [];
+    Apoio::igual([false, 'ANEXO_III', '%PDF-1.5 recibo'], [$salva['teste'] ?? null, $salva['entrada']['servico'] ?? null, $repo->pdf((int)($salva['id'] ?? 0), 'recibo')['pdf'] ?? null],
+        'historico: entrada, valores e recibo guardados');
+    $de_novo = $prod->preparar($cnpj, $mesFechado);
+    Apoio::igual([2, '1500.00'], [$de_novo['sugestao']['tipo_declaracao'] ?? null, number_format($de_novo['sugestao']['folhas'][array_key_last($de_novo['sugestao']['folhas'])] ?? 0, 2, '.', '')],
+        'mes ja declarado: sugere retificadora; a folha da ultima declaracao vem preenchida');
+
+    // SERPRO recusou a transmissao: nada e guardado.
+    $antes = count($repo->doMes($cnpj, $mesFechado));
+    $httpErro = (new TransporteFalso())->responder(200, '{"access_token":"A","jwt_token":"J"}')
+        ->responder(400, json_encode(['status' => '400', 'mensagens' => [['codigo' => 'Erro-PGDASD-099', 'texto' => 'Valores diferentes do calculado']]]));
+    $erro = (new DeclaracaoSimples($pdo, ['serpro' => ['modo' => 'PRODUCAO']] + $cfgGeral, new IntegraContador('PRODUCAO', $cred, $httpErro)))
+        ->transmitir(['competencia' => $mesFechado] + $entrada, [], false, 'ip');
+    Apoio::verificar(!$erro['ok'] && str_contains($erro['mensagem'], 'Valores diferentes') && count($repo->doMes($cnpj, $mesFechado)) === $antes,
+        'recusada pela Receita: mostra o motivo e nao guarda nada');
 }

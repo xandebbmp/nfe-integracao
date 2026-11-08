@@ -45,7 +45,9 @@ const ACOES_HISTORICO = {
   PORTAL_USUARIO_DESATIVADO: 'Acesso ao portal desativado', PORTAL_ADMIN_CONCEDIDO: 'Virou responsável da empresa no portal',
   PORTAL_ADMIN_RETIRADO: 'Deixou de ser responsável da empresa no portal',
   GUIA_DAS_ANEXADA: 'Guia DAS anexada', GUIA_DAS_TROCADA: 'Guia DAS trocada', GUIA_DAS_REMOVIDA: 'Guia DAS removida',
-  SERPRO_DAS_TESTE: 'Teste de guia na Receita (SERPRO)', GUIA_DAS_PAGA: 'Guia DAS marcada como paga', GUIA_DAS_PAGAMENTO_DESFEITO: 'Guia DAS: "paga" desfeito',
+  SERPRO_DAS_TESTE: 'Teste de guia na Receita (SERPRO)', SERPRO_DAS: 'DAS gerado pela Receita (SERPRO)',
+  SERPRO_DECLARACAO: 'Declaração do Simples transmitida (SERPRO)', SERPRO_DECLARACAO_TESTE: 'Teste de declaração do Simples (SERPRO)',
+  GUIA_DAS_PAGA: 'Guia DAS marcada como paga', GUIA_DAS_PAGAMENTO_DESFEITO: 'Guia DAS: "paga" desfeito',
 };
 
 const ACOES_SISTEMA = {
@@ -328,7 +330,7 @@ function abrirModal(titulo, subtitulo, conteudo, opcoes = {}) {
   if (abas) { abas.replaceChildren(...(opcoes.abas ? [opcoes.abas] : [])); abas.hidden = !opcoes.abas; }
   if (rodape) { rodape.replaceChildren(...(opcoes.rodape || [])); rodape.hidden = !opcoes.rodape; }
   else if (opcoes.rodape) conteudo = [...conteudo, el('div', { class: 'acoes' }, ...opcoes.rodape)];
-  $('modal-corpo').replaceChildren(...conteudo);
+  $('modal-corpo').replaceChildren(...conteudo.filter((item) => item !== null && item !== undefined && item !== false)); // blocos que nao se aplicam (null) nao aparecem
   $('modal-corpo').scrollTop = 0;
   delete $('modal').dataset.sujo;
   if (!$('modal').open) $('modal').showModal();
@@ -1189,8 +1191,12 @@ async function abrirFechamento(mes) {
             el('td', { class: 'num' }, l.percentual_simples === null ? '—' : `${String(l.percentual_simples).replace('.', ',')}%`),
             el('td', { class: 'num' }, l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado)),
             r.guias_instalado ? el('td', {}, celulaGuia(l, mes, r.pagamento_instalado),
-              r.serpro_modo === 'TESTE' ? el('button', { class: 'link-botao guia-serpro', type: 'button', title: 'Pede uma guia ao ambiente de teste do SERPRO (exemplo, sem custo)',
-                onclick: () => testarSerpro(l, mes) }, 'Testar Receita') : null) : null))))),
+              (r.serpro_modo === 'TESTE' || r.serpro_modo === 'PRODUCAO') && l.simples === 'ME/EPP'
+                ? el('button', { class: 'link-botao guia-serpro', type: 'button', 'data-declarar': l.cnpj,
+                  title: r.serpro_modo === 'TESTE' ? 'Declaração e DAS no ambiente de teste do SERPRO (exemplo, sem custo)'
+                    : 'Confere a receita, transmite a declaração do Simples e gera o DAS pela Receita',
+                  onclick: () => abrirDeclaracao(l, mes, r.serpro_modo) }, r.serpro_modo === 'TESTE' ? 'Testar Receita' : 'Declarar e gerar DAS')
+                : null) : null))))),
       semNotas > 0 ? el('p', { class: 'suave' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
       r.guias_instalado ? null : el('p', { class: 'aviso' }, 'Para anexar as guias DAS, falta atualizar o banco: botão Sistema > Atualizar banco.'),
       el('p', { class: 'suave' },
@@ -1347,7 +1353,7 @@ async function testarSerpro(l, mes) {
   const voltar = el('button', { class: 'botao', type: 'button', onclick: () => abrirFechamento(mes) }, 'Voltar');
   abrirModal('Testar Receita (SERPRO)', `${l.razao_social} · ${mm}/${ano}`, [area, el('div', { class: 'acoes' }, voltar)]);
   try {
-    const r = await api('serpro_das.php', { metodo: 'POST', corpo: { cnpj: l.cnpj, competencia: mes } });
+    const r = await api('serpro_das.php', { metodo: 'POST', corpo: { acao: 'testar', cnpj: l.cnpj, competencia: mes } });
     const bytes = Uint8Array.from(atob(r.pdf_base64), (c) => c.charCodeAt(0));
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
     area.replaceChildren(
@@ -1361,6 +1367,236 @@ async function testarSerpro(l, mes) {
   } catch (e) {
     area.replaceChildren(el('p', { class: 'erro' }, e.message));
   }
+}
+
+// ==========================================================================
+// Declaracao do Simples e DAS pela Receita (SERPRO)
+// Fechamento do mes > "Declarar e gerar DAS" (no teste: "Testar Receita").
+// Regras no servidor: src/Nfse/Servico/DeclaracaoSimples.php
+//   1. confere a receita do mes (vem das notas) e a atividade;
+//   2. "Calcular" pergunta a Receita quanto da (nada e enviado);
+//   3. "Transmitir" envia a declaracao OFICIAL, gera o DAS e anexa para o cliente.
+// ==========================================================================
+
+/** Numero em reais digitado ("1.234,56") -> numero. */
+function lerReais(texto) {
+  const limpo = String(texto ?? '').trim().replace(/\./g, '').replace(',', '.');
+  return limpo === '' ? 0 : Number(limpo);
+}
+function reaisCampo(valor) { return Number(valor || 0).toFixed(2).replace('.', ','); }
+
+async function abrirDeclaracao(l, mes, modo) {
+  const [ano, mm] = mes.split('-');
+  const teste = modo === 'TESTE';
+  const voltar = el('button', { class: 'botao', type: 'button', onclick: () => abrirFechamento(mes) }, 'Voltar');
+  abrirModal(teste ? 'Testar Receita: declaração e DAS' : 'Declaração do Simples e DAS', `${l.razao_social} · ${mm}/${ano}`,
+    [el('p', { class: 'suave' }, 'Carregando a receita do mês...')]);
+  let p;
+  try {
+    p = await api(`serpro_das.php?cnpj=${encodeURIComponent(l.cnpj)}&competencia=${mes}`);
+  } catch (e) {
+    abrirModal('Declaração do Simples e DAS', `${l.razao_social} · ${mm}/${ano}`, [el('p', { class: 'erro' }, e.message), el('div', { class: 'acoes' }, voltar)]);
+    return;
+  }
+
+  const ids = (nome) => `decl-${nome}`;
+  const campoReais = (nome, valor) => el('input', { id: ids(nome), type: 'text', inputmode: 'decimal', value: reaisCampo(valor) });
+  const semRet = campoReais('sem-retencao', p.receita.servicos_sem_retencao);
+  const comRet = campoReais('com-retencao', p.receita.servicos_com_retencao);
+  const merc = campoReais('mercadorias', p.receita.mercadorias);
+  const servico = el('select', { id: ids('servico') }, ...Object.entries(p.servicos).map(([v, t]) =>
+    el('option', { value: v, selected: v === p.sugestao.servico }, t)));
+  const mercadoria = el('select', { id: ids('mercadoria') }, ...Object.entries(p.mercadorias).map(([v, t]) =>
+    el('option', { value: v, selected: Number(v) === p.sugestao.mercadoria }, t)));
+  const tipo = el('select', { id: ids('tipo') },
+    el('option', { value: 1, selected: p.sugestao.tipo_declaracao === 1 }, 'Original (primeira do mês)'),
+    el('option', { value: 2, selected: p.sugestao.tipo_declaracao === 2 }, 'Retificadora (corrige uma já enviada)'));
+  const folhas = Object.entries(p.sugestao.folhas).map(([pa, valor]) => ({ pa, campo: el('input', { type: 'text', inputmode: 'decimal', value: reaisCampo(valor), 'aria-label': `Folha ${pa.slice(4)}/${pa.slice(0, 4)}` }) }));
+  const total = el('strong', { id: ids('total') });
+  const somar = () => { total.textContent = moeda(lerReais(semRet.value) + lerReais(comRet.value) + lerReais(merc.value)); };
+  [semRet, comRet, merc].forEach((c) => c.addEventListener('input', () => { somar(); invalidar(); }));
+  somar();
+
+  const resultado = el('div', { id: ids('resultado'), 'aria-live': 'polite' });
+  const calcular = el('button', { id: 'botao-calcular-das', class: 'botao botao--forte', type: 'button' }, 'Calcular (não envia nada)');
+  const confirmo = el('input', { id: ids('confirmo'), type: 'checkbox' });
+  const avisar = el('input', { id: ids('avisar'), type: 'checkbox', checked: true });
+  const transmitir = el('button', { id: 'botao-transmitir-das', class: 'botao botao--forte', type: 'button', disabled: true },
+    teste ? 'Transmitir (teste) e gerar DAS' : 'Transmitir declaração e gerar DAS');
+  const passoEnviar = el('div', { id: ids('enviar'), class: 'secao', hidden: true },
+    el('h3', {}, '3. Transmitir'),
+    el('label', { class: 'linha-check' }, confirmo, teste
+      ? ' Entendi: é o ambiente de teste do SERPRO. Vai o pedido de exemplo dele e volta uma guia de exemplo (não é desta empresa e não vai para o cliente).'
+      : ` Conferi os valores. Transmitir a declaração OFICIAL do Simples de ${mm}/${ano} em nome de ${l.razao_social}.`),
+    teste ? null : el('label', { class: 'linha-check' }, avisar, ' Avisar o cliente por e-mail quando a guia estiver pronta'),
+    el('div', { class: 'acoes' }, transmitir));
+  confirmo.addEventListener('change', () => { transmitir.disabled = !confirmo.checked || !conferidos; });
+
+  let conferidos = null;
+  function invalidar() { conferidos = null; passoEnviar.hidden = true; confirmo.checked = false; transmitir.disabled = true; resultado.replaceChildren(); }
+  for (const c of [servico, mercadoria, tipo, ...folhas.map((f) => f.campo)]) c.addEventListener('input', invalidar);
+  function entrada() {
+    return {
+      cnpj: l.cnpj, competencia: mes, tipo_declaracao: Number(tipo.value),
+      servico: servico.value, servicos_sem_retencao: semRet.value, servicos_com_retencao: comRet.value,
+      mercadoria: Number(mercadoria.value), mercadorias: merc.value,
+      folhas: Object.fromEntries(folhas.map((f) => [f.pa, f.campo.value])),
+    };
+  }
+  const tabelaTributos = (tributos, totalDevido) => el('table', { class: 'mini' },
+    el('tbody', {}, ...tributos.map((t) => el('tr', {}, el('td', {}, t.nome), el('td', { class: 'num' }, moeda(t.valor)))),
+      el('tr', {}, el('td', {}, el('strong', {}, 'Total do DAS')), el('td', { class: 'num' }, el('strong', {}, moeda(totalDevido))))));
+
+  calcular.addEventListener('click', async () => {
+    invalidar();
+    calcular.disabled = true;
+    resultado.replaceChildren(el('p', { class: 'suave' }, 'Perguntando à Receita... (até 1 minuto)'));
+    try {
+      const r = await api('serpro_das.php', { metodo: 'POST', corpo: { acao: 'calcular', ...entrada() } });
+      conferidos = r.tributos.map((t) => ({ codigo: t.codigo, valor: t.valor }));
+      resultado.replaceChildren(...[
+        el('h3', {}, '2. Valores calculados pela Receita'),
+        r.teste ? el('p', { class: 'aviso' }, 'Ambiente de teste: estes valores são de EXEMPLO do SERPRO, não desta empresa.') : null,
+        tabelaTributos(r.tributos, r.valor_devido),
+        ...(r.avisos || []).map((a) => el('p', { class: 'aviso' }, a)),
+        el('p', { class: 'suave' }, 'Nada foi enviado ainda. Confira com o PGDAS-D se precisar. Mudou algum campo? Calcule de novo.')].filter(Boolean));
+      passoEnviar.hidden = false;
+    } catch (e) {
+      resultado.replaceChildren(el('p', { class: 'erro' }, e.message));
+    }
+    calcular.disabled = false;
+  });
+
+  transmitir.addEventListener('click', async () => {
+    if (!conferidos || !confirmo.checked) return;
+    transmitir.disabled = true;
+    transmitir.textContent = 'Transmitindo... (até 2 minutos)';
+    try {
+      const r = await api('serpro_das.php', { metodo: 'POST', corpo: { acao: 'transmitir', ...entrada(), conferidos, avisar: avisar.checked } });
+      const d = r.declaracao;
+      const pdf = (qual) => el('button', { class: 'botao', type: 'button', onclick: () => abrirPdfDeclaracao(d.id, qual) },
+        qual === 'recibo' ? 'Recibo da declaração (PDF)' : 'Declaração (PDF)');
+      let guia;
+      if (!r.das.ok) guia = el('p', { class: 'erro' }, `A declaração foi transmitida, mas o DAS não saiu: ${r.das.mensagem} Tente "Declarar e gerar DAS" de novo mais tarde (escolha Retificadora só se mudar valores) ou gere no PGDAS-D e anexe.`);
+      else {
+        const bytes = Uint8Array.from(atob(r.das.pdf_base64), (c) => c.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        guia = el('div', {},
+          el('p', { class: r.teste ? 'aviso' : 'ok-texto' }, r.teste
+            ? 'Guia de EXEMPLO do ambiente de teste: não é desta empresa e não foi anexada para o cliente.'
+            : `✓ Guia anexada para o cliente${r.das.avisados ? ` (${r.das.avisados} pessoa(s) avisada(s) por e-mail)` : ''}.`),
+          el('dl', { class: 'grade' },
+            el('div', {}, el('dt', {}, 'Valor'), el('dd', {}, moeda(r.das.valor))),
+            el('div', {}, el('dt', {}, 'Vencimento'), el('dd', {}, dataCurta(r.das.vencimento))),
+            el('div', {}, el('dt', {}, 'Número do DAS'), el('dd', { class: 'mono' }, r.das.numero_documento || '—'))),
+          el('p', {}, el('a', { class: 'botao', href: url, target: '_blank', rel: 'noopener' }, 'Abrir o DAS (PDF)')));
+      }
+      abrirModal(r.teste ? 'Testar Receita: pronto' : 'Declaração transmitida', `${l.razao_social} · ${mm}/${ano}`, [
+        el('div', { id: 'declaracao-pronta' },
+          el('p', { class: 'ok-texto' }, `✓ Declaração ${d.numero || ''} transmitida${r.teste ? ' (teste)' : ''}.`),
+          ...(d.avisos || []).map((a) => el('p', { class: 'aviso' }, a)),
+          tabelaTributos(d.tributos, d.valor_devido),
+          el('div', { class: 'acoes' }, d.tem_recibo ? pdf('recibo') : null, d.tem_declaracao ? pdf('declaracao') : null),
+          guia),
+        el('div', { class: 'acoes' }, el('button', { class: 'botao', type: 'button', onclick: () => abrirFechamento(mes) }, 'Voltar ao Fechamento')),
+      ]);
+    } catch (e) {
+      resultado.append(el('p', { class: 'erro' }, e.message));
+      transmitir.textContent = teste ? 'Transmitir (teste) e gerar DAS' : 'Transmitir declaração e gerar DAS';
+      transmitir.disabled = !confirmo.checked;
+    }
+  });
+
+  const jaFeitas = (p.declaracoes_do_mes || []).filter((d) => !d.teste);
+  abrirModal(teste ? 'Testar Receita: declaração e DAS' : 'Declaração do Simples e DAS', `${l.razao_social} · ${mm}/${ano}`, [
+    teste ? el('p', { class: 'aviso' }, 'Modo TESTE: o SERPRO de demonstração responde sempre com dados de exemplo. Serve para ver o caminho inteiro sem custo. Nada vai para a Receita nem para o cliente.') : null,
+    jaFeitas.length ? el('p', { class: 'aviso' }, `Já existe declaração deste mês enviada pelo sistema (nº ${jaFeitas[0].numero_declaracao || '—'}). Para corrigir, use "Retificadora".`) : null,
+    el('div', { class: 'secao', id: ids('receita') },
+      el('h3', {}, '1. Receita do mês'),
+      el('p', { class: 'suave' }, `Veio das ${p.receita.notas} nota(s) autorizada(s) no sistema. Recebeu algo fora do sistema? Some aqui.`),
+      el('div', { class: 'campos' },
+        el('label', {}, 'Tipo da declaração', tipo),
+        el('label', { class: 'largo' }, 'Atividade dos serviços (NFS-e)', servico,
+          el('span', { class: 'campo-ajuda' }, 'Na dúvida, confirme com o contador. Vale para serviços com ISS devido em ' + (p.empresa.municipio === '2927408' ? 'Salvador' : 'no município da empresa') + '.')),
+        el('label', {}, 'Serviços SEM retenção de ISS (R$)', semRet),
+        el('label', {}, 'Serviços COM retenção de ISS (R$)', comRet),
+        el('label', { class: 'largo' }, 'Atividade das mercadorias (NF-e)', mercadoria),
+        el('label', {}, 'Venda de mercadorias (R$)', merc),
+        el('p', { class: 'largo' }, 'Receita bruta do mês: ', total)),
+      recolhivel('Folha de salários dos 12 meses anteriores', 'obrigatória a partir de 11/2026 (usada no fator "r")', false,
+        el('p', { class: 'suave' }, 'Salários + pró-labore + encargos de cada mês. Sem funcionário nem pró-labore, deixe 0,00. Vem preenchida com o que foi informado na última declaração.'),
+        el('div', { class: 'campos campos--folha' }, ...folhas.map((f) => el('label', {}, `${f.pa.slice(4)}/${f.pa.slice(0, 4)}`, f.campo))))),
+    el('div', { class: 'acoes' }, calcular, voltar),
+    resultado,
+    passoEnviar,
+  ]);
+}
+
+async function abrirPdfDeclaracao(id, qual) {
+  const aba = window.open('', '_blank');
+  try {
+    const blob = await api(`serpro_das.php?id=${id}&pdf=${qual}`, { blob: true });
+    const url = URL.createObjectURL(blob);
+    if (aba) aba.location = url; else window.location = url;
+  } catch (e) {
+    if (aba) aba.close();
+    alert(`Não foi possível abrir: ${e.message}`);
+  }
+}
+
+/** Sistema > "Integração com a Receita (SERPRO)": chaves do contrato e certificado do escritório. */
+function secaoSerpro() {
+  const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
+  const retorno = el('div', { 'aria-live': 'polite' });
+
+  async function carregar(mensagem) {
+    let s;
+    try { s = await api('serpro_acesso.php'); } catch (e) { area.replaceChildren(el('p', { class: 'erro' }, e.message)); return; }
+    const key = el('input', { id: 'serpro-key', type: 'text', autocomplete: 'off', placeholder: s.chaves ? '•••••••• (já salva: digite só para trocar)' : 'Consumer Key' });
+    const secret = el('input', { id: 'serpro-secret', type: 'password', autocomplete: 'new-password', placeholder: s.chaves ? '•••••••• (já salvo)' : 'Consumer Secret' });
+    const arquivo = el('input', { id: 'serpro-cert', type: 'file', accept: '.pfx,.p12' });
+    const senha = el('input', { id: 'serpro-cert-senha', type: 'password', autocomplete: 'new-password' });
+    const salvar = el('button', { class: 'botao botao--forte', type: 'button' }, 'Salvar acesso');
+    const testar = el('button', { class: 'botao', type: 'button', disabled: !s.completo }, 'Testar login no SERPRO');
+    const apagar = el('button', { class: 'botao botao--perigo', type: 'button', hidden: !s.chaves && !s.certificado }, 'Apagar acesso');
+    const fazer = async (botao, acao) => {
+      botao.disabled = true;
+      retorno.replaceChildren(el('p', { class: 'suave' }, 'Aguarde...'));
+      try { const r = await acao(); await carregar(r.mensagem); } catch (e) { retorno.replaceChildren(el('p', { class: 'erro' }, e.message)); botao.disabled = false; }
+    };
+    salvar.addEventListener('click', () => fazer(salvar, async () => {
+      let r = null;
+      if (key.value || secret.value) r = await api('serpro_acesso.php', { metodo: 'POST', corpo: { acao: 'chaves', key: key.value, secret: secret.value } });
+      if (arquivo.files[0]) {
+        const dados = new FormData();
+        dados.append('senha', senha.value);
+        dados.append('arquivo', arquivo.files[0]);
+        r = await api('serpro_acesso.php', { metodo: 'POST', corpo: dados });
+      }
+      if (!r) throw new Error('Preencha as chaves ou escolha o certificado.');
+      return r;
+    }));
+    testar.addEventListener('click', () => fazer(testar, () => api('serpro_acesso.php', { metodo: 'POST', corpo: { acao: 'testar_login' } })));
+    apagar.addEventListener('click', () => {
+      if (confirm('Apagar as chaves e o certificado do SERPRO deste sistema?')) fazer(apagar, () => api('serpro_acesso.php', { metodo: 'POST', corpo: { acao: 'apagar' } }));
+    });
+    const c = s.certificado;
+    area.replaceChildren(...[
+      el('p', { class: 'suave' }, 'Só para o modo Produção (em Configurações > "Gerar DAS pela Receita"). Depois de contratar o Integra Contador na loja do SERPRO, copie as chaves da Área do Cliente e envie o certificado e-CNPJ de quem contratou. Cada cliente precisa dar procuração eletrônica para esse CNPJ no e-CAC. Tudo fica guardado criptografado.'),
+      el('ul', { class: 'lista-situacao' },
+        el('li', {}, s.chaves ? el('span', { class: 'ok-texto' }, '✓ Chaves salvas') : el('span', { class: 'aviso' }, 'Chaves: falta')),
+        el('li', {}, c ? el('span', { class: s.certificado_vencido ? 'ruim' : 'ok-texto' },
+          `${s.certificado_vencido ? '✕ Certificado vencido' : '✓ Certificado'}: ${c.titular} (${cnpj(c.cnpj)}), válido até ${dataCurta(c.validade)}`)
+          : el('span', { class: 'aviso' }, 'Certificado do escritório: falta'))),
+      el('div', { class: 'campos' },
+        el('label', {}, 'Consumer Key', key), el('label', {}, 'Consumer Secret', secret),
+        el('label', {}, 'Certificado e-CNPJ (.pfx)', arquivo), el('label', {}, 'Senha do certificado', senha)),
+      el('div', { class: 'acoes' }, salvar, testar, apagar),
+      mensagem ? el('p', { class: 'ok-texto' }, mensagem) : null].filter(Boolean));
+    retorno.replaceChildren();
+  }
+  carregar();
+  return el('section', { class: 'secao', id: 'secao-serpro' }, el('h3', {}, 'Integração com a Receita (SERPRO): acesso de produção'), area, retorno);
 }
 
 /** Explica por que uma empresa ficou sem "DAS estimado". */
@@ -1778,13 +2014,14 @@ function abrirSistema(opcoes = {}) {
     secaoPessoasPainel(),
     el('section', { class: 'secao', id: 'secao-email' }, el('h3', {}, 'E-mail'), emailArea),
     el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
+    secaoSerpro(),
     el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
   ]);
   recarregar();
   carregarBanco();
   carregarConfiguracoes();
   carregarEmail();
-  const focos = { email: 'secao-email', pessoas: 'secao-pessoas', banco: 'secao-banco' };
+  const focos = { email: 'secao-email', pessoas: 'secao-pessoas', banco: 'secao-banco', serpro: 'secao-serpro' };
   if (focos[opcoes.focar]) setTimeout(() => $(focos[opcoes.focar])?.scrollIntoView({ block: 'start' }), 50);
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
