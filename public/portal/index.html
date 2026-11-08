@@ -8,7 +8,7 @@
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261106b">
+  <link rel="stylesheet" href="portal.css?v=20261108b">
 </head>
 <body>
 
@@ -208,6 +208,7 @@
             <a class="menu__item" href="#emitir"><i class="icone">post_add</i><span>Emitir nota</span></a>
             <a class="menu__item" href="#notas"><i class="icone">receipt_long</i><span>Minhas notas</span><span id="menu-rejeitadas" class="menu__marca menu__marca--qtd" title="Notas não autorizadas" hidden></span></a>
             <a class="menu__item" href="#recorrencias"><i class="icone">event_repeat</i><span>Recorrências</span><span class="menu__marca menu__marca--qtd" id="menu-recorrencias" hidden>0</span></a>
+            <a class="menu__item" href="#guias"><i class="icone">request_quote</i><span>Guias do Simples</span></a>
           </nav>
 
           <nav class="menu__grupo" aria-label="Cadastros">
@@ -505,6 +506,28 @@
                 <button type="button" class="btn btn--primario" id="botao-nova-recorrencia"><i class="icone icone--p">add</i> Nova recorrência</button>
               </div>
               <div class="cartoes-servico" id="recorrencias-lista"></div>
+            </div>
+          </section>
+          <!-- ===== Guias do Simples (DAS) ===== -->
+          <section data-pagina="guias" data-titulo="Guias do Simples" hidden>
+            <div class="pagina-lista">
+              <div class="titulo-pagina">
+                <div>
+                  <h1>Guias do Simples</h1>
+                  <p class="secundario">As guias DAS que a contabilidade preparou para a sua empresa. Pague até o vencimento.</p>
+                </div>
+              </div>
+              <div class="cartao">
+                <div class="tabela-rolagem">
+                  <table class="tabela tabela--guias">
+                    <thead>
+                      <tr><th>Mês</th><th class="direita">Valor</th><th>Vencimento</th><th>Situação</th><th class="acoes"><span class="so-leitor">Ações</span></th></tr>
+                    </thead>
+                    <tbody id="guias-linhas"></tbody>
+                  </table>
+                </div>
+              </div>
+              <p class="secundario guias-nota">A situação considera só a data de vencimento: o portal não sabe se a guia já foi paga.</p>
             </div>
           </section>
           <!-- ===== Tomadores ===== -->
@@ -821,6 +844,6 @@
     </form>
   </dialog>
 
-  <script src="portal.js?v=20261106d"></script>
+  <script src="portal.js?v=20261108a"></script>
 </body>
 </html>

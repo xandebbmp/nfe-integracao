@@ -573,3 +573,15 @@ a { color: var(--primaria); }
 .btn--perigo:disabled { opacity: .45; cursor: not-allowed; filter: none; }
 .detalhe__acoes .btn--perigo-leve { color: var(--erro-texto); }
 
+
+/* Guias do Simples */
+.guias-nota { font-size: 12px; margin-top: 10px; }
+#guias-linhas .acoes .btn { margin-left: 6px; }
+@media (max-width: 700px) {
+  /* Celular: cada guia vira um cartao (sem rolar para o lado para achar os botoes) */
+  .tabela--guias thead { display: none; }
+  .tabela--guias tr { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 14px; border-bottom: 1px solid var(--borda); }
+  .tabela--guias td { border: 0; padding: 0; white-space: normal; }
+  .tabela--guias td.acoes { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+  #guias-linhas .acoes .btn { margin-left: 0; }
+}

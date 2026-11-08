@@ -233,3 +233,11 @@ details summary { cursor: pointer; margin-top: 10px; }
 /* Modelo da nota NFS-e Nacional na producao (Sistema > Ambiente) */
 .ambiente-modelo { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--borda); border-radius: 10px; display: grid; gap: 6px; }
 .ambiente-modelo p { margin: 0; }
+
+/* Fechamento do mes: tabela larga rola de lado no celular */
+.tabela-rolagem { overflow-x: auto; margin: 12px 0; }
+.tabela-rolagem .mini td.num { white-space: nowrap; }
+.botao--pequeno { padding: 4px 10px; font-size: 13px; }
+.guia-celula { display: grid; gap: 2px; white-space: nowrap; }
+.guia-celula__acoes { display: flex; gap: 10px; font-size: 12px; }
+.form-guia input[type=file] { padding: 6px 0; }

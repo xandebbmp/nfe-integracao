@@ -169,6 +169,74 @@ final class ClienteRepositorio
     }
 
     /**
+     * Fechamento do mes (contador): RECEITA de cada empresa, para conferir
+     * antes de fazer a declaracao do Simples (PGDAS-D).
+     *
+     * Diferente do uso para cobranca (usoPorMes):
+     *   - soma VALORES, nao so a quantidade;
+     *   - nota cancelada NAO entra na receita (so e contada a parte);
+     *   - NFS-e entra no mes da COMPETENCIA (mes do servico); NF-e no mes
+     *     da autorizacao;
+     *   - NF-e de entrada (tpNF 0) e de devolucao (finNFe 4) ficam de fora.
+     *
+     * Devolve, por CNPJ:
+     *   nfse_qtd, nfse_valor, nfe_qtd, nfe_valor  -> notas autorizadas do mes
+     *   canceladas                                -> canceladas do mes (fora da receita)
+     *   rbt12                                     -> receita dos 12 meses ANTERIORES ao mes
+     *
+     * @param string $mes AAAA-MM
+     * @return array<string, array<string, float|int>>
+     */
+    public function receitaPorMes(string $mes, int $tpAmb): array
+    {
+        $inicioMes = new \DateTimeImmutable($mes . '-01');
+        $inicio12 = $inicioMes->modify('-12 months')->format('Y-m');
+        // So para nao ler a tabela inteira: notas criadas antes disso nao entram em nenhuma conta.
+        $criadasDesde = $inicioMes->modify('-15 months')->format('Y-m-d');
+
+        $sql = "WITH notas AS (
+                    SELECT emitente_cnpj, padrao, status,
+                           CASE WHEN padrao = 'NFE'
+                                THEN COALESCE((payload->'totais'->'ICMSTot'->>'vNF')::numeric, 0)
+                                ELSE COALESCE((payload->'valores'->>'valor_servicos')::numeric, 0)
+                           END AS valor,
+                           CASE WHEN padrao <> 'NFE' AND payload->>'competencia' ~ '^[0-9]{4}-[0-9]{2}'
+                                THEN left(payload->>'competencia', 7)
+                                ELSE to_char(COALESCE(data_autorizacao, criado_em) AT TIME ZONE :fuso, 'YYYY-MM')
+                           END AS mes
+                      FROM nfse_documentos
+                     WHERE tp_amb = :amb
+                       AND status IN ('AUTORIZADO', 'CANCELADO')
+                       AND criado_em >= :desde
+                       AND NOT (padrao = 'NFE' AND (payload->'ide'->>'tpNF' = '0' OR payload->'ide'->>'finNFe' = '4'))
+                )
+                SELECT emitente_cnpj,
+                       count(*)                FILTER (WHERE mes = :mes AND status = 'AUTORIZADO' AND padrao <> 'NFE') AS nfse_qtd,
+                       COALESCE(sum(valor)     FILTER (WHERE mes = :mes AND status = 'AUTORIZADO' AND padrao <> 'NFE'), 0) AS nfse_valor,
+                       count(*)                FILTER (WHERE mes = :mes AND status = 'AUTORIZADO' AND padrao = 'NFE') AS nfe_qtd,
+                       COALESCE(sum(valor)     FILTER (WHERE mes = :mes AND status = 'AUTORIZADO' AND padrao = 'NFE'), 0) AS nfe_valor,
+                       count(*)                FILTER (WHERE mes = :mes AND status = 'CANCELADO') AS canceladas,
+                       COALESCE(sum(valor)     FILTER (WHERE mes >= :inicio12 AND mes < :mes AND status = 'AUTORIZADO'), 0) AS rbt12
+                  FROM notas
+                 GROUP BY emitente_cnpj";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':amb' => $tpAmb, ':fuso' => self::FUSO, ':mes' => $mes, ':inicio12' => $inicio12, ':desde' => $criadasDesde]);
+
+        $saida = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $saida[(string)$l['emitente_cnpj']] = [
+                'nfse_qtd' => (int)$l['nfse_qtd'],
+                'nfse_valor' => round((float)$l['nfse_valor'], 2),
+                'nfe_qtd' => (int)$l['nfe_qtd'],
+                'nfe_valor' => round((float)$l['nfe_valor'], 2),
+                'canceladas' => (int)$l['canceladas'],
+                'rbt12' => round((float)$l['rbt12'], 2),
+            ];
+        }
+        return $saida;
+    }
+
+    /**
      * Ultimos N meses de um cliente: mes => [padrao => quantidade].
      *
      * @return array<string, array<string, int>>
