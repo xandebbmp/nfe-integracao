@@ -253,3 +253,7 @@ details summary { cursor: pointer; margin-top: 10px; }
 .guia-ajuda__textos { display: grid; gap: 2px; flex: 1; }
 .guia-ajuda__textos small { color: var(--suave); }
 .guia-ajuda__seta { color: var(--destaque); font-size: 12px; }
+
+/* Declaracao do Simples (Fechamento > Declarar e gerar DAS) */
+.campos--folha { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+.lista-situacao { margin: 8px 0; padding-left: 18px; }

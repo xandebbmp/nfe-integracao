@@ -237,6 +237,50 @@ final class ClienteRepositorio
     }
 
     /**
+     * Receita de UMA empresa num mes, separada como a declaracao do Simples
+     * pede: servicos (NFS-e) com e sem retencao de ISS, e mercadorias (NF-e).
+     * Mesmas regras de receitaPorMes() (autorizadas; NF-e de entrada e
+     * devolucao nao contam; NFS-e pelo mes da competencia).
+     *
+     * @return array{servicos_sem_retencao: float, servicos_com_retencao: float, mercadorias: float, notas: int}
+     */
+    public function receitaSimples(string $cnpj, string $mes, int $tpAmb): array
+    {
+        $desde = (new \DateTimeImmutable($mes . '-01'))->modify('-3 months')->format('Y-m-d');
+        $stmt = $this->pdo->prepare(
+            "WITH notas AS (
+                SELECT padrao,
+                       CASE WHEN padrao = 'NFE'
+                            THEN COALESCE((payload->'totais'->'ICMSTot'->>'vNF')::numeric, 0)
+                            ELSE COALESCE((payload->'valores'->>'valor_servicos')::numeric, 0)
+                       END AS valor,
+                       padrao <> 'NFE' AND COALESCE(payload->'valores'->>'iss_retido', 'false') IN ('true', '1') AS retido,
+                       CASE WHEN padrao <> 'NFE' AND payload->>'competencia' ~ '^[0-9]{4}-[0-9]{2}'
+                            THEN left(payload->>'competencia', 7)
+                            ELSE to_char(COALESCE(data_autorizacao, criado_em) AT TIME ZONE :fuso, 'YYYY-MM')
+                       END AS mes
+                  FROM nfse_documentos
+                 WHERE tp_amb = :amb AND emitente_cnpj = :cnpj AND status = 'AUTORIZADO'
+                   AND criado_em >= :desde
+                   AND NOT (padrao = 'NFE' AND (payload->'ide'->>'tpNF' = '0' OR payload->'ide'->>'finNFe' = '4'))
+            )
+            SELECT COALESCE(sum(valor) FILTER (WHERE padrao <> 'NFE' AND NOT retido), 0) AS sem_retencao,
+                   COALESCE(sum(valor) FILTER (WHERE padrao <> 'NFE' AND retido), 0)     AS com_retencao,
+                   COALESCE(sum(valor) FILTER (WHERE padrao = 'NFE'), 0)                AS mercadorias,
+                   count(*) AS notas
+              FROM notas WHERE mes = :mes"
+        );
+        $stmt->execute([':fuso' => self::FUSO, ':amb' => $tpAmb, ':cnpj' => $cnpj, ':desde' => $desde, ':mes' => $mes]);
+        $l = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        return [
+            'servicos_sem_retencao' => round((float)($l['sem_retencao'] ?? 0), 2),
+            'servicos_com_retencao' => round((float)($l['com_retencao'] ?? 0), 2),
+            'mercadorias' => round((float)($l['mercadorias'] ?? 0), 2),
+            'notas' => (int)($l['notas'] ?? 0),
+        ];
+    }
+
+    /**
      * Ultimos N meses de um cliente: mes => [padrao => quantidade].
      *
      * @return array<string, array<string, int>>

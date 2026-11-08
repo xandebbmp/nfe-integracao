@@ -245,8 +245,8 @@ arquivo: tempo de sessão, "lembrar de mim", senhas erradas antes de
 bloquear e tempo de bloqueio do portal; tipo de NFS-e do portal;
 tentativas e espera quando a prefeitura falha; tempo para devolver nota
 travada à fila; espera máxima e tamanho de lote da API; link de
-visualização de Salvador; **Gerar DAS pela Receita** (SERPRO, por enquanto
-só Desligado ou Teste; ver "Fechamento do mês e guia DAS" na seção 12).
+visualização de Salvador; **Gerar DAS pela Receita** (SERPRO: Desligado,
+Teste ou Produção; ver "Fechamento do mês e guia DAS" na seção 12).
 
 - Cada campo mostra o **padrão do arquivo**. O valor do painel fica em
   `sistema_ajustes` (script `0009`) e substitui o do arquivo. "Voltar ao
@@ -685,7 +685,10 @@ Para planilha, acrescente `&formato=csv`.
 | `GET /v1/admin/fechamento.php?mes=AAAA-MM[&formato=csv]` | Fechamento do mês: receita por empresa, DAS estimado e guia anexada |
 | `POST /v1/admin/guia_das.php` | Anexar ou trocar a guia (multipart: `cnpj`, `competencia`, `valor`, `vencimento`, `linha_digitavel`, `avisar`, `arquivo`) ou JSON `{"acao": "remover" \| "pagar" \| "desfazer_pagamento", "id"}` |
 | `GET /v1/admin/guia_das.php?id=` | PDF da guia |
-| `POST /v1/admin/serpro_das.php` | Modo teste do SERPRO: `{"cnpj","competencia"}` devolve a guia de exemplo (não salva) |
+| `GET /v1/admin/serpro_das.php?cnpj=&competencia=` | Conferência da declaração do Simples: receita do mês (com/sem retenção de ISS, mercadorias), atividade e folha sugeridas |
+| `POST /v1/admin/serpro_das.php` | `{"acao": "calcular", ...}` (não envia), `{"acao": "transmitir", ..., "conferidos": [...], "avisar": true}` (declara, gera e anexa o DAS) ou `{"acao": "testar"}` (guia de exemplo, só no teste) |
+| `GET /v1/admin/serpro_das.php?id=&pdf=recibo\|declaracao` | PDFs guardados da declaração |
+| `GET/POST /v1/admin/serpro_acesso.php` | Acesso de produção ao SERPRO: situação, `{"acao": "chaves"}`, certificado (multipart), `{"acao": "testar_login"}`, `{"acao": "apagar"}` |
 
 ### Fechamento do mês e guia DAS do Simples
 
@@ -708,18 +711,39 @@ Passo a passo com telas: Central de Ajuda › *Fechamento do mês e guia DAS*.
 - **Pagamento** (script `0016`): **Marcar paga** (painel) ou **Já paguei**
   (portal) grava a data e quem marcou; **Desfazer** volta. O sistema **não
   confere o pagamento na Receita**. Trocar a guia apaga a marcação.
-- **Gerar DAS pela Receita (SERPRO Integra Contador):** só o **modo teste**
-  está pronto. Em **Sistema > Configurações**, "Gerar DAS pela Receita" =
-  **Teste** mostra o link **Testar Receita** no Fechamento. Ele chama o
-  ambiente de demonstração gratuito do SERPRO (`IntegraContador::URL_TESTE`),
-  que só aceita o cenário da documentação (contratante, autor e contribuinte
-  `00000000000100`, período `201801`) e devolve sempre a mesma guia de
-  exemplo. Nada é salvo; a chamada fica no histórico (`SERPRO_DAS_TESTE`). O
-  ambiente de teste tem limite de chamadas ("quota"): se estourar, espere.
-  **Produção não está implementada**: exige contrato pago com o SERPRO
-  (cobrança por chamada), consumer key/secret, certificado e-CNPJ do
-  escritório (mTLS) e procuração eletrônica de cada cliente. Código em
-  `src/Nfse/Serpro/IntegraContador.php`.
+- **Declarar e gerar DAS pela Receita (SERPRO Integra Contador, script
+  `0017`):** em **Sistema > Configurações**, "Gerar DAS pela Receita" =
+  **Teste** ou **Produção** mostra, na linha de cada ME/EPP do Fechamento,
+  **Testar Receita** (teste) ou **Declarar e gerar DAS** (produção). Fluxo
+  (`src/Nfse/Servico/DeclaracaoSimples.php`):
+  1. **Conferir:** receita do mês das notas, separada em serviços sem e com
+     retenção de ISS e mercadorias (`ClienteRepositorio::receitaSimples`);
+     atividade (tabela `SERVICOS`/`MERCADORIAS`, códigos `idAtividade` do
+     PGDASD) e folha de salários dos 12 meses anteriores (obrigatória para
+     PA >= 202611) vêm da última declaração.
+  2. **Calcular:** `TRANSDECLARACAO11` com `indicadorTransmissao=false`:
+     a Receita devolve os valores, nada é gravado.
+  3. **Transmitir:** `indicadorTransmissao=true` + `valoresParaComparacao`
+     com o que o contador viu (diferença de 1 centavo = recusa). Guarda em
+     `fiscal_declaracoes_simples` (entrada, valores, número, recibo e
+     declaração em PDF), pede o DAS (`GERARDAS12`) e anexa a guia como o
+     "Anexar guia" (portal + e-mail).
+  - **Teste:** ambiente de demonstração gratuito
+    (`IntegraContador::URL_TESTE`). Só aceita os pedidos de exemplo da
+    documentação: a declaração vai como `DADOS_DECLARACAO_TESTE` e o DAS com
+    contribuinte `00000000000100`, período `201801`. Respostas de exemplo;
+    a guia **não** é anexada. Tem limite de chamadas ("quota").
+  - **Produção:** login OAuth2 com certificado (mTLS) em
+    `https://autenticacao.sapi.serpro.gov.br/authenticate` (Basic
+    key:secret, `role-type: TERCEIROS`, `grant_type=client_credentials`),
+    depois `Bearer access_token` + `jwt_token`. O escritório (CNPJ do
+    certificado) é contratante e autor; o cliente é o contribuinte e precisa
+    dar **procuração eletrônica** no e-CAC para o escritório. Consumer
+    Key/Secret e certificado são cadastrados em **Sistema > Integração com a
+    Receita (SERPRO): acesso de produção** e ficam criptografados em
+    `sistema_ajustes` (`src/Nfse/Serpro/AcessoSerpro.php`). Produção só
+    declara mês já terminado.
+  - Histórico: `SERPRO_DECLARACAO[_TESTE]`, `SERPRO_DAS[_TESTE]`.
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
 exemplo, ao detectar fatura em atraso:
