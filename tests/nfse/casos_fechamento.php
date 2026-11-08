@@ -9,6 +9,8 @@ declare(strict_types=1);
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\FechamentoMes;
 use Xande\NfeIntegracao\Nfse\Servico\GuiasDas;
+use Xande\NfeIntegracao\Nfse\Serpro\IntegraContador;
+use Xande\NfeIntegracao\Nfse\Dominio\AjustesPainel;
 
 function testesFechamentoUnidade(): void
 {
@@ -23,6 +25,43 @@ function testesFechamentoUnidade(): void
     Apoio::igual(null, FechamentoMes::linha('11222333000181', 'Empresa', 1, '2.00', $r)['das_estimado'], 'nao optante: sem DAS');
     $vazia = FechamentoMes::linha('11222333000181', 'Empresa', 3, '2.00', []);
     Apoio::igual([0, 0.0, 0.0], [$vazia['notas'], $vazia['receita_mes'], $vazia['das_estimado']], 'empresa sem notas no mes: tudo zero');
+}
+
+function testesSerproUnidade(): void
+{
+    echo "\n[15b] Integra Contador (SERPRO), modo teste\n";
+
+    $pdf = "%PDF-1.4\n% das de exemplo\n%%EOF";
+    $das = [[
+        'pdf' => base64_encode($pdf), 'cnpjCompleto' => '00000000000100',
+        'detalhamentoDas' => ['periodoApuracao' => '202101', 'numeroDocumento' => '07202136999997159',
+            'dataVencimento' => '20210222', 'dataLimiteAcolhimento' => '20210222',
+            'valores' => ['principal' => 1032.58, 'multa' => 0, 'juros' => 0, 'total' => 1032.58]],
+    ]];
+    $http = (new TransporteFalso())->responder(200, json_encode(['status' => 200, 'mensagens' => [['codigo' => 'Sucesso-PGDASD', 'texto' => '']], 'dados' => json_encode($das)]));
+    $r = (new IntegraContador($http))->gerarDasTeste('33444555000101', '2026-11');
+    Apoio::igual([true, 1032.58, '2021-02-22', '07202136999997159', $pdf],
+        [$r['ok'], $r['valor'] ?? null, $r['vencimento'] ?? null, $r['numero_documento'] ?? null, $r['pdf'] ?? null],
+        'gerar DAS (teste): le valor, vencimento AAAAMMDD, numero e o PDF em base64');
+
+    $req = $http->requisicoes[0];
+    $corpo = json_decode((string)$req['corpo'], true);
+    Apoio::igual([IntegraContador::URL_TESTE . '/Emitir', 'Bearer ' . IntegraContador::TOKEN_TESTE, IntegraContador::TOKEN_TESTE],
+        [$req['url'], $req['cabecalhos']['Authorization'] ?? null, $req['cabecalhos']['jwt_token'] ?? null], 'envelope: rota /Emitir e token do ambiente de teste');
+    Apoio::igual(['PGDASD', 'GERARDAS12', '00000000000100', ['periodoApuracao' => '202101']],
+        [$corpo['pedidoDados']['idSistema'], $corpo['pedidoDados']['idServico'], $corpo['contribuinte']['numero'], json_decode($corpo['pedidoDados']['dados'], true)],
+        'envelope: PGDASD/GERARDAS12, "dados" vai como texto JSON; no teste usa o CNPJ e o mes de exemplo');
+
+    $erro = (new IntegraContador((new TransporteFalso())->responder(400, json_encode(['status' => 400, 'mensagens' => [['codigo' => 'Erro-PGDASD-001', 'texto' => 'Nao existe declaracao']]]))))
+        ->gerarDasTeste('33444555000101', '2026-11');
+    Apoio::verificar(!$erro['ok'] && str_contains($erro['mensagem'], 'HTTP 400') && str_contains($erro['mensagem'], 'Nao existe declaracao'), 'erro do SERPRO: mostra o codigo e o texto');
+    $semRede = (new IntegraContador((new TransporteFalso())->responder(0, '')))->gerarDasTeste('33444555000101', '2026-11');
+    Apoio::verificar(!$semRede['ok'] && str_contains($semRede['mensagem'], 'Sem resposta'), 'sem internet: explica');
+    $semPdf = (new IntegraContador((new TransporteFalso())->responder(200, json_encode(['status' => 200, 'mensagens' => [], 'dados' => '[]']))))->gerarDasTeste('33444555000101', '2026-11');
+    Apoio::verificar(!$semPdf['ok'] && str_contains($semPdf['mensagem'], 'sem a guia'), 'resposta sem guia: explica');
+
+    Apoio::igual(['TESTE', null], AjustesPainel::validar('serpro.modo', 'TESTE'), 'painel: modo teste pode ser ligado');
+    Apoio::verificar(AjustesPainel::validar('serpro.modo', 'PRODUCAO')[1] !== null, 'painel: producao ainda nao existe (depende de contrato)');
 }
 
 function testesFechamentoIntegracao(PDO $pdo, array $cfgGeral): void

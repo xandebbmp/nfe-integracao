@@ -380,6 +380,7 @@ echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
 testesClientesUnidade();
 testesPortalUnidade();
 testesFechamentoUnidade();
+testesSerproUnidade();
 testesSistemaUnidade($cfgGeral);
 
 $dsn = getenv('NFSE_TESTE_PG');

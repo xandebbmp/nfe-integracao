@@ -62,6 +62,10 @@ final class AjustesPainel
         'email.url_portal' => ['grupo' => 'E-mail', 'rotulo' => 'Endereço do portal', 'tipo' => 'url',
             'ajuda' => 'Vai no link do e-mail, ex.: https://fiscal.suaempresa.com.br/portal/. Vazio = "Esqueci a senha" desligado.'],
 
+        'serpro.modo' => ['grupo' => 'Integração com a Receita (SERPRO)', 'rotulo' => 'Gerar DAS pela Receita', 'tipo' => 'opcao',
+            'opcoes' => ['' => 'Desligado', 'TESTE' => 'Teste (demonstração do SERPRO: guia de exemplo, sem custo)'],
+            'ajuda' => 'No teste aparece "Testar Receita" no Fechamento do mês. A guia é de exemplo e não vai para o cliente. Produção depende de contrato com o SERPRO.'],
+
         'salvador.url_visualizacao' => ['grupo' => 'Salvador', 'rotulo' => 'Link para ver a nota no site da prefeitura', 'tipo' => 'url',
             'ajuda' => 'Use {numero}, {inscricao} e {verificacao} no endereço. Vazio = sem link.'],
     ];

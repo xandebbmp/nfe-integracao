@@ -45,4 +45,4 @@ if (($_GET['formato'] ?? '') === 'csv') {
     exit;
 }
 
-$api->responder(200, $fechamento + ['ambiente' => $ambiente]);
+$api->responder(200, $fechamento + ['ambiente' => $ambiente, 'serpro_modo' => (string)($api->cfg['serpro']['modo'] ?? '')]);
