@@ -12,8 +12,10 @@ enviada, autorizada, rejeitada, denegada, consultada ou cancelada.
     (abre `/monitor/?emitente=<CNPJ>`, já filtrado). Não pede outro token.
     O botão **"← Painel admin"** volta. **Sair**, em qualquer um dos dois,
     sai dos dois;
-  - quem só acompanha as notas (suporte) pode continuar usando o
-    `monitor_token` de `config/nfse.local.php`;
+  - quem só acompanha as notas (suporte) usa a **senha do Monitor**,
+    gerada no painel (Sistema > **Senha do Monitor**; aparece uma vez, o
+    banco guarda só o hash). O `monitor_token` de `config/nfse.local.php`
+    continua valendo;
   - o token do admin no monitor é **só leitura**: ele não emite nem cancela
     pela API (`emitir.php` responde `PROIBIDO`).
   Uso previsto: **rede interna/VPN** (decisão C3).
@@ -66,7 +68,7 @@ evento "nfse" chega ─► GET documento.php?id=...&xml=0 ─► redesenha a lin
 
 ## Implantação
 
-1. Defina `monitor_token` em `config/nfse.local.php`.
+1. Gere a senha no painel (Sistema > **Senha do Monitor**). Opcional: quem entra no painel já abre o Monitor.
 2. A pasta `public/` já é a raiz do site: a página fica em `/monitor/`.
 3. nginx: desligue o buffer do SSE (ver `docs/nfse-arquitetura.md`, seção 10).
 4. Se o painel for aberto por muita gente ao mesmo tempo, reserve um pool

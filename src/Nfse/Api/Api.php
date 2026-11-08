@@ -101,7 +101,9 @@ final class Api
                 }
             }
             $tokenPainel = (string)($this->cfg['monitor_token'] ?? '');
-            if ($tokenPainel !== '' && hash_equals($tokenPainel, $token)) {
+            $hashPainel = (string)($this->cfg['monitor_token_hash'] ?? '');
+            if (($tokenPainel !== '' && hash_equals($tokenPainel, $token))
+                || ($hashPainel !== '' && hash_equals($hashPainel, $hash))) {
                 return ['consumidor' => null, 'painel' => true];
             }
             // Quem entrou no painel admin abre o monitor sem outro login.
@@ -117,7 +119,7 @@ final class Api
 
         // Ambiente de desenvolvimento sem nenhum token configurado: libera
         // somente chamadas da propria maquina.
-        $semTokens = $this->cfg['consumidores'] === [] && empty($this->cfg['monitor_token']);
+        $semTokens = $this->cfg['consumidores'] === [] && empty($this->cfg['monitor_token']) && empty($this->cfg['monitor_token_hash']);
         if ($semTokens && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true)) {
             return ['consumidor' => 'LOCAL', 'painel' => true];
         }

@@ -29,6 +29,24 @@ function testesSistemaUnidade(array $cfg): void
     Apoio::igual('ERRO', $d['resultado'], 'resultado geral ERRO');
     Apoio::verificar(!in_array('Internet: acesso ao fisco', array_column($d['grupos'], 'titulo'), true), 'internet pulada quando pedido');
 
+    echo "\n[12a2] Diagnostico: avisos que nao sao problema\n";
+    $prod = $cfg;
+    $prod['tpAmb'] = 1;
+    $prod['emitentes'] = [
+        '11111111000191' => ['razao_social' => 'NACIONAL SO', 'inscricao_municipal' => '', 'padroes_permitidos' => ['NACIONAL'], 'certificado' => ['arquivo' => '/nao/existe.pfx']],
+        '22222222000191' => ['razao_social' => 'SALVADOR', 'inscricao_municipal' => '', 'padroes_permitidos' => ['SALVADOR'], 'certificado' => ['arquivo' => '/nao/existe.pfx']],
+    ];
+    $d = (new Diagnostico($prod, null, dirname(__DIR__, 2)))->executar(false);
+    $itens = array_merge(...array_column($d['grupos'], 'itens'));
+    $ambiente = array_values(array_filter($itens, fn($i) => str_starts_with($i['texto'], 'Ambiente')))[0] ?? [];
+    Apoio::igual('OK', $ambiente['nivel'] ?? null, 'producao nao vira aviso (a tarja do painel ja avisa)');
+    $im = array_values(array_filter($itens, fn($i) => str_contains($i['texto'], 'inscrição municipal')));
+    Apoio::igual(1, count($im), 'inscricao municipal: so avisa quem emite NFS-e Salvador');
+    Apoio::verificar(str_contains($im[0]['texto'] ?? '', '22222222000191'), 'inscricao municipal: aviso e da empresa de Salvador');
+    foreach ($itens as $i) {
+        Apoio::verificar(!preg_match('/systemctl|sudo |openssl rand|bash deploy/', $i['resolver']), "dica sem comando de terminal: '{$i['texto']}'");
+    }
+
     echo "\n[12b] Configuracoes editaveis pelo painel\n";
     Apoio::igual([7, null], AjustesPainel::validar('portal.tentativas_login', '7'), 'numero dentro do limite aceito');
     Apoio::verificar(AjustesPainel::validar('portal.tentativas_login', '1')[1] !== null, 'numero fora do limite recusado');
@@ -254,5 +272,38 @@ function testesSistemaIntegracao(PDO $pdo, array $cfg): void
     $outraChave = ['chave_certificados' => base64_encode(random_bytes(32))] + $comChave;
     Apoio::igual('', NfseConfig::comClientes($outraChave, $pdo)['email']['senha'], 'senha do e-mail: chave trocada nao quebra (fica sem senha)');
     Apoio::verificar($configChave->salvarSenhaEmail('', null)['ok'] && !$configChave->senhaEmailNoPainel(), 'senha do e-mail: vazio apaga');
+
+    // ---- Senha do Monitor gerada pelo painel ----
+    $semMonitor = ['monitor_token' => ''] + $cfg;
+    $configMonitor = new ConfiguracoesPainel($pdo, $semMonitor);
+    Apoio::verificar(!$configMonitor->senhaMonitor()['definida'], 'monitor: sem senha no inicio');
+    $d = (new Diagnostico(NfseConfig::comClientes($semMonitor, $pdo), $pdo, dirname(__DIR__, 2)))->executar(false);
+    $itensMonitor = array_values(array_filter(array_merge(...array_column($d['grupos'], 'itens')), fn($i) => str_contains($i['texto'], 'Monitor')));
+    Apoio::igual('ATENCAO', $itensMonitor[0]['nivel'] ?? null, 'monitor: diagnostico avisa que falta a senha');
+    Apoio::verificar(str_contains($itensMonitor[0]['resolver'] ?? '', 'Gerar senha'), 'monitor: dica aponta o botao do painel');
+    $r = $configMonitor->gerarSenhaMonitor('10.0.0.1');
+    Apoio::verificar($r['ok'] && strlen($r['senha']) === 48 && $r['situacao']['no_painel'], 'monitor: senha gerada pelo painel');
+    $guardado = (string)$pdo->query("SELECT valor FROM sistema_ajustes WHERE chave = 'monitor.senha'")->fetchColumn();
+    Apoio::verificar(!str_contains($guardado, $r['senha']) && str_contains($guardado, hash('sha256', $r['senha'])), 'monitor: banco guarda so o hash');
+    $comMonitor = NfseConfig::comClientes($semMonitor, $pdo);
+    Apoio::igual(hash('sha256', $r['senha']), $comMonitor['monitor_token_hash'] ?? null, 'monitor: API passa a conhecer a senha nova');
+    $d = (new Diagnostico($comMonitor, $pdo, dirname(__DIR__, 2)))->executar(false);
+    $itensMonitor = array_values(array_filter(array_merge(...array_column($d['grupos'], 'itens')), fn($i) => str_contains($i['texto'], 'Monitor')));
+    Apoio::igual('OK', $itensMonitor[0]['nivel'] ?? null, 'monitor: diagnostico ok depois de gerar');
+    $r2 = $configMonitor->gerarSenhaMonitor(null);
+    Apoio::verificar($r2['senha'] !== $r['senha'] && NfseConfig::comClientes($semMonitor, $pdo)['monitor_token_hash'] === hash('sha256', $r2['senha']), 'monitor: senha nova substitui a anterior');
+
+    // ---- Copia de seguranca dos XMLs ligada pelo painel ----
+    $semCopia = $cfg;
+    $semCopia['armazenamento']['tipo'] = 'nenhum';
+    $copia = fn(array $c) => array_values(array_filter(array_merge(...array_column((new Diagnostico($c, $pdo, dirname(__DIR__, 2)))->executar(false)['grupos'], 'itens')),
+        fn($i) => str_contains($i['texto'], 'XMLs')))[0] ?? [];
+    $item = $copia(NfseConfig::comClientes($semCopia, $pdo));
+    Apoio::verificar($item['nivel'] === 'ATENCAO' && str_contains($item['resolver'], 'Configurações'), 'copia dos XMLs: desligada, dica aponta o painel');
+    Apoio::verificar((new ConfiguracoesPainel($pdo, $semCopia))->salvar(['armazenamento.tipo' => 'local'], null)['ok'], 'copia dos XMLs: ligada pelo painel');
+    $ligada = NfseConfig::comClientes($semCopia, $pdo);
+    Apoio::igual('local', $ligada['armazenamento']['tipo'], 'copia dos XMLs: API e worker passam a usar a pasta');
+    Apoio::igual('OK', $copia($ligada)['nivel'] ?? null, 'copia dos XMLs: diagnostico ok depois de ligar');
+    Apoio::verificar(AjustesPainel::validar('armazenamento.tipo', 's3')[1] !== null, 'copia dos XMLs: nuvem (S3) nao e ligada pelo painel (precisa das chaves no servidor)');
     $pdo->exec('DELETE FROM sistema_ajustes');
 }

@@ -6,6 +6,7 @@ namespace Xande\NfeIntegracao\Nfse\Servico;
 use PDO;
 use Throwable;
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoFactory;
+use Xande\NfeIntegracao\Nfse\Dominio\Padrao;
 use Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente;
 use Xande\NfeIntegracao\Nfse\Infra\CofreCertificado;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
@@ -86,7 +87,7 @@ final class Diagnostico
         if (version_compare(PHP_VERSION, '8.1.0', '>=')) {
             $this->item('OK', 'PHP ' . PHP_VERSION);
         } else {
-            $this->item('ERRO', 'PHP ' . PHP_VERSION . ' é antigo (mínimo 8.1).', 'Peça a quem cuida do servidor: sudo bash deploy/instalar_pacotes.sh');
+            $this->item('ERRO', 'PHP ' . PHP_VERSION . ' é antigo (mínimo 8.1).', 'Peça a quem cuida do servidor para atualizar o PHP para a versão 8.1 ou mais nova.');
         }
         $extensoes = [
             'curl' => 'php8.3-curl', 'dom' => 'php8.3-xml', 'openssl' => 'php8.3-cli', 'pdo_pgsql' => 'php8.3-pgsql',
@@ -98,15 +99,16 @@ final class Diagnostico
             $this->item('OK', 'Extensões do PHP instaladas');
         } else {
             $this->item('ERRO', 'Extensões do PHP faltando: ' . implode(', ', array_keys($faltando)),
-                'Peça a quem cuida do servidor: sudo apt install ' . implode(' ', array_unique($faltando)) . ' && sudo systemctl restart php8.3-fpm');
+                'Peça a quem cuida do servidor para instalar estas extensões do PHP: ' . implode(', ', array_keys($faltando)) . '.');
         }
     }
 
     private function configuracao(): void
     {
         $this->grupo('Configuração');
+        // Producao nao e problema: a tarja no topo do painel ja avisa.
         if ((int)$this->cfg['tpAmb'] === 1) {
-            $this->item('ATENCAO', 'Ambiente: PRODUÇÃO. As notas emitidas têm valor fiscal.', 'Confirme que a homologação foi concluída (docs/nfse-homologacao.md).');
+            $this->item('OK', 'Ambiente: PRODUÇÃO (notas com valor fiscal)');
         } else {
             $this->item('OK', 'Ambiente: HOMOLOGAÇÃO (notas sem valor fiscal)');
         }
@@ -117,11 +119,12 @@ final class Diagnostico
             $this->item('ERRO', 'Chave dos certificados ausente: o painel não aceita certificados.',
                 "Peça a quem cuida do servidor para preencher 'chave_certificados' em config/nfse.local.php (manual de implantação, passo 7).");
         }
-        $monitor = (string)($this->cfg['monitor_token'] ?? '');
-        if (strlen($monitor) < 24 || str_contains(strtoupper($monitor), 'TOKEN')) {
-            $this->item('ATENCAO', 'Senha do Monitor (monitor_token) vazia ou fraca: a página /monitor/ não abre.', "Preencha 'monitor_token' em config/nfse.local.php (gere com: openssl rand -hex 32).");
+        $monitorNoPainel = strlen((string)($this->cfg['monitor_token_hash'] ?? '')) === 64;
+        if ($monitorNoPainel || ConfiguracoesPainel::monitorTokenForte((string)($this->cfg['monitor_token'] ?? ''))) {
+            $this->item('OK', 'Senha do Monitor configurada');
         } else {
-            $this->item('OK', 'Monitor configurado');
+            $this->item('ATENCAO', 'Senha do Monitor não foi gerada: só quem entra no painel consegue abrir o Monitor.',
+                'Na tela Sistema, em "Senha do Monitor", clique em "Gerar senha".');
         }
     }
 
@@ -129,7 +132,7 @@ final class Diagnostico
     {
         $this->grupo('Banco de dados e worker');
         if ($this->pdo === null) {
-            $this->item('ERRO', 'Sem conexão com o banco de dados.', 'Confira config/database.local.php e se o PostgreSQL está ligado (sudo systemctl status postgresql).');
+            $this->item('ERRO', 'Sem conexão com o banco de dados.', 'Confira se o PostgreSQL está ligado e se os dados de acesso em config/database.local.php estão certos.');
             return;
         }
         $this->item('OK', 'Conexão com o PostgreSQL');
@@ -137,7 +140,7 @@ final class Diagnostico
 
         foreach (['nfse_documentos' => 'notas', 'fiscal_clientes' => 'empresas'] as $tabela => $nome) {
             if (!$sistema->tabelaExiste($tabela)) {
-                $this->item('ERRO', "Tabelas de {$nome} não existem.", 'Clique em "Atualizar banco" na tela Sistema (ou rode bash deploy/aplicar_banco.sh).');
+                $this->item('ERRO', "Tabelas de {$nome} não existem.", 'Clique em "Atualizar banco" na tela Sistema.');
                 return;
             }
         }
@@ -154,7 +157,7 @@ final class Diagnostico
             $resolver = [
                 'PAUSADO' => 'Clique em "Retomar envios" na tela Sistema.',
                 'REINICIANDO' => 'Espere alguns segundos e rode o diagnóstico de novo.',
-                'PARADO' => 'O worker é instalado uma vez no servidor (manual de implantação, passo do worker): sudo systemctl enable --now nfse-worker@1 nfse-worker@2',
+                'PARADO' => 'Clique em "Ligar worker" na tela Sistema.',
             ][$w['situacao']] ?? '';
             $this->item($nivel, "{$w['titulo']}. {$w['texto']}", $resolver);
         }
@@ -211,7 +214,10 @@ final class Diagnostico
             } catch (Throwable $e) {
                 $this->item('ERRO', "{$nome}: o certificado não abriu ({$e->getMessage()}).", 'Envie o certificado de novo no painel, conferindo a senha.');
             }
-            if (trim((string)($emitente['inscricao_municipal'] ?? '')) === '') {
+            // Inscricao municipal: so a NFS-e de Salvador exige. Quem emite pelo
+            // padrao Nacional nao precisa (a Receita nao pede).
+            $emiteSalvador = in_array(Padrao::SALVADOR, (array)($emitente['padroes_permitidos'] ?? []), true);
+            if ($emiteSalvador && trim((string)($emitente['inscricao_municipal'] ?? '')) === '') {
                 $this->item('ATENCAO', "{$nome}: inscrição municipal vazia (obrigatória em Salvador).", 'Preencha no cadastro da empresa no painel.');
             }
         }
@@ -228,7 +234,7 @@ final class Diagnostico
         foreach ($consumidores as $nome => $dados) {
             $token = !empty($dados['token_hash']) ? str_repeat('x', 64) : (string)($dados['token'] ?? '');
             if (strlen($token) < 24 || str_contains(strtoupper($token), 'TOKEN')) {
-                $this->item('ERRO', "Sistema {$nome}: token vazio, curto ou de exemplo.", 'Gere um token novo no painel (ou: openssl rand -hex 32).');
+                $this->item('ERRO', "Sistema {$nome}: token vazio, curto ou de exemplo.", 'Gere um token novo na empresa, no painel.');
                 continue;
             }
             if (NfseConfig::cnpjsPermitidos($this->cfg, (string)$nome) === []) {
@@ -253,12 +259,13 @@ final class Diagnostico
             if (is_dir($caminho) && is_writable($caminho)) {
                 $this->item('OK', "{$pasta} com permissão de escrita");
             } else {
-                $this->item('ERRO', "{$pasta} sem permissão de escrita.", "Peça a quem cuida do servidor: sudo mkdir -p {$caminho} && sudo chown -R www-data:www-data {$caminho}");
+                $this->item('ERRO', "{$pasta} sem permissão de escrita.", "Peça a quem cuida do servidor para criar a pasta {$pasta} e liberar a gravação para o sistema.");
             }
         }
         $tipo = $this->cfg['armazenamento']['tipo'] ?? 'nenhum';
         if ($tipo === 'nenhum') {
-            $this->item('ATENCAO', 'Cópia dos XMLs fora do banco desligada.', 'Configure "local" ou "s3" em armazenamento (config/nfse.local.php). Enquanto isso, mantenha o backup diário do banco.');
+            $this->item('ATENCAO', 'Cópia de segurança dos XMLs desligada: os XMLs ficam só no banco de dados.',
+                'Na tela Sistema, em Configurações > "Cópia de segurança dos XMLs", escolha "Ligada" e salve.');
             return;
         }
         try {
@@ -266,9 +273,10 @@ final class Diagnostico
             if ($tipo === 'local') {
                 $armazenamento->salvar('_verificacao/teste.txt', 'ok ' . date(DATE_ATOM), 'text/plain');
             }
-            $this->item('OK', "Cópia dos XMLs: {$tipo}" . ($tipo === 'local' ? ' (gravação de teste ok)' : ''));
+            $this->item('OK', $tipo === 'local' ? 'Cópia de segurança dos XMLs ligada (pasta storage/xml/nfse, gravação de teste ok)' : "Cópia de segurança dos XMLs ligada ({$tipo})");
         } catch (Throwable $e) {
-            $this->item('ERRO', "Cópia dos XMLs ({$tipo}): " . $e->getMessage(), "Revise o bloco 'armazenamento' em config/nfse.local.php.");
+            $this->item('ERRO', "Cópia dos XMLs ({$tipo}): " . $e->getMessage(),
+                $tipo === 'local' ? 'Peça a quem cuida do servidor para liberar a gravação na pasta da cópia dos XMLs.' : "Revise o bloco 'armazenamento' em config/nfse.local.php.");
         }
     }
 

@@ -100,10 +100,10 @@ comentários estão em `config/nfse.php`):
 | `tpAmb` | `2` = homologação (testes, sem valor fiscal); `1` = produção. Valor inicial: quem troca no dia a dia é o painel (Sistema > **Ambiente de emissão**), que vale por cima deste | `2` |
 | `admin_token` | Senha do painel admin (`/admin/`). Vazio = painel desligado | `openssl rand -hex 32` |
 | `chave_certificados` | Chave que criptografa os certificados enviados pelo painel. **Guarde cópia.** | `php -r 'echo base64_encode(random_bytes(32)), PHP_EOL;'` |
-| `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas. Opcional: quem entra no painel admin já abre o monitor sem ele | `openssl rand -hex 32` |
+| `monitor_token` | Senha do monitor ao vivo (`/monitor/`), que mostra todas as notas. Opcional: quem entra no painel admin já abre o monitor sem ele. **Prefira gerar pelo painel** (Sistema > **Senha do Monitor**), que vale junto com este | `openssl rand -hex 32` |
 | `consumidores` | Sistemas internos com token fixo no arquivo, que emitem por vários CNPJs (opcional; as empresas clientes ficam no painel) | ver `config/nfse.local.php.example` |
 | `emitentes` | Empresas configuradas por arquivo (opcional; prefira o painel) | idem |
-| `armazenamento` | Cópia dos XMLs: `local` (pasta) ou `s3` (AWS S3, MinIO, Wasabi...) | `['tipo' => 's3', ...]` |
+| `armazenamento` | Cópia dos XMLs: `local` (pasta) ou `s3` (AWS S3, MinIO, Wasabi...). A cópia numa pasta pode ser ligada pelo painel (Sistema > Configurações > **Cópia de segurança dos XMLs**) | `['tipo' => 's3', ...]` |
 | `api.max_documentos_por_lote` | Máximo de notas por chamada | `50` |
 | `api.max_aguardar_segundos` | Máximo que a API espera quando o cliente usa `?aguardar=` | `60` |
 | `fila.max_tentativas` | Tentativas antes de virar `ERRO` | `5` |
