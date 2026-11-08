@@ -27,6 +27,7 @@ require __DIR__ . '/casos_clientes.php';
 require __DIR__ . '/casos_portal.php';
 require __DIR__ . '/casos_sistema.php';
 require __DIR__ . '/casos_painel.php';
+require __DIR__ . '/casos_fechamento.php';
 
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoLocal;
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoS3;
@@ -378,6 +379,7 @@ echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
 
 testesClientesUnidade();
 testesPortalUnidade();
+testesFechamentoUnidade();
 testesSistemaUnidade($cfgGeral);
 
 $dsn = getenv('NFSE_TESTE_PG');
@@ -563,6 +565,7 @@ if (!$dsn) {
     testesPortalIntegracao($pdo, $cfgGeral);
     testesSistemaIntegracao($pdo, $cfgGeral);
     testesPainelIntegracao($pdo, $cfgGeral);
+    testesFechamentoIntegracao($pdo, $cfgGeral);
 }
 
 // ===========================================================================
