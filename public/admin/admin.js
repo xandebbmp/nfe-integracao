@@ -343,6 +343,7 @@ function abrirModal(titulo, subtitulo, conteudo, opcoes = {}) {
   $('modal-corpo').replaceChildren(...conteudo.filter((item) => item !== null && item !== undefined && item !== false)); // blocos que nao se aplicam (null) nao aparecem
   $('modal-corpo').scrollTop = 0;
   $('modal').classList.toggle('modal--sistema', !!opcoes.sistema);
+  $('modal').dataset.tela = opcoes.tela || '';
   delete $('modal').dataset.sujo;
   if (!$('modal').open) $('modal').showModal();
 }
@@ -1225,11 +1226,33 @@ function moeda(valor) {
   return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/** Situacao da guia DAS de uma empresa no mes: cor da linha (legenda) e texto. */
+function situacaoGuia(l) {
+  if (l.simples === 'Não optante') return { tom: 'neutro', texto: 'Sem DAS (fora do Simples)' };
+  if (!l.guia) return { tom: 'rejeicao', texto: 'Falta anexar a guia' };
+  if (l.guia.pago_em) return { tom: 'ok', texto: `Paga em ${dataCurta(l.guia.pago_em)}` };
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (String(l.guia.vencimento).slice(0, 10) < hoje) return { tom: 'cancelada', texto: `Venceu em ${dataCurta(l.guia.vencimento)}` };
+  return { tom: 'info', texto: `A pagar até ${dataCurta(l.guia.vencimento)}` };
+}
+
+/** "2026-11" -> "novembro de 2026" */
+function mesExtenso(mes) {
+  const [a, m] = mes.split('-').map(Number);
+  const t = new Date(a, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function mesVizinho(mes, passo) {
+  const [a, m] = mes.split('-').map(Number);
+  const d = new Date(a, m - 1 + passo, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 async function abrirFechamento(mes) {
   mes = mes || estado.mes;
-  const campoMes = el('input', { type: 'month', value: mes });
-  const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
-  const baixar = el('button', { class: 'botao', type: 'button' }, 'Baixar planilha (CSV)');
+  const campoMes = el('input', { type: 'month', value: mes, 'aria-label': 'Escolher o mês' });
+  const area = el('div', { class: 'fech-area' }, el('p', { class: 'suave' }, 'Carregando...'));
+  const baixar = el('button', { class: 'botao', type: 'button' }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'download'), ' Baixar planilha (CSV)');
   campoMes.addEventListener('change', () => abrirFechamento(campoMes.value));
   baixar.addEventListener('click', async () => {
     try {
@@ -1239,56 +1262,93 @@ async function abrirFechamento(mes) {
     } catch (e) { alert(`Não foi possível baixar: ${e.message}`); }
   });
 
-  abrirModal('Fechamento do mês', 'Receita de cada empresa com as notas emitidas no sistema', [
-    el('div', { class: 'acoes' }, el('label', { class: 'suave' }, 'Mês ', campoMes), baixar),
-    area,
-  ]);
+  // Barra do mes: anterior / mes / proximo, e a planilha a direita
+  const barra = el('div', { class: 'fech-barra' },
+    el('div', { class: 'fech-mes' },
+      botaoIcone('chevron_left', 'Mês anterior', () => abrirFechamento(mesVizinho(mes, -1))),
+      el('strong', { class: 'fech-mes__nome' }, mesExtenso(mes)),
+      botaoIcone('chevron_right', 'Próximo mês', () => abrirFechamento(mesVizinho(mes, 1))),
+      campoMes),
+    baixar);
+
+  abrirModal('Fechamento do mês', 'Receita de cada empresa no mês, base para a declaração do Simples e a guia DAS', [barra, area], { tela: 'fechamento' });
 
   try {
     const r = await api(`fechamento.php?mes=${mes}`);
     // Aparecem: quem teve nota no mes, toda ME/EPP (paga DAS mesmo sem nota no sistema) e quem ja tem guia.
     const comNotas = r.empresas.filter((l) => l.notas > 0 || l.canceladas > 0 || l.simples === 'ME/EPP' || l.guia);
     const semNotas = r.empresas.length - comNotas.length;
+    const canceladas = comNotas.reduce((soma, l) => soma + (l.canceladas || 0), 0);
+    const precisamGuia = comNotas.filter((l) => l.simples !== 'Não optante');
+    const comGuia = precisamGuia.filter((l) => l.guia).length;
+    const pagas = precisamGuia.filter((l) => l.guia && l.guia.pago_em).length;
+
+    const contador = (nome, icone, valor, rodape) => el('div', { class: 'contador' },
+      el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, nome), el('i', { class: 'icone', 'aria-hidden': 'true' }, icone)),
+      el('span', { class: 'contador__valor' }, valor),
+      rodape ? el('span', { class: 'contador__rodape' }, rodape) : null);
+
+    const linhas = comNotas.map((l) => {
+      const sit = situacaoGuia(l);
+      const perc = l.percentual_simples === null ? null : `${String(l.percentual_simples).replace('.', ',')}%`;
+      return el('tr', { class: `linha-status linha-status--${sit.tom}`, title: sit.texto },
+        el('td', {},
+          el('div', { class: 'empresa__nome' }, l.razao_social),
+          el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj)),
+          el('span', { class: 'visualmente-oculto' }, ` · ${sit.texto}`)),
+        el('td', {}, l.simples ? el('span', { class: 'fech-regime' }, l.simples) : '—'),
+        el('td', { class: 'num', title: `NFS-e: ${l.nfse.quantidade} (${moeda(l.nfse.valor)}) · NF-e: ${l.nfe.quantidade} (${moeda(l.nfe.valor)})` },
+          el('div', {}, l.notas),
+          l.canceladas ? el('div', { class: 'fech-sub' }, `${l.canceladas} cancelada${l.canceladas > 1 ? 's' : ''}`) : null),
+        el('td', { class: 'num' }, el('strong', {}, moeda(l.receita_mes)),
+          el('div', { class: 'fech-sub', title: 'Soma dos 12 meses anteriores (só notas do sistema)' }, `12 meses: ${moeda(l.receita_12_meses)}`)),
+        el('td', { class: 'num' },
+          l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado),
+          perc ? el('div', { class: 'fech-sub', title: 'Percentual aproximado do Simples, do cadastro da empresa' }, `${perc} da receita`) : null),
+        r.guias_instalado ? el('td', { class: 'fech-guia' }, celulaGuia(l, mes, r.pagamento_instalado),
+          (r.serpro_modo === 'TESTE' || r.serpro_modo === 'PRODUCAO') && l.simples === 'ME/EPP'
+            ? el('button', { class: 'link-botao guia-serpro', type: 'button', 'data-declarar': l.cnpj,
+              title: r.serpro_modo === 'TESTE' ? 'Declaração e DAS no ambiente de teste do SERPRO (exemplo, sem custo)'
+                : 'Confere a receita, transmite a declaração do Simples e gera o DAS pela Receita',
+              onclick: () => abrirDeclaracao(l, mes, r.serpro_modo) }, r.serpro_modo === 'TESTE' ? 'Testar Receita' : 'Declarar e gerar DAS')
+            : null) : null);
+    });
+
     // filter(Boolean): tira os blocos que nao se aplicam (null), senao aparece "null" na tela.
     area.replaceChildren(...[
-      el('div', { class: 'numeros' },
-        el('div', { class: 'numero' }, el('b', {}, moeda(r.totais.receita_mes)), el('span', {}, 'receita do mês (todas as empresas)')),
-        el('div', { class: 'numero' }, el('b', {}, r.totais.notas), el('span', {}, 'notas autorizadas')),
-        el('div', { class: 'numero' }, el('b', {}, moeda(r.totais.das_estimado)), el('span', {}, 'DAS estimado (soma)'))),
       r.ambiente !== 'PRODUCAO' ? el('p', { class: 'aviso' }, 'Ambiente de homologação: estas notas são de teste, sem valor fiscal.') : null,
+      el('div', { class: 'contadores fech-contadores' },
+        contador('Receita do mês', 'payments', moeda(r.totais.receita_mes), 'todas as empresas'),
+        contador('Notas autorizadas', 'receipt_long', r.totais.notas, canceladas ? `${canceladas} cancelada(s) fora da receita` : 'nenhuma cancelada'),
+        contador('DAS estimado', 'calculate', moeda(r.totais.das_estimado), 'soma, só referência'),
+        r.guias_instalado ? contador('Guias DAS', 'request_quote', `${comGuia}/${precisamGuia.length}`, `${pagas} paga(s)`) : null),
       comNotas.length === 0
-        ? el('p', { class: 'suave' }, 'Nenhuma empresa emitiu nota neste mês.')
-        : el('div', { id: 'fechamento-tabela', class: 'tabela-rolagem' }, el('table', { class: 'mini' },
-          el('thead', {}, el('tr', {},
-            el('th', {}, 'Empresa'), el('th', {}, 'Simples'),
-            el('th', { class: 'num' }, 'Notas'), el('th', { class: 'num', title: 'Canceladas não entram na receita' }, 'Canceladas'),
-            el('th', { class: 'num' }, 'Receita do mês'), el('th', { class: 'num', title: 'Soma dos 12 meses anteriores (só notas do sistema)' }, '12 meses anteriores'),
-            el('th', { class: 'num', title: 'Percentual aproximado do Simples, do cadastro da empresa' }, '% Simples'),
-            el('th', { class: 'num' }, 'DAS estimado'),
-            r.guias_instalado ? el('th', {}, 'Guia DAS') : null)),
-          el('tbody', {}, ...comNotas.map((l) => el('tr', {},
-            el('td', {}, l.razao_social, el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj))),
-            el('td', {}, l.simples || '—'),
-            el('td', { class: 'num', title: `NFS-e: ${l.nfse.quantidade} (${moeda(l.nfse.valor)}) · NF-e: ${l.nfe.quantidade} (${moeda(l.nfe.valor)})` }, l.notas),
-            el('td', { class: 'num' }, l.canceladas || '—'),
-            el('td', { class: 'num' }, el('strong', {}, moeda(l.receita_mes))),
-            el('td', { class: 'num' }, moeda(l.receita_12_meses)),
-            el('td', { class: 'num' }, l.percentual_simples === null ? '—' : `${String(l.percentual_simples).replace('.', ',')}%`),
-            el('td', { class: 'num' }, l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado)),
-            r.guias_instalado ? el('td', {}, celulaGuia(l, mes, r.pagamento_instalado),
-              (r.serpro_modo === 'TESTE' || r.serpro_modo === 'PRODUCAO') && l.simples === 'ME/EPP'
-                ? el('button', { class: 'link-botao guia-serpro', type: 'button', 'data-declarar': l.cnpj,
-                  title: r.serpro_modo === 'TESTE' ? 'Declaração e DAS no ambiente de teste do SERPRO (exemplo, sem custo)'
-                    : 'Confere a receita, transmite a declaração do Simples e gera o DAS pela Receita',
-                  onclick: () => abrirDeclaracao(l, mes, r.serpro_modo) }, r.serpro_modo === 'TESTE' ? 'Testar Receita' : 'Declarar e gerar DAS')
-                : null) : null))))),
-      semNotas > 0 ? el('p', { class: 'suave' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
+        ? el('p', { class: 'suave fech-vazio' }, 'Nenhuma empresa emitiu nota neste mês.')
+        : el('section', { class: 'cartao tabela-cartao fech-lista' },
+          el('ul', { class: 'legenda', 'aria-label': 'Legenda das cores' },
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--rejeicao' }), 'Falta a guia'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--info' }), 'Guia a pagar'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--ok' }), 'Paga'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--cancelada' }), 'Venceu sem pagar'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--neutro' }), 'Sem DAS')),
+          el('div', { id: 'fechamento-tabela', class: 'tabela-rolagem' }, el('table', { class: 'tabela tabela--status' },
+            el('thead', {}, el('tr', {},
+              el('th', {}, 'Empresa'), el('th', {}, 'Regime'),
+              el('th', { class: 'num' }, 'Notas'), el('th', { class: 'num' }, 'Receita do mês'),
+              el('th', { class: 'num' }, 'DAS estimado'),
+              r.guias_instalado ? el('th', {}, 'Guia DAS') : null)),
+            el('tbody', {}, ...linhas)))),
+      semNotas > 0 ? el('p', { class: 'suave fech-nota' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
       r.guias_instalado ? null : el('p', { class: 'aviso' }, 'Para anexar as guias DAS, falta atualizar o banco: botão Sistema > Atualizar banco.'),
-      el('p', { class: 'suave' },
-        'Como usar: confira a receita de cada empresa, faça a declaração no PGDAS-D (site do Simples Nacional), gere o DAS ',
-        'e clique em "Anexar guia". O cliente vê a guia no portal e recebe um aviso por e-mail. ',
-        'O DAS estimado é só uma referência (receita × % do Simples do cadastro). O valor certo é o do PGDAS-D, ',
-        'que considera a faixa dos últimos 12 meses, o anexo da atividade e receitas que não passaram pelo sistema.'),
+      el('details', { class: 'fech-ajuda' },
+        el('summary', {}, 'Como fazer o fechamento'),
+        el('ol', {},
+          el('li', {}, 'Confira a receita de cada empresa (canceladas não entram).'),
+          el('li', {}, 'Faça a declaração no PGDAS-D, no site do Simples Nacional, e gere o DAS.'),
+          el('li', {}, 'Clique em "Anexar guia" na linha da empresa. O cliente vê a guia no portal e recebe um aviso por e-mail.'),
+          el('li', {}, 'Quando o cliente pagar, marque a guia como paga.')),
+        el('p', { class: 'suave' }, 'O DAS estimado é só uma referência (receita × % do Simples do cadastro). O valor certo é o do PGDAS-D, ',
+          'que considera a faixa dos últimos 12 meses, o anexo da atividade e receitas que não passaram pelo sistema.')),
     ].filter(Boolean));
   } catch (e) {
     area.replaceChildren(el('p', { class: 'erro' }, e.message));
@@ -1300,25 +1360,25 @@ async function abrirFechamento(mes) {
 /** Celula "Guia DAS" de uma empresa: botao Anexar ou a guia ja anexada (paga ou nao). */
 function celulaGuia(l, mes, pagamentoInstalado) {
   if (!l.guia) {
-    return el('button', { class: 'botao botao--pequeno', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Anexar guia');
+    if (l.simples === 'Não optante') return el('span', { class: 'suave' }, 'Sem DAS');
+    return el('button', { class: 'botao botao--forte botao--pequeno', type: 'button', onclick: () => abrirAnexarGuia(l, mes) },
+      el('i', { class: 'icone', 'aria-hidden': 'true' }, 'attach_file'), ' Anexar guia');
   }
   const g = l.guia;
-  let pagamento = null;
-  if (g.pago_em) {
-    pagamento = el('span', { class: 'ok-texto', title: g.pago_marcado_por ? `Marcada por ${g.pago_marcado_por}` : '' }, `✓ Paga em ${dataCurta(g.pago_em)}`);
-  }
-  const acoes = [
-    el('button', { class: 'link-botao', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Trocar'),
-    el('button', { class: 'link-botao', type: 'button', onclick: () => removerGuia(g, l, mes) }, 'Remover'),
-  ];
+  const acoes = [];
   if (pagamentoInstalado) {
-    acoes.unshift(g.pago_em
-      ? el('button', { class: 'link-botao', type: 'button', onclick: () => pagamentoGuia(g, mes, null) }, 'Desfazer pago')
-      : el('button', { class: 'link-botao', type: 'button', onclick: () => pagamentoGuia(g, mes, true) }, 'Marcar paga'));
+    acoes.push(g.pago_em
+      ? botaoIcone('undo', 'Desfazer pago', () => pagamentoGuia(g, mes, null))
+      : botaoIcone('price_check', 'Marcar como paga', () => pagamentoGuia(g, mes, true)));
   }
+  acoes.push(botaoIcone('swap_horiz', 'Trocar a guia', () => abrirAnexarGuia(l, mes)));
+  acoes.push(botaoIcone('delete_outline', 'Remover a guia', () => removerGuia(g, l, mes), true));
   return el('div', { class: 'guia-celula' },
-    el('button', { class: 'link-botao', type: 'button', title: 'Abrir o PDF', onclick: () => abrirPdfGuia(g.id) }, `${moeda(g.valor)} · vence ${dataCurta(g.vencimento)}`),
-    pagamento,
+    el('button', { class: 'guia-celula__pdf', type: 'button', title: 'Abrir o PDF da guia', onclick: () => abrirPdfGuia(g.id) },
+      el('i', { class: 'icone', 'aria-hidden': 'true' }, 'picture_as_pdf'),
+      el('span', {}, el('strong', {}, moeda(g.valor)), el('small', {}, g.pago_em
+        ? `paga em ${dataCurta(g.pago_em)}${g.pago_marcado_por ? ' · ' + g.pago_marcado_por.replace(/\s*<[^>]*>$/, '') : ''}`
+        : `vence ${dataCurta(g.vencimento)}`))),
     el('div', { class: 'guia-celula__acoes' }, ...acoes));
 }
 

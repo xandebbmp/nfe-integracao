@@ -348,3 +348,39 @@ details summary { cursor: pointer; margin-top: 10px; }
 .novo-acesso__linha .botao { min-height: 36px; }
 .novo-acesso .opcao-linha { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 .novo-acesso .opcao-linha input { width: auto; min-height: 0; }
+
+/* ==========================================================================
+   Fechamento do mes (nov/2026)
+   ========================================================================== */
+.modal[data-tela="fechamento"] { width: min(1200px, 96vw); }
+.modal[data-tela="fechamento"] .modal__corpo { padding-top: 16px; display: grid; gap: 16px; }
+.fech-area { display: grid; gap: 16px; }
+.fech-barra { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.fech-mes { display: flex; align-items: center; gap: 4px; }
+.fech-mes__nome { min-width: 170px; text-align: center; font-size: 17px; font-weight: 600; }
+.fech-mes input[type="month"] { width: auto; margin-left: 8px; }
+.fech-barra .botao .icone, .fech-guia .botao .icone { font-size: 18px; vertical-align: -4px; }
+.fech-contadores { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.contador__rodape { font-size: 12px; color: var(--suave); }
+.fech-lista { overflow: hidden; }
+.fech-lista .tabela th.num, .fech-lista .tabela td.num { text-align: right; }
+.fech-lista .tabela td { vertical-align: middle; white-space: normal; }
+.fech-lista .empresa__nome { min-width: 220px; max-width: 360px; }
+.fech-regime { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 99px; font-size: 12px; font-weight: 500;
+  background: var(--destaque-suave); color: var(--destaque); white-space: nowrap; }
+.fech-sub { font-size: 12px; color: var(--suave); white-space: nowrap; }
+.fech-guia { min-width: 230px; }
+.guia-celula { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.guia-celula__pdf { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 4px 6px; margin-left: -6px;
+  border-radius: 6px; font: inherit; color: var(--texto); cursor: pointer; text-align: left; }
+.guia-celula__pdf:hover { background: color-mix(in srgb, var(--cor, #8a94a0) 14%, transparent); }
+.guia-celula__pdf .icone { color: var(--st-rejeitado); font-size: 22px; }
+.guia-celula__pdf span { display: grid; }
+.guia-celula__pdf small { font-size: 12px; color: var(--suave); }
+.guia-celula__acoes { display: flex; gap: 2px; }
+.guia-serpro { display: block; margin-top: 6px; font-size: 13px; }
+.fech-nota { margin: 0; font-size: 13px; }
+.fech-ajuda { border: 1px solid var(--divisoria); border-radius: var(--raio); padding: 0 16px; }
+.fech-ajuda summary { padding: 12px 0; margin: 0; font-weight: 500; }
+.fech-ajuda ol { margin: 0 0 8px; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.fech-ajuda p { font-size: 13px; margin: 0 0 14px; }
