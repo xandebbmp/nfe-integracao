@@ -1980,12 +1980,40 @@ function abrirSistema(opcoes = {}) {
   // ---- Diagnostico ----
   const NIVEIS = { ERRO: { nome: 'Erro', ponto: 'PARADO' }, ATENCAO: { nome: 'Atenção', ponto: 'PAUSADO' }, OK: { nome: 'OK', ponto: 'LIGADO' } };
 
-  function itemDiagnostico(i, grupo) {
-    return el('li', { class: 'diag-item' },
-      el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[i.nivel].ponto}`, title: NIVEIS[i.nivel].nome }),
-      el('div', {},
-        el('div', {}, grupo ? el('span', { class: 'suave' }, `${grupo} · `) : null, i.texto),
-        i.resolver ? el('div', { class: 'diag-resolver' }, el('strong', {}, 'Como resolver: '), i.resolver) : null));
+  // Cor de cada nivel na legenda do sistema (erro = vermelho, atencao = amarelo, ok = verde)
+  const TOM_NIVEL = { ERRO: 'cancelada', ATENCAO: 'rejeicao', OK: 'ok' };
+  const ICONE_NIVEL = { ERRO: 'error', ATENCAO: 'warning', OK: 'check_circle' };
+  const ICONE_GRUPO = {
+    'Servidor (PHP)': 'dns', 'Configuração': 'tune', 'Banco de dados e worker': 'storage',
+    'Empresas e certificados': 'verified_user', 'Acesso à API': 'vpn_key', 'Pastas e cópia dos XMLs': 'folder',
+    'Internet: acesso ao fisco': 'public',
+  };
+  // "Como resolver" que da para fazer nesta mesma tela: botao que leva ate a parte certa.
+  function atalhoResolver(texto) {
+    const t = String(texto || '');
+    const destinos = [
+      [/Ligar worker|worker/i, 'secao-worker', 'Ir para Worker'],
+      [/Senha do Monitor/i, 'secao-monitor', 'Ir para Senha do Monitor'],
+      [/Atualizar banco|banco/i, 'secao-banco', 'Ir para Banco de dados'],
+      [/e-mail|SMTP/i, 'secao-email', 'Ir para E-mail'],
+      [/Configura/i, 'secao-config', 'Ir para Configurações'],
+      [/SERPRO/i, 'secao-serpro', 'Ir para SERPRO'],
+    ];
+    const d = destinos.find(([re, id]) => re.test(t) && $(id));
+    if (!d) return null;
+    return el('button', { class: 'botao botao--pequeno', type: 'button',
+      onclick: () => $(d[1]).scrollIntoView({ block: 'start', behavior: 'smooth' }) },
+    el('i', { class: 'icone', 'aria-hidden': 'true' }, 'arrow_forward'), ' ', d[2]);
+  }
+
+  function itemProblema(i, grupo) {
+    return el('li', { class: `diag-card linha-status linha-status--${TOM_NIVEL[i.nivel]}` },
+      el('i', { class: 'icone diag-card__icone', 'aria-hidden': 'true' }, ICONE_NIVEL[i.nivel]),
+      el('div', { class: 'diag-card__corpo' },
+        el('div', { class: 'diag-card__grupo' }, `${NIVEIS[i.nivel].nome} · ${grupo}`),
+        el('div', { class: 'diag-card__texto' }, i.texto),
+        i.resolver ? el('div', { class: 'diag-card__resolver' }, el('strong', {}, 'Como resolver: '), i.resolver) : null,
+        atalhoResolver(i.resolver)));
   }
 
   async function rodarDiagnostico() {
@@ -1994,22 +2022,39 @@ function abrirSistema(opcoes = {}) {
     try {
       const d = await api('diagnostico.php');
       const problemas = [];
-      const certos = [];
       for (const g of d.grupos) {
-        for (const i of g.itens) (i.nivel === 'OK' ? certos : problemas).push([i, g.titulo]);
+        for (const i of g.itens) if (i.nivel !== 'OK') problemas.push([i, g.titulo]);
       }
-      problemas.sort((a, b) => (a[0].nivel === 'ERRO' ? 0 : 1) - (b[0].nivel === 'ERRO' ? 0 : 1));
+      problemas.sort((x, y) => (x[0].nivel === 'ERRO' ? 0 : 1) - (y[0].nivel === 'ERRO' ? 0 : 1));
       const t = d.total;
       const resumo = d.resultado === 'OK' ? 'Tudo certo'
-        : [t.ERRO ? `${t.ERRO} erro(s)` : null, t.ATENCAO ? `${t.ATENCAO} aviso(s)` : null].filter(Boolean).join(' e ');
+        : [t.ERRO ? `${t.ERRO} erro${t.ERRO > 1 ? 's' : ''}` : null, t.ATENCAO ? `${t.ATENCAO} aviso${t.ATENCAO > 1 ? 's' : ''}` : null].filter(Boolean).join(' e ');
+
+      // Um quadradinho por grupo: o pior nivel do grupo e quantos itens estao ok.
+      const pior = (itens) => itens.some((i) => i.nivel === 'ERRO') ? 'ERRO' : itens.some((i) => i.nivel === 'ATENCAO') ? 'ATENCAO' : 'OK';
+      const grupos = el('ul', { class: 'diag-grupos' }, ...d.grupos.map((g) => {
+        const n = pior(g.itens);
+        const oks = g.itens.filter((i) => i.nivel === 'OK').length;
+        return el('li', { class: `diag-grupo linha-status linha-status--${TOM_NIVEL[n]}` },
+          el('i', { class: 'icone diag-grupo__icone', 'aria-hidden': 'true' }, ICONE_GRUPO[g.titulo] || 'settings'),
+          el('span', { class: 'diag-grupo__nome' }, g.titulo),
+          el('span', { class: 'diag-grupo__estado' }, n === 'OK' ? `${oks} ok` : `${g.itens.length - oks} para ver · ${oks} ok`));
+      }));
+
       diagArea.replaceChildren(...[
-        el('div', { class: 'sistema-estado' },
-          el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[d.resultado].ponto}` }),
-          el('strong', {}, resumo),
-          el('span', { class: 'suave' }, `${t.OK} item(ns) ok · conferido em ${dataHora(d.feito_em)}`)),
-        problemas.length ? el('ul', { class: 'diag-lista' }, ...problemas.map(([i, g]) => itemDiagnostico(i, g))) : null,
-        el('details', {}, el('summary', { class: 'suave' }, `Ver os ${certos.length} itens ok`),
-          el('ul', { class: 'diag-lista' }, ...certos.map(([i, g]) => itemDiagnostico(i, g)))),
+        el('div', { class: `diag-resumo linha-status linha-status--${TOM_NIVEL[d.resultado]}` },
+          el('i', { class: 'icone diag-resumo__icone', 'aria-hidden': 'true' }, ICONE_NIVEL[d.resultado]),
+          el('div', {},
+            el('strong', { class: 'diag-resumo__titulo' }, resumo),
+            el('div', { class: 'suave' }, `${t.OK} itens ok · conferido em ${dataHora(d.feito_em)}`))),
+        grupos,
+        problemas.length ? el('h4', { class: 'diag-subtitulo' }, 'Para resolver') : null,
+        problemas.length ? el('ul', { class: 'diag-cards' }, ...problemas.map(([i, g]) => itemProblema(i, g))) : null,
+        el('details', { class: 'diag-oks' }, el('summary', {}, `Ver os ${t.OK} itens ok`),
+          ...d.grupos.filter((g) => g.itens.some((i) => i.nivel === 'OK')).map((g) => el('div', { class: 'diag-oks__grupo' },
+            el('h5', {}, g.titulo),
+            el('ul', {}, ...g.itens.filter((i) => i.nivel === 'OK').map((i) => el('li', {},
+              el('i', { class: 'icone', 'aria-hidden': 'true' }, 'check'), i.texto)))))),
       ].filter(Boolean));
     } catch (e) {
       diagArea.replaceChildren(el('p', { class: 'erro' }, e.message));
