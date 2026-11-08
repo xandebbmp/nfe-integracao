@@ -1176,11 +1176,21 @@ function secaoHistorico(c) {
 // Relatorio de cobranca
 // ==========================================================================
 
+/** Uso do plano de uma empresa no mes: cor da linha (legenda), percentual e texto. */
+function usoDoPlano(l) {
+  if (l.razao_social === '(fora do cadastro)') return { tom: 'neutro', pct: null, texto: 'Fora do cadastro' };
+  if (!l.limite_mensal) return { tom: 'info', pct: null, texto: l.total ? 'Sem limite' : 'Sem uso no mês' };
+  const pct = Math.round((l.total / l.limite_mensal) * 100);
+  if (pct >= 100) return { tom: 'cancelada', pct, texto: 'Limite atingido' };
+  if (pct >= 80) return { tom: 'rejeicao', pct, texto: 'Perto do limite' };
+  return { tom: 'ok', pct, texto: 'Dentro do plano' };
+}
+
 async function abrirRelatorio(mes) {
   mes = mes || estado.mes;
-  const campoMes = el('input', { type: 'month', value: mes });
-  const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
-  const baixar = el('button', { class: 'botao', type: 'button' }, 'Baixar planilha (CSV)');
+  const campoMes = el('input', { type: 'month', value: mes, 'aria-label': 'Escolher o mês' });
+  const area = el('div', { class: 'fech-area' }, el('p', { class: 'suave' }, 'Carregando...'));
+  const baixar = el('button', { class: 'botao', type: 'button' }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'download'), ' Baixar planilha (CSV)');
   campoMes.addEventListener('change', () => abrirRelatorio(campoMes.value));
   baixar.addEventListener('click', async () => {
     try {
@@ -1190,24 +1200,71 @@ async function abrirRelatorio(mes) {
     } catch (e) { alert(`Não foi possível baixar: ${e.message}`); }
   });
 
-  abrirModal('Relatório de cobrança', 'Notas autorizadas no mês, por empresa e tipo', [
-    el('div', { class: 'acoes' }, el('label', { class: 'suave' }, 'Mês ', campoMes), baixar),
-    area,
-  ]);
+  const barra = el('div', { class: 'fech-barra' },
+    el('div', { class: 'fech-mes' },
+      botaoIcone('chevron_left', 'Mês anterior', () => abrirRelatorio(mesVizinho(mes, -1))),
+      el('strong', { class: 'fech-mes__nome' }, mesExtenso(mes)),
+      botaoIcone('chevron_right', 'Próximo mês', () => abrirRelatorio(mesVizinho(mes, 1))),
+      campoMes),
+    baixar);
+
+  abrirModal('Relatório de cobrança', 'Notas autorizadas no mês por empresa, para cobrar pelo plano de cada uma', [barra, area], { tela: 'fechamento' });
 
   try {
     const r = await api(`uso.php?mes=${mes}`);
-    area.replaceChildren(
-      el('p', {}, `Ambiente: ${r.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'} · Total do mês: `, el('strong', {}, r.total), ' notas'),
-      el('table', { class: 'mini' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Empresa'), el('th', {}, 'Plano'), el('th', { class: 'num' }, 'Limite'),
-          ...TIPOS.map((t) => el('th', { class: 'num' }, t.nome)), el('th', { class: 'num' }, 'Total'))),
-        el('tbody', {}, ...r.empresas.map((l) => el('tr', {},
-          el('td', {}, l.razao_social, el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj))),
-          el('td', {}, l.plano || '—'), el('td', { class: 'num' }, l.limite_mensal || '—'),
-          el('td', { class: 'num' }, l.nfe), el('td', { class: 'num' }, l.nfse_nacional), el('td', { class: 'num' }, l.nfse_salvador),
-          el('td', { class: 'num' }, el('strong', {}, l.total)))))),
-    );
+    const empresas = [...r.empresas].sort((x, y) => y.total - x.total || String(x.razao_social).localeCompare(String(y.razao_social)));
+    // So mostra as colunas de tipo que tiveram nota no mes (as outras ficam na planilha).
+    const campos = { NFE: 'nfe', NACIONAL: 'nfse_nacional', SALVADOR: 'nfse_salvador' };
+    const tipos = TIPOS.filter((t) => empresas.some((l) => Number(l[campos[t.padrao] || t.campo] || 0) > 0));
+    const usos = empresas.map(usoDoPlano);
+    const comUso = empresas.filter((l) => l.total > 0).length;
+    const perto = usos.filter((u) => u.tom === 'rejeicao').length;
+    const noLimite = usos.filter((u) => u.tom === 'cancelada').length;
+
+    const contador = (nome, icone, valor, rodape) => el('div', { class: 'contador' },
+      el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, nome), el('i', { class: 'icone', 'aria-hidden': 'true' }, icone)),
+      el('span', { class: 'contador__valor' }, valor),
+      rodape ? el('span', { class: 'contador__rodape' }, rodape) : null);
+
+    area.replaceChildren(...[
+      r.ambiente !== 'PRODUCAO' ? el('p', { class: 'aviso' }, 'Ambiente de homologação: estas notas são de teste, sem valor fiscal.') : null,
+      el('div', { class: 'contadores fech-contadores' },
+        contador('Notas a cobrar', 'receipt_long', r.total, 'autorizadas no mês'),
+        contador('Empresas com uso', 'business', `${comUso}/${empresas.length}`, 'emitiram ao menos 1 nota'),
+        contador('Perto do limite', 'trending_up', perto, '80% ou mais do plano'),
+        contador('Limite atingido', 'block', noLimite, 'emissão pode estar travada')),
+      empresas.length === 0
+        ? el('p', { class: 'suave fech-vazio' }, 'Nenhuma empresa cadastrada.')
+        : el('section', { class: 'cartao tabela-cartao fech-lista' },
+          el('ul', { class: 'legenda', 'aria-label': 'Legenda das cores' },
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--ok' }), 'Dentro do plano'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--rejeicao' }), 'Perto do limite (80%)'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--cancelada' }), 'Limite atingido'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--info' }), 'Sem limite'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--neutro' }), 'Fora do cadastro')),
+          el('div', { class: 'tabela-rolagem' }, el('table', { class: 'tabela tabela--status' },
+            el('thead', {}, el('tr', {},
+              el('th', {}, 'Empresa'), el('th', {}, 'Plano'),
+              ...tipos.map((t) => el('th', { class: 'num' }, t.nome)),
+              el('th', {}, 'Uso do plano'),
+              el('th', { class: 'num' }, 'Total'))),
+            el('tbody', {}, ...empresas.map((l, i) => {
+              const u = usos[i];
+              return el('tr', { class: `linha-status linha-status--${u.tom}`, title: u.texto },
+                el('td', {}, el('div', { class: 'empresa__nome' }, l.razao_social), el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj)),
+                  el('span', { class: 'visualmente-oculto' }, ` · ${u.texto}`)),
+                el('td', {}, l.plano ? el('span', { class: 'fech-regime' }, l.plano) : el('span', { class: 'suave' }, '—')),
+                ...tipos.map((t) => el('td', { class: 'num' }, Number(l[campos[t.padrao] || t.campo] || 0) || el('span', { class: 'suave' }, '—'))),
+                el('td', { class: 'uso-celula' }, l.limite_mensal
+                  ? el('div', {},
+                    el('div', { class: 'uso-celula__texto' }, el('span', {}, `${l.total} de ${l.limite_mensal}`), el('span', { class: 'fech-sub' }, `${u.pct}%`)),
+                    el('div', { class: 'barra uso-celula__barra' }, el('div', { class: 'barra__cheio', style: `width:${Math.min(100, u.pct)}%` })))
+                  : el('span', { class: 'fech-sub' }, u.texto)),
+                el('td', { class: 'num' }, el('strong', { class: 'uso-total' }, l.total)));
+            })))),
+          el('div', { class: 'uso-rodape' }, el('span', {}, `${empresas.length} empresa(s)`), el('span', {}, 'Total do mês: ', el('strong', {}, r.total), ' notas'))),
+      el('p', { class: 'suave fech-nota' }, 'Conta cada nota autorizada uma vez, mesmo que tenha sido cancelada depois. Rejeitadas, denegadas e com erro não contam.'),
+    ].filter(Boolean));
   } catch (e) {
     area.replaceChildren(el('p', { class: 'erro' }, e.message));
   }
