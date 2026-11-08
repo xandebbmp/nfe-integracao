@@ -1994,7 +1994,7 @@ function abrirSistema(opcoes = {}) {
     const d = destinos.find(([re, id]) => re.test(t) && $(id));
     if (!d) return null;
     return el('button', { class: 'link-botao', type: 'button',
-      onclick: () => $(d[1]).scrollIntoView({ block: 'start', behavior: 'smooth' }) }, `${d[2]} →`);
+      onclick: () => mostrarSecao(d[1]) }, `${d[2]} →`);
   }
 
   async function rodarDiagnostico() {
@@ -2067,8 +2067,8 @@ function abrirSistema(opcoes = {}) {
     erros[c.chave] = el('span', { class: 'erro' });
     // O padrao do arquivo so aparece quando o valor foi alterado no painel (no botao e na dica dele).
     const voltar = c.alterado
-      ? el('button', { class: 'config-restaurar', type: 'button', title: `Padrão do arquivo: ${textoValor(c, c.padrao)}`,
-        onclick: (ev) => { ev.preventDefault(); entrada.value = c.padrao ?? ''; } }, 'Alterado · restaurar padrão')
+      ? el('button', { class: 'config-restaurar', type: 'button', title: `Alterado no painel. Padrão do arquivo: ${textoValor(c, c.padrao)}`, 'aria-label': 'Restaurar o padrão do arquivo',
+        onclick: (ev) => { ev.preventDefault(); entrada.value = c.padrao ?? ''; } }, 'Restaurar')
       : null;
     return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
       el('span', { class: 'config-rotulo' }, c.rotulo, voltar),
@@ -2108,7 +2108,7 @@ function abrirSistema(opcoes = {}) {
 
     configArea.replaceChildren(
       el('p', { class: 'suave' }, `Ambiente: ${dados.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'}. `,
-        'Os tokens só mudam no arquivo config/nfse.local.php, por segurança. O ambiente e o e-mail têm blocos próprios, acima.'),
+        'Os tokens só mudam no arquivo config/nfse.local.php, por segurança. O ambiente e o e-mail têm páginas próprias neste menu.'),
       ...blocos,
       el('div', { class: 'acoes' }, salvar),
       retorno);
@@ -2291,32 +2291,47 @@ function abrirSistema(opcoes = {}) {
     secaoSerpro(),
     el('section', { class: 'secao', id: 'secao-historico' }, el('h3', {}, 'Histórico'), historicoArea),
   ];
-  // Menu lateral: cada item leva a sua parte da tela (tudo continua na mesma pagina).
-  const itensNav = [
-    ['secao-ambiente', 'Ambiente e worker'], ['secao-fila', 'Fila de envio'], ['secao-banco', 'Banco e diagnóstico'],
-    ['secao-pessoas', 'Pessoas e acesso'], ['secao-email', 'E-mail'], ['secao-config', 'Configurações'],
-    ['secao-serpro', 'Integração SERPRO'], ['secao-historico', 'Histórico'],
+  // Menu lateral: cada item e uma pagina com as suas partes (as outras ficam escondidas).
+  const paginas = [
+    ['ambiente', 'Ambiente e worker', ['secao-ambiente', 'secao-worker', 'secao-fila', 'secao-workers']],
+    ['banco', 'Banco e diagnóstico', ['secao-banco', 'secao-diagnostico']],
+    ['pessoas', 'Pessoas e acesso', ['secao-pessoas', 'secao-monitor']],
+    ['email', 'E-mail', ['secao-email']],
+    ['config', 'Configurações', ['secao-config']],
+    ['serpro', 'Integração SERPRO', ['secao-serpro']],
+    ['historico', 'Histórico', ['secao-historico']],
   ];
+  const corpoSecoes = el('div', { class: 'sistema-secoes' }, ...secoes.filter(Boolean));
   navWorker = el('span', { class: 'sistema-nav__estado' });
   const nav = el('nav', { class: 'sistema-nav', 'aria-label': 'Partes da tela Sistema' },
-    ...itensNav.map(([id, nome], i) => el('a', {
-      href: `#${id}`, class: 'sistema-nav__item', 'aria-current': i === 0 ? 'true' : null,
-      onclick: (ev) => {
-        ev.preventDefault();
-        nav.querySelectorAll('[aria-current]').forEach((a) => a.removeAttribute('aria-current'));
-        ev.currentTarget.setAttribute('aria-current', 'true');
-        $(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      },
-    }, nome, id === 'secao-ambiente' ? navWorker : null)));
+    ...paginas.map(([chave, nome]) => el('a', {
+      href: `#sistema-${chave}`, class: 'sistema-nav__item', 'data-pagina': chave,
+      onclick: (ev) => { ev.preventDefault(); mostrarPagina(chave); },
+    }, nome, chave === 'ambiente' ? navWorker : null)));
+  function mostrarPagina(chave, focoId) {
+    const pagina = paginas.find((p) => p[0] === chave) || paginas[0];
+    for (const s of corpoSecoes.children) s.hidden = !pagina[2].includes(s.id);
+    nav.querySelectorAll('.sistema-nav__item').forEach((a) => {
+      if (a.dataset.pagina === pagina[0]) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    $('modal-corpo').scrollTop = 0;
+    if (focoId) setTimeout(() => $(focoId)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 30);
+  }
+  /** Leva a uma parte da tela (id da secao), trocando de pagina se precisar. */
+  function mostrarSecao(id) {
+    const pagina = paginas.find((p) => p[2].includes(id));
+    if (pagina) mostrarPagina(pagina[0], id);
+  }
   abrirModal('Sistema', 'Ambiente, worker (o programa que envia as notas), banco de dados, pessoas, e-mail e configurações', [
-    el('div', { class: 'sistema-pagina' }, nav, el('div', { class: 'sistema-secoes' }, ...secoes.filter(Boolean))),
+    el('div', { class: 'sistema-pagina' }, nav, corpoSecoes),
   ], { sistema: true });
+  mostrarPagina('ambiente');
   recarregar();
   carregarBanco();
   carregarConfiguracoes();
   carregarEmail();
   const focos = { monitor: 'secao-monitor', email: 'secao-email', pessoas: 'secao-pessoas', banco: 'secao-banco', serpro: 'secao-serpro' };
-  if (focos[opcoes.focar]) setTimeout(() => $(focos[opcoes.focar])?.scrollIntoView({ block: 'start' }), 50);
+  if (focos[opcoes.focar]) mostrarSecao(focos[opcoes.focar]);
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }
@@ -2336,14 +2351,13 @@ function secaoAmbiente() {
   function desenhar(a, mensagem) {
     const producao = a.atual === 1;
     const retorno = el('div', { 'aria-live': 'polite' }, mensagem ? el('p', { class: 'envio-ok' }, '✓ ' + mensagem) : null);
-    const filhos = [
-      el('div', { class: 'ambiente-atual' },
-        el('span', { class: 'suave' }, 'Agora:'),
-        el('span', { class: 'ambiente-atual__nome' + (producao ? ' ambiente-atual__nome--producao' : '') },
-          producao ? '1 - Produção (notas com valor fiscal)' : '2 - Homologação (testes, sem valor fiscal)')),
-      el('p', { class: 'suave' }, 'Vale para o sistema todo: NF-e e NFS-e, API, portal das empresas e worker. '
-        + 'Homologação e produção têm numeração separada.'),
-    ];
+    const linhaAmbiente = el('div', { class: 'estado-linha' },
+      el('span', { class: `estado-ponto estado-ponto--${producao ? 'producao' : 'teste'}`, 'aria-hidden': 'true' }),
+      el('div', { class: 'estado-linha__texto' },
+        el('strong', {}, producao ? 'Produção' : 'Homologação'),
+        el('span', {}, producao ? 'Notas com valor fiscal. ' : 'Testes, sem valor fiscal. ',
+          'Vale para o sistema todo (NF-e, NFS-e, API, portal e worker). Homologação e produção têm numeração separada.')));
+    const filhos = [linhaAmbiente];
 
     if (!producao) {
       // Antes de ligar: o que ainda falta nas empresas (so avisa, nao impede).
@@ -2385,7 +2399,7 @@ function secaoAmbiente() {
           voltar.disabled = false;
         }
       });
-      filhos.push(el('div', { class: 'acoes' }, voltar));
+      linhaAmbiente.append(el('div', { class: 'estado-linha__acao' }, voltar));
     }
     filhos.push(modeloDaReceita(a, retorno));
     filhos.push(retorno);
@@ -2397,7 +2411,7 @@ function secaoAmbiente() {
   function modeloDaReceita(a, retorno) {
     const novo = a.producao_modelo_novo;
     const trocar = el('button', { class: 'botao', type: 'button' },
-      novo ? 'Voltar a produção para o modelo antigo' : 'A Receita mudou: usar o modelo novo na produção');
+      novo ? 'Voltar para o modelo antigo' : 'Usar o modelo novo');
     trocar.addEventListener('click', async () => {
       const pergunta = novo
         ? 'Voltar a PRODUÇÃO para o modelo ANTIGO (sem finNFSe)? Use só se as notas de produção estiverem sendo recusadas por causa do finNFSe.'
@@ -2412,14 +2426,14 @@ function secaoAmbiente() {
         trocar.disabled = false;
       }
     });
-    return el('div', { class: 'ambiente-modelo' },
-      el('strong', {}, 'Modelo da nota NFS-e Nacional na produção'),
-      el('p', {}, 'Agora: ', el('strong', {}, novo ? 'NOVO (de 20/10/2026, com finNFSe)' : 'ANTIGO (sem finNFSe)'),
-        '. A homologação já usa o modelo novo.'),
-      el('p', { class: 'suave' }, novo
-        ? 'Se as notas de produção voltarem com o erro E1235 recusando o finNFSe, a produção ainda está no modelo antigo: volte pelo botão abaixo.'
-        : 'Quando a Receita mudar a produção, as notas de produção voltam com o erro E1235 pedindo o finNFSe: aí é só clicar no botão abaixo e reenviar.'),
-      el('div', { class: 'acoes' }, trocar));
+    return el('div', { class: 'estado-linha' },
+      el('span', { class: 'estado-ponto estado-ponto--neutro', 'aria-hidden': 'true' }),
+      el('div', { class: 'estado-linha__texto' },
+        el('strong', {}, 'Modelo da NFS-e Nacional: ', novo ? 'novo (com finNFSe)' : 'antigo (sem finNFSe)'),
+        el('span', {}, 'A homologação já usa o modelo novo. ', novo
+          ? 'Se as notas de produção voltarem com o erro E1235 recusando o finNFSe, volte para o antigo.'
+          : 'Troque quando as notas de produção voltarem com o erro E1235 pedindo o finNFSe, e reenvie.')),
+      el('div', { class: 'estado-linha__acao' }, trocar));
   }
 
   api('ambiente.php').then((a) => desenhar(a)).catch((e) => area.replaceChildren(el('p', { class: 'erro' }, e.message)));
@@ -2530,9 +2544,12 @@ function secaoPessoasPainel() {
     el('h3', {}, 'Pessoas do painel'),
     el('p', { class: 'suave' }, 'Quem entra neste painel. Cada pessoa usa o próprio e-mail e senha, e o histórico mostra quem fez cada mudança.'),
     lista,
-    el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
-    el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
-    el('div', { class: 'acoes' }, botao, mensagem),
+    el('div', { class: 'novo-acesso' },
+      el('h4', { class: 'novo-acesso__titulo' }, 'Cadastrar uma pessoa'),
+      el('div', { class: 'novo-acesso__linha' },
+        el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email), botao),
+      el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
+      mensagem),
     area);
 }
 

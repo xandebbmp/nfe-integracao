@@ -416,3 +416,52 @@ details summary { cursor: pointer; margin-top: 10px; }
 .diag-item2__resolver { font-size: 13px; color: var(--suave); margin-top: 2px; }
 .diag-item2__resolver .link-botao { font-size: 13px; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .diag-grupo2 > summary::after { transition: none; } }
+
+/* ==========================================================================
+   Tela Sistema (nov/2026): paginas pelo menu lateral e linhas de estado
+   ========================================================================== */
+.sistema-secoes > .secao:first-child, .sistema-secoes > .secao[hidden] + .secao:not([hidden]) { padding-top: 20px; }
+.sistema-secoes .secao > h3 { font-size: 16px; margin-bottom: 4px; }
+.sistema-secoes .secao > h3 + p.suave { margin: 0 0 12px; font-size: 13px; }
+
+/* Linha de estado: ponto + titulo + explicacao + acao a direita */
+.estado-linha { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 12px; padding: 14px 0; border-top: 1px solid var(--divisoria); }
+.estado-linha:first-child { border-top: 0; padding-top: 4px; }
+.estado-ponto { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: #8a94a0; }
+.estado-ponto--producao { background: var(--producao); }
+.estado-ponto--teste { background: #2f6fb0; }
+.estado-linha__texto { flex: 1 1 320px; min-width: 0; display: grid; gap: 2px; }
+.estado-linha__texto strong { font-size: 15px; font-weight: 600; }
+.estado-linha__texto span { font-size: 13px; color: var(--suave); }
+.estado-linha__acao { margin-left: auto; }
+
+/* Worker: estado a esquerda, botoes a direita */
+#secao-worker { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: center; }
+#secao-worker > h3, #secao-worker > div:last-child { grid-column: 1 / -1; }
+#secao-worker .acoes { margin-top: 0; justify-content: flex-end; }
+.sistema-estado .ponto-sistema { width: 10px; height: 10px; grid-row: span 2; align-self: start; margin-top: 7px; }
+.sistema-estado strong { font-size: 15px; font-weight: 600; }
+.sistema-estado .suave { font-size: 13px; }
+
+/* Fila: faixa unica de numeros */
+#secao-fila .numeros { gap: 0; border: 1px solid var(--divisoria); border-radius: var(--raio); overflow: hidden; }
+#secao-fila .numero { padding: 12px 16px; border-right: 1px solid var(--divisoria); border-radius: 0; display: flex; flex-direction: column-reverse; gap: 4px; }
+#secao-fila .numero:last-child { border-right: 0; }
+#secao-fila .numero b { text-align: right; }
+#secao-fila .numero span { font-size: 13px; }
+
+/* Configuracoes: grupos sem moldura, separados por linha */
+.config-grupo { border: 0; border-top: 1px solid var(--divisoria); border-radius: 0; padding: 18px 0 4px; margin: 18px 0 0; }
+.config-grupo:first-of-type { border-top: 0; margin-top: 8px; padding-top: 4px; }
+.config-grupo legend { float: left; width: 100%; padding: 0 0 12px; margin: 0; font-size: 14px; font-weight: 600; }
+.config-grupo legend + * { clear: both; }
+.campos label { gap: 6px; }
+.campos .config-ajuda { line-height: 1.4; }
+/* Campos alinhados em linha mesmo quando um rotulo tem "Restaurar" ou ajuda maior */
+.config-grupo .campos { row-gap: 6px; align-items: stretch; }
+.config-grupo .campos > label { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 6px; align-content: start; padding-bottom: 12px; }
+.config-rotulo { flex-wrap: nowrap; align-items: baseline; }
+.config-restaurar { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 0 8px; min-height: 20px; border-radius: 99px;
+  background: var(--destaque-suave); color: var(--destaque); font-size: 11px; font-weight: 500; text-decoration: none; }
+.config-restaurar::before { content: "restart_alt"; font-family: "Material Icons"; font-size: 13px; }
+.config-restaurar:hover { text-decoration: none; filter: brightness(.95); }
