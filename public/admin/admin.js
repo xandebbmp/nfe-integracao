@@ -33,6 +33,10 @@ const SITUACOES = {
   LIMITE_ATINGIDO: { nome: 'Limite atingido', cor: 'var(--sit-limite)' },
 };
 
+/** Cor da linha da empresa (legenda acima da tabela) e icones dos contadores. */
+const COR_SITUACAO = { LIBERADA: 'ok', VENCIDA: 'rejeicao', LIMITE_ATINGIDO: 'info', BLOQUEADA: 'cancelada' };
+const ICONE_CONTADOR = { '': 'business', LIBERADA: 'task_alt', BLOQUEADA: 'block', VENCIDA: 'event_busy', LIMITE_ATINGIDO: 'data_usage' };
+
 const TIPOS = [
   { padrao: 'NFE', nome: 'NF-e (produtos)', campo: 'nfe' },
   { padrao: 'NACIONAL', nome: 'NFS-e Nacional', campo: 'nfse_nacional' },
@@ -98,7 +102,7 @@ function dataCurta(texto) {
 
 function dataHora(texto) {
   if (!texto) return '—';
-  const d = new Date(String(texto).replace(' ', 'T').replace(/\+00$/, 'Z'));
+  const d = new Date(String(texto).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1').replace(/\+00$/, 'Z').replace(/([+-]\d{2})$/, '$1:00'));
   return isNaN(d) ? texto : d.toLocaleString('pt-BR');
 }
 
@@ -247,6 +251,7 @@ async function carregar() {
   $('selo-ambiente').textContent = producao ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
   $('selo-ambiente').className = `selo selo--${producao ? 'producao' : 'homologacao'}`;
   $('aviso-producao').hidden = !producao;
+  document.body.classList.toggle('em-producao', producao);
   const [ano, mes] = dados.mes.split('-');
   $('mes-atual').textContent = `Uso de ${mes}/${ano}`;
   desenhar();
@@ -278,9 +283,11 @@ function desenhar() {
       class: `contador cartao${estado.filtroSituacao === situacao && situacao ? ' contador--ativo' : ''}`,
       style: `--cor:${cor}`,
       onclick: () => { estado.filtroSituacao = estado.filtroSituacao === situacao ? '' : situacao; $('filtro-situacao').value = estado.filtroSituacao; desenhar(); },
-    }, el('span', { class: 'contador__valor' }, valor), el('span', { class: 'contador__nome' }, nome))),
+    }, el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, nome), el('i', { class: 'icone', 'aria-hidden': 'true' }, ICONE_CONTADOR[situacao])),
+      el('span', { class: 'contador__valor' }, valor))),
     el('div', { class: 'contador cartao', style: '--cor:var(--st-autorizado)' },
-      el('span', { class: 'contador__valor' }, totalNotas), el('span', { class: 'contador__nome' }, 'Notas autorizadas no mês')),
+      el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, 'Notas autorizadas no mês'), el('i', { class: 'icone', 'aria-hidden': 'true' }, 'receipt_long')),
+      el('span', { class: 'contador__valor' }, totalNotas)),
   );
 
   const lista = filtrados();
@@ -300,10 +307,12 @@ function linhaCliente(c) {
   else certificado = dataCurta(c.certificado_validade);
 
   const vencido = c.liberado_ate && c.situacao === 'VENCIDA';
-  return el('tr', { onclick: () => abrirCliente(c.cnpj) },
-    el('td', {}, el('div', { class: 'empresa__nome' }, c.nome_fantasia || c.razao_social), el('div', { class: 'empresa__cnpj mono' }, cnpj(c.cnpj))),
+  // A cor da linha mostra a situacao (legenda acima da tabela); o texto vai para o leitor de tela e para a dica.
+  const nomeSituacao = (SITUACOES[c.situacao] || { nome: c.situacao }).nome;
+  return el('tr', { class: `linha-status linha-status--${COR_SITUACAO[c.situacao] || 'neutro'}`, title: [nomeSituacao, c.situacao_mensagem].filter(Boolean).join(': '), onclick: () => abrirCliente(c.cnpj) },
+    el('td', {}, el('div', { class: 'empresa__nome' }, c.nome_fantasia || c.razao_social), el('div', { class: 'empresa__cnpj mono' }, cnpj(c.cnpj)),
+      el('span', { class: 'visualmente-oculto' }, ` · ${nomeSituacao}`)),
     el('td', {}, c.plano || '—'),
-    el('td', { title: c.situacao_mensagem }, seloSituacao(c.situacao)),
     ...TIPOS.map((t) => el('td', { class: 'mono' }, c.padroes_permitidos.includes(t.padrao) ? c.autorizadas_mes[t.campo] : el('span', { class: 'suave', title: 'Tipo não contratado' }, '—'))),
     el('td', {}, limite
       ? el('div', {}, `${c.consumo_mes} / ${limite}`, el('div', { class: 'barra' }, el('div', { class: 'barra__cheio', style: `width:${pct}%;--cor:${corBarra}` })))
@@ -333,6 +342,7 @@ function abrirModal(titulo, subtitulo, conteudo, opcoes = {}) {
   else if (opcoes.rodape) conteudo = [...conteudo, el('div', { class: 'acoes' }, ...opcoes.rodape)];
   $('modal-corpo').replaceChildren(...conteudo.filter((item) => item !== null && item !== undefined && item !== false)); // blocos que nao se aplicam (null) nao aparecem
   $('modal-corpo').scrollTop = 0;
+  $('modal').classList.toggle('modal--sistema', !!opcoes.sistema);
   delete $('modal').dataset.sujo;
   if (!$('modal').open) $('modal').showModal();
 }
@@ -1065,6 +1075,51 @@ function autorDoRegistro(r) {
   return el('span', { title: r.autor }, ' por ', el('strong', {}, r.autor.replace(/\s*<[^>]*>$/, '')));
 }
 
+/**
+ * Historico agrupado por dia ("Hoje · 08/11", "Ontem · 07/11"), so a hora em cada linha.
+ * Quem fez fica em texto normal; e-mail e IP aparecem ao passar o mouse (title).
+ * conteudo(r) devolve os nos da linha (acao, autor, detalhe).
+ */
+function listaHistorico(registros, conteudo) {
+  const hoje = new Date();
+  const ontem = new Date(Date.now() - 864e5);
+  const mesmoDia = (a, b) => a.toDateString() === b.toDateString();
+  const dias = [];
+  let atual = null;
+  for (const r of registros) {
+    // Postgres manda "2026-11-08 10:05:27.656624-03": o Date do navegador quer "T", ate 3 casas e fuso "-03:00".
+    const d = new Date(String(r.criado_em).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1').replace(/([+-]\d{2})$/, '$1:00'));
+    const valida = !isNaN(d);
+    const chave = valida ? d.toDateString() : '';
+    if (!atual || atual.chave !== chave) {
+      let titulo = '—';
+      if (valida) {
+        const dm = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const nome = mesmoDia(d, hoje) ? 'Hoje' : mesmoDia(d, ontem) ? 'Ontem' : d.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-')[0];
+        titulo = `${nome.charAt(0).toUpperCase()}${nome.slice(1)} · ${dm}`;
+      }
+      atual = { chave, titulo, itens: [] };
+      dias.push(atual);
+    }
+    const dica = [r.autor, r.ip ? `IP ${r.ip}` : ''].filter(Boolean).join(' · ');
+    atual.itens.push(el('li', { class: 'historico__item', title: dica || null },
+      el('time', { class: 'historico__hora', datetime: r.criado_em }, valida ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''),
+      el('div', { class: 'historico__corpo' }, ...conteudo(r))));
+  }
+  return el('div', { class: 'historico' }, ...dias.map((g) => el('section', { class: 'historico__dia' },
+    el('h4', { class: 'historico__titulo' }, g.titulo),
+    el('ul', { class: 'historico__lista' }, ...g.itens))));
+}
+
+/** "por Alexandre" ou o selo da chave de emergencia (chama atencao quando ela e usada). */
+function autorHistorico(r) {
+  if (!r.autor) return null;
+  const nome = r.autor.replace(/\s*<[^>]*>$/, '');
+  return /chave de emerg/i.test(nome)
+    ? el('span', { class: 'historico__autor' }, ' por ', el('span', { class: 'historico__selo' }, nome))
+    : el('span', { class: 'historico__autor' }, ' por ', nome);
+}
+
 function secaoHistorico(c) {
   const itens = (c.historico || []).map((h) => {
     let detalhe = '';
@@ -1079,12 +1134,14 @@ function secaoHistorico(c) {
     } else if (h.acao === 'CERTIFICADO') {
       detalhe = `${h.detalhes.titular}, válido até ${dataCurta(h.detalhes.validade)}`;
     }
-    return el('li', {}, el('time', { class: 'suave' }, dataHora(h.criado_em)), ' · ', el('strong', {}, ACOES_HISTORICO[h.acao] || h.acao),
-      autorDoRegistro(h), h.ip ? el('span', { class: 'suave' }, ` (IP ${h.ip})`) : null, detalhe ? el('div', { class: 'suave' }, detalhe) : null);
+    return { ...h, _detalhe: detalhe };
   });
   return el('section', { class: 'secao' },
     el('h3', {}, 'Histórico de alterações'),
-    itens.length ? el('ul', { class: 'linha-tempo' }, ...itens) : el('p', { class: 'suave' }, 'Sem registros.'));
+    itens.length
+      ? listaHistorico(itens, (h) => [el('strong', {}, ACOES_HISTORICO[h.acao] || h.acao), autorHistorico(h),
+        h._detalhe ? el('div', { class: 'historico__detalhe' }, h._detalhe) : null])
+      : el('p', { class: 'suave' }, 'Sem registros.'));
 }
 
 // ==========================================================================
@@ -1674,6 +1731,7 @@ async function atualizarPontoSistema() {
 }
 
 function abrirSistema(opcoes = {}) {
+  let navWorker = null;
   const estadoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   const filaArea = el('div', {});
   const workersArea = el('div', {});
@@ -1757,10 +1815,14 @@ function abrirSistema(opcoes = {}) {
       : el('p', { class: 'suave' }, 'Nenhum worker dando sinal agora.'));
 
     historicoArea.replaceChildren(s.acoes_recentes.length
-      ? el('ul', { class: 'linha-tempo' }, ...s.acoes_recentes.map((a) => el('li', {},
-        el('time', { class: 'suave' }, dataHora(a.criado_em)), ' · ', el('strong', {}, ACOES_SISTEMA[a.acao] || a.acao),
-        autorDoRegistro(a), a.ip ? el('span', { class: 'suave' }, ` (IP ${a.ip})`) : null)))
+      ? listaHistorico(s.acoes_recentes, (a) => [el('strong', {}, ACOES_SISTEMA[a.acao] || a.acao), autorHistorico(a)])
       : el('p', { class: 'suave' }, 'Nenhuma ação ainda.'));
+    // Estado do worker no menu lateral da tela Sistema
+    if (navWorker) {
+      const rotulos = { PARADO: 'parado', PAUSADO: 'pausado', REINICIANDO: 'reiniciando' };
+      navWorker.textContent = rotulos[s.situacao] || '';
+      navWorker.className = `sistema-nav__estado sistema-nav__estado--${s.situacao}`;
+    }
   }
 
   async function recarregar() {
@@ -1837,12 +1899,15 @@ function abrirSistema(opcoes = {}) {
     }
     entradas[c.chave] = entrada;
     erros[c.chave] = el('span', { class: 'erro' });
-    const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
+    // O padrao do arquivo so aparece quando o valor foi alterado no painel (no botao e na dica dele).
+    const voltar = c.alterado
+      ? el('button', { class: 'config-restaurar', type: 'button', title: `Padrão do arquivo: ${textoValor(c, c.padrao)}`,
+        onclick: (ev) => { ev.preventDefault(); entrada.value = c.padrao ?? ''; } }, 'Alterado · restaurar padrão')
+      : null;
     return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
-      el('span', { class: 'config-rotulo' }, c.rotulo),
+      el('span', { class: 'config-rotulo' }, c.rotulo, voltar),
       entrada,
-      el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
-        c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
+      c.ajuda ? el('span', { class: 'config-ajuda' }, c.ajuda) : null,
       erros[c.chave]);
   }
 
@@ -2046,20 +2111,40 @@ function abrirSistema(opcoes = {}) {
     }
   }
 
-  abrirModal('Sistema', 'Ambiente, worker (o programa que envia as notas), banco de dados, pessoas, e-mail e configurações', [
+  const secoes = [
     secaoAmbiente(),
-    el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
-    el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
-    el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
+    el('section', { class: 'secao', id: 'secao-worker' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
+    el('section', { class: 'secao', id: 'secao-fila' }, el('h3', {}, 'Fila de envio'), filaArea),
+    el('section', { class: 'secao', id: 'secao-workers' }, el('h3', {}, 'Workers ligados'), workersArea),
     el('section', { class: 'secao', id: 'secao-banco' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
-    el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
+    el('section', { class: 'secao', id: 'secao-diagnostico' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
     secaoPessoasPainel(),
     secaoSenhaMonitor(),
     el('section', { class: 'secao', id: 'secao-email' }, el('h3', {}, 'E-mail'), emailArea),
-    el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
+    el('section', { class: 'secao', id: 'secao-config' }, el('h3', {}, 'Configurações'), configArea),
     secaoSerpro(),
-    el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
-  ]);
+    el('section', { class: 'secao', id: 'secao-historico' }, el('h3', {}, 'Histórico'), historicoArea),
+  ];
+  // Menu lateral: cada item leva a sua parte da tela (tudo continua na mesma pagina).
+  const itensNav = [
+    ['secao-ambiente', 'Ambiente e worker'], ['secao-fila', 'Fila de envio'], ['secao-banco', 'Banco e diagnóstico'],
+    ['secao-pessoas', 'Pessoas e acesso'], ['secao-email', 'E-mail'], ['secao-config', 'Configurações'],
+    ['secao-serpro', 'Integração SERPRO'], ['secao-historico', 'Histórico'],
+  ];
+  navWorker = el('span', { class: 'sistema-nav__estado' });
+  const nav = el('nav', { class: 'sistema-nav', 'aria-label': 'Partes da tela Sistema' },
+    ...itensNav.map(([id, nome], i) => el('a', {
+      href: `#${id}`, class: 'sistema-nav__item', 'aria-current': i === 0 ? 'true' : null,
+      onclick: (ev) => {
+        ev.preventDefault();
+        nav.querySelectorAll('[aria-current]').forEach((a) => a.removeAttribute('aria-current'));
+        ev.currentTarget.setAttribute('aria-current', 'true');
+        $(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      },
+    }, nome, id === 'secao-ambiente' ? navWorker : null)));
+  abrirModal('Sistema', 'Ambiente, worker (o programa que envia as notas), banco de dados, pessoas, e-mail e configurações', [
+    el('div', { class: 'sistema-pagina' }, nav, el('div', { class: 'sistema-secoes' }, ...secoes.filter(Boolean))),
+  ], { sistema: true });
   recarregar();
   carregarBanco();
   carregarConfiguracoes();

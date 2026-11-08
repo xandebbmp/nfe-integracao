@@ -7,13 +7,14 @@ declare(strict_types=1);
  * GET /v1/portal/notas.php?status=&busca=&mes=AAAA-MM&pagina=1
  *       status: AUTORIZADAS | EM_ANDAMENTO | COM_PROBLEMA | CANCELADAS (vazio = todas)
  *       busca:  nome ou CPF/CNPJ do tomador, ou numero da NFS-e/DPS
- * GET /v1/portal/notas.php?id=UUID     detalhe de uma nota (com o bloco "cancelamento")
+ * GET /v1/portal/notas.php?id=UUID     detalhe de uma nota (com os blocos "cancelamento" e "historico")
  *
  * So aparecem notas da empresa de quem esta logado, no ambiente atual.
  */
 
 use Xande\NfeIntegracao\Nfse\Api\Api;
 use Xande\NfeIntegracao\Nfse\Api\PortalSessao;
+use Xande\NfeIntegracao\Nfse\Repositorio\MonitorRepositorio;
 use Xande\NfeIntegracao\Nfse\Servico\PortalCancelamento;
 use Xande\NfeIntegracao\Nfse\Servico\PortalInicio;
 
@@ -30,6 +31,14 @@ if (isset($_GET['id'])) {
     }
     // O que da para fazer sobre cancelamento (botao, pedido em andamento ou recusado).
     $nota['cancelamento'] = (new PortalCancelamento($api->pdo(), $api->cfg))->situacao($nota);
+    // Linha do tempo da nota (aba "Historico" do detalhe): o mesmo registro que alimenta o Monitor,
+    // so com os campos que o cliente precisa ver.
+    $nota['historico'] = array_map(static fn (array $l): array => [
+        'operacao' => $l['operacao'],
+        'status' => $l['status'],
+        'mensagem' => $l['mensagem'],
+        'criado_em' => $l['criado_em'],
+    ], (new MonitorRepositorio($api->pdo()))->historico((string)$nota['id']));
     $api->responder(200, ['nota' => $nota]);
 }
 

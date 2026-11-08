@@ -7,8 +7,8 @@
   <title>Portal Gestão Fiscal NFS-e</title>
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261108c">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="portal.css?v=20261108r11">
   <!-- Ajuda guiada (menu "Ajuda"): o mesmo motor do painel admin -->
   <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
 </head>
@@ -21,25 +21,25 @@
 
     <!-- Lado esquerdo: apresentacao -->
     <div class="login__marca">
-      <div class="logo">
-        <div class="logo__icone"><i class="icone">receipt_long</i></div>
+      <div class="logo logo--login">
+        <svg class="logo__selo" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2.2"/><path d="M11.5 16.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <div>
-          <span class="logo__nome" style="color:#fff">Gestão Fiscal</span>
+          <span class="logo__nome">Gestão Fiscal</span>
           <span class="logo__sub">NFS-e Nacional · Salvador-BA</span>
         </div>
       </div>
 
-      <div>
-        <h1>Sua nota de serviço em <em>3 campos</em>.</h1>
-        <p class="login__texto">Os dados da sua empresa, endereço do cliente e impostos são preenchidos sozinhos. Você informa só o que muda.</p>
-      </div>
+      <div class="login__miolo">
+        <h1>Três campos.<br>Nota autorizada.</h1>
 
-      <!-- Ilustracao: o que o cliente digita x o que o sistema preenche -->
-      <div class="login__nota" aria-hidden="true">
-        <div class="login__nota-topo"><span>Nova NFS-e</span><span class="mono">DPS nº 000124</span></div>
-        <div class="login__nota-linha"><span class="login__nota-num">1</span><span>Tomador <b>12.345.678/0001-90</b></span><span class="login__nota-auto">endereço automático</span></div>
-        <div class="login__nota-linha"><span class="login__nota-num">2</span><span>Serviço <b>01.01 Desenvolvimento</b></span><span class="login__nota-auto">ISS 5%</span></div>
-        <div class="login__nota-linha"><span class="login__nota-num">3</span><span>Valor <b class="num">R$ 1.500,00</b></span><span class="login__nota-auto">líquido calculado</span></div>
+        <!-- Ilustracao: os 3 campos que o cliente digita aparecem um a um e o carimbo "desce" -->
+        <div class="login__papel" role="img" aria-label="Exemplo de NFS-e preenchida em três campos e autorizada">
+          <div class="login__papel-topo"><span>NFS-e · exemplo</span><span>DPS 1/124</span></div>
+          <div class="login__papel-linha login__passo1"><span class="login__papel-num">01</span><span><small>Para quem</small><b class="mono">12.345.678/0001-90</b></span></div>
+          <div class="login__papel-linha login__passo2"><span class="login__papel-num">02</span><span><small>O que foi feito</small><b>01.01 · Desenvolvimento</b></span></div>
+          <div class="login__papel-linha login__passo3"><span class="login__papel-num">03</span><span><small>Quanto custou</small><b class="login__papel-valor">R$ 1.500,00</b></span></div>
+          <div class="login__carimbo" aria-hidden="true"><span>NFS-e</span><b>AUTORIZADA</b><span>Nacional</span></div>
+        </div>
       </div>
 
       <p class="login__rodape">Emissão pelo Padrão Nacional ou pela Prefeitura de Salvador</p>
@@ -80,7 +80,7 @@
           Entrar <i class="icone icone--p">arrow_forward</i>
         </button>
 
-        <p class="login__ajuda">Primeiro acesso? Use a senha provisória que você recebeu.</p>
+        <p class="login__ajuda"><b>Primeiro acesso?</b> Use a senha provisória que você recebeu.</p>
       </form>
 
       <!-- Troca obrigatoria da senha provisoria (1o acesso) -->
@@ -283,10 +283,18 @@
                     <h2>Últimas notas</h2>
                     <a href="#notas" class="btn btn--secundario">Ver todas</a>
                   </div>
+                  <!-- Legenda: a cor da linha mostra o status da nota -->
+                  <ul class="legenda" aria-label="Legenda das cores">
+                    <li><span class="legenda__cor legenda__cor--ok"></span>Autorizada</li>
+                    <li><span class="legenda__cor legenda__cor--info"></span>Em processamento</li>
+                    <li><span class="legenda__cor legenda__cor--rejeicao"></span>Rejeição</li>
+                    <li><span class="legenda__cor legenda__cor--cancelada"></span>Cancelada</li>
+                    <li><span class="legenda__cor legenda__cor--neutro"></span>Substituída</li>
+                  </ul>
                   <div class="tabela-rolagem">
-                    <table class="tabela">
+                    <table class="tabela tabela--status">
                       <thead>
-                        <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th>Status</th></tr>
+                        <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th class="direita"><span class="so-leitor">Arquivos</span></th></tr>
                       </thead>
                       <tbody id="inicio-notas"></tbody>
                     </table>
@@ -480,8 +488,8 @@
                 <div class="chips" role="group" aria-label="Situação" id="notas-filtro-status">
                   <button type="button" class="chip" data-status="" aria-pressed="true">Todas</button>
                   <button type="button" class="chip" data-status="AUTORIZADAS" aria-pressed="false">Autorizadas</button>
-                  <button type="button" class="chip" data-status="EM_ANDAMENTO" aria-pressed="false">Na prefeitura</button>
-                  <button type="button" class="chip" data-status="COM_PROBLEMA" aria-pressed="false">Com problema</button>
+                  <button type="button" class="chip" data-status="EM_ANDAMENTO" aria-pressed="false">Em processamento</button>
+                  <button type="button" class="chip" data-status="COM_PROBLEMA" aria-pressed="false">Rejeição</button>
                   <button type="button" class="chip" data-status="CANCELADAS" aria-pressed="false">Canceladas</button>
                 </div>
                 <div class="filtros__campos">
@@ -493,10 +501,17 @@
               </div>
 
               <div class="cartao">
+                <ul class="legenda" aria-label="Legenda das cores">
+                  <li><span class="legenda__cor legenda__cor--ok"></span>Autorizada</li>
+                  <li><span class="legenda__cor legenda__cor--info"></span>Em processamento</li>
+                  <li><span class="legenda__cor legenda__cor--rejeicao"></span>Rejeição</li>
+                  <li><span class="legenda__cor legenda__cor--cancelada"></span>Cancelada</li>
+                  <li><span class="legenda__cor legenda__cor--neutro"></span>Substituída</li>
+                </ul>
                 <div class="tabela-rolagem">
-                  <table class="tabela tabela--clicavel">
+                  <table class="tabela tabela--clicavel tabela--status">
                     <thead>
-                      <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th>Status</th><th><span class="so-leitor">Arquivos</span></th></tr>
+                      <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th class="direita"><span class="so-leitor">Arquivos</span></th></tr>
                     </thead>
                     <tbody id="notas-linhas"></tbody>
                   </table>
@@ -533,10 +548,16 @@
                 </div>
               </div>
               <div class="cartao">
+                <ul class="legenda" aria-label="Legenda das cores">
+                  <li><span class="legenda__cor legenda__cor--ok"></span>Paga</li>
+                  <li><span class="legenda__cor legenda__cor--info"></span>A vencer</li>
+                  <li><span class="legenda__cor legenda__cor--rejeicao"></span>Vence hoje</li>
+                  <li><span class="legenda__cor legenda__cor--cancelada"></span>Venceu</li>
+                </ul>
                 <div class="tabela-rolagem">
-                  <table class="tabela tabela--guias">
+                  <table class="tabela tabela--guias tabela--status">
                     <thead>
-                      <tr><th>Mês</th><th class="direita">Valor</th><th>Vencimento</th><th>Situação</th><th class="acoes"><span class="so-leitor">Ações</span></th></tr>
+                      <tr><th>Mês</th><th class="direita">Valor</th><th>Vencimento</th><th class="acoes"><span class="so-leitor">Ações</span></th></tr>
                     </thead>
                     <tbody id="guias-linhas"></tbody>
                   </table>
@@ -621,9 +642,15 @@
 
               <div class="cartao">
                 <div class="tabela-rolagem">
-                  <table class="tabela">
+                  <ul class="legenda" aria-label="Legenda das cores">
+                    <li><span class="legenda__cor legenda__cor--ok"></span>Ativo</li>
+                    <li><span class="legenda__cor legenda__cor--info"></span>Aguardando 1º acesso</li>
+                    <li><span class="legenda__cor legenda__cor--rejeicao"></span>Bloqueado por senha errada</li>
+                    <li><span class="legenda__cor legenda__cor--neutro"></span>Desativado</li>
+                  </ul>
+                  <table class="tabela tabela--status">
                     <thead>
-                      <tr><th>Nome</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th class="direita"><span class="so-leitor">Ações</span></th></tr>
+                      <tr><th>Nome</th><th>Papel</th><th>Último acesso</th><th class="direita"><span class="so-leitor">Ações</span></th></tr>
                     </thead>
                     <tbody id="usuarios-linhas"></tbody>
                   </table>
@@ -860,7 +887,7 @@
   </dialog>
 
   <script src="../ajuda/tour.js?v=20261108c"></script>
-  <script src="portal.js?v=20261108d"></script>
+  <script src="portal.js?v=20261108r11"></script>
   <script src="portal-guias.js?v=20261108a"></script>
 </body>
 </html>
