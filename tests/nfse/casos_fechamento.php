@@ -51,6 +51,9 @@ function testesSerproUnidade(): void
     Apoio::igual(['PGDASD', 'GERARDAS12', '00000000000100', ['periodoApuracao' => '202101']],
         [$corpo['pedidoDados']['idSistema'], $corpo['pedidoDados']['idServico'], $corpo['contribuinte']['numero'], json_decode($corpo['pedidoDados']['dados'], true)],
         'envelope: PGDASD/GERARDAS12, "dados" vai como texto JSON; no teste usa o CNPJ e o mes de exemplo');
+    Apoio::igual([['numero' => '00000000000191', 'tipo' => 2], ['numero' => '00000000191', 'tipo' => 1], 2],
+        [$corpo['contratante'], $corpo['autorPedidoDados'], $corpo['contribuinte']['tipo']],
+        'envelope: no teste o contratante e CNPJ de exemplo e o autor do pedido e CPF de exemplo');
 
     $erro = (new IntegraContador((new TransporteFalso())->responder(400, json_encode(['status' => 400, 'mensagens' => [['codigo' => 'Erro-PGDASD-001', 'texto' => 'Nao existe declaracao']]]))))
         ->gerarDasTeste('33444555000101', '2026-11');

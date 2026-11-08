@@ -31,6 +31,8 @@ final class IntegraContador
     public const TOKEN_TESTE = '06aef429-a981-3ec5-a1f8-71d38d86481e';
     /** No modo teste o SERPRO so responde para os dados de exemplo dele. */
     public const CONTRATANTE_TESTE = '00000000000191';
+    /** O autor do pedido no modo teste e um CPF de exemplo (com CNPJ o SERPRO responde "Dados invalidos"). */
+    public const AUTOR_TESTE = '00000000191';
     public const CONTRIBUINTE_TESTE = '00000000000100';
     public const PERIODO_TESTE = '202101';
 
@@ -90,9 +92,9 @@ final class IntegraContador
     private function chamar(string $rota, string $contribuinte, string $sistema, string $servico, array $dados): array
     {
         $corpo = [
-            'contratante' => ['numero' => self::CONTRATANTE_TESTE, 'tipo' => 2],
-            'autorPedidoDados' => ['numero' => self::CONTRATANTE_TESTE, 'tipo' => 2],
-            'contribuinte' => ['numero' => $contribuinte, 'tipo' => strlen($contribuinte) === 11 ? 1 : 2],
+            'contratante' => ['numero' => self::CONTRATANTE_TESTE, 'tipo' => self::tipo(self::CONTRATANTE_TESTE)],
+            'autorPedidoDados' => ['numero' => self::AUTOR_TESTE, 'tipo' => self::tipo(self::AUTOR_TESTE)],
+            'contribuinte' => ['numero' => $contribuinte, 'tipo' => self::tipo($contribuinte)],
             'pedidoDados' => [
                 'idSistema' => $sistema,
                 'idServico' => $servico,
@@ -119,6 +121,12 @@ final class IntegraContador
         $conteudo = $json['dados'] ?? '';
         $decodificado = is_string($conteudo) ? json_decode($conteudo, true) : $conteudo;
         return ['ok' => true, 'dados' => is_array($decodificado) ? $decodificado : [], 'mensagens' => $mensagens, 'texto_mensagens' => $texto];
+    }
+
+    /** Tipo do documento no envelope: 1 = CPF (11 digitos), 2 = CNPJ. */
+    private static function tipo(string $documento): int
+    {
+        return strlen($documento) === 11 ? 1 : 2;
     }
 
     /** "20210222" ou "2021-02-22" -> "2021-02-22" (vazio se nao reconhecer). */
