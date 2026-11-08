@@ -8,6 +8,8 @@
   <!-- Mesmo visual do monitor + ajustes do painel -->
   <link rel="stylesheet" href="../monitor/monitor.css?v=20261106n">
   <link rel="stylesheet" href="admin.css?v=20261108c">
+  <!-- Tour guiado (botao "Tour guiado"): o mesmo do portal -->
+  <link rel="stylesheet" href="../ajuda/tour.css?v=20261108a">
 </head>
 <body>
 
@@ -66,6 +68,7 @@
         <button id="botao-relatorio" class="botao">Relatório de cobrança</button>
         <button id="botao-nova" class="botao botao--forte">+ Nova empresa</button>
         <a class="botao" href="../ajuda/#painel" target="_blank" rel="noopener" title="Passo a passo de cada tela (abre em outra aba)">Ajuda</a>
+        <button id="botao-tour" class="botao" title="Mostra cada parte desta tela, passo a passo">Tour guiado</button>
         <button id="botao-eu" class="botao" title="Trocar a minha senha" hidden></button>
         <button id="botao-sair" class="botao">Sair</button>
       </div>
@@ -131,6 +134,7 @@
     <div id="modal-rodape" class="modal__rodape" hidden></div>
   </dialog>
 
-  <script src="admin.js?v=20261108d"></script>
+  <script src="../ajuda/tour.js?v=20261108a"></script>
+  <script src="admin.js?v=20261108e"></script>
 </body>
 </html>

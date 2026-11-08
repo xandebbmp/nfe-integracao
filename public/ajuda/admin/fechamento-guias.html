@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fechamento do mês e guia DAS - Central de Ajuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../portal/portal.css">
+  <link rel="stylesheet" href="../ajuda.css">
+</head>
+<body>
+  <!-- Artigo da Central de Ajuda. Modelo e regras: portal/emitir-nfse.html -->
+  <header class="ajuda-topo">
+    <a class="ajuda-topo__marca" href="../"><i class="icone">help_center</i> Central de Ajuda</a>
+    <a class="btn btn--secundario" href="../../admin/"><i class="icone icone--p">admin_panel_settings</i> Ir para o painel</a>
+  </header>
+
+  <main class="ajuda artigo">
+    <nav class="migalha" aria-label="Você está em">
+      <a href="../">Central de Ajuda</a> <span>›</span> <span>Painel do administrador</span> <span>›</span> <span>Fechamento do mês e guia DAS</span>
+    </nav>
+
+    <h1>Fechamento do mês e guia DAS do Simples</h1>
+    <p class="artigo__resumo">No fim do mês, veja quanto cada empresa faturou, faça a declaração do Simples e entregue a guia DAS para o cliente pagar pelo portal.</p>
+
+    <div class="caixa caixa--info">
+      <h2><i class="icone">lightbulb</i> Antes de começar</h2>
+      <ul>
+        <li>A receita vem das notas <b>autorizadas</b> no sistema: NFS-e pela data de competência e NF-e pela data de autorização. Notas canceladas não entram.</li>
+        <li>A declaração (PGDAS-D) e a guia continuam sendo feitas no <b>site do Simples Nacional</b>. O sistema mostra os números e entrega a guia ao cliente.</li>
+        <li>Na primeira vez, clique em <span class="botao-nome">Atualizar banco</span> (em <b>Sistema</b>) para criar as tabelas das guias.</li>
+      </ul>
+    </div>
+
+    <ol class="passos">
+      <li class="passo">
+        <h2>Abra o Fechamento do mês</h2>
+        <p>No topo do painel, clique em <span class="botao-nome">Fechamento do mês</span>.</p>
+        <figure class="print">
+          <img src="../img/admin/fechamento-01-botao.png" alt="Topo do painel com o botão Fechamento do mês" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Confira a receita de cada empresa</h2>
+        <p>Escolha o <b>mês</b>. Os quadros do topo somam a receita, as notas e o DAS estimado de todas as empresas. Na lista, cada empresa mostra:</p>
+        <ul>
+          <li><b>Receita do mês</b>: soma das notas autorizadas no mês (NFS-e + NF-e).</li>
+          <li><b>12 meses anteriores</b>: receita dos 12 meses antes deste, que define a faixa do Simples.</li>
+          <li><b>% Simples</b> e <b>DAS estimado</b>: receita × percentual do cadastro da empresa. É só uma referência.</li>
+          <li><b>Guia DAS</b>: anexar, ver, marcar como paga, trocar ou remover a guia.</li>
+        </ul>
+        <p>Para levar ao Excel, clique em <span class="botao-nome">Baixar planilha (CSV)</span>. A planilha traz também as empresas sem notas no mês.</p>
+        <figure class="print">
+          <img src="../img/admin/fechamento-02-tela.png" alt="Fechamento do mês com receita, notas, DAS estimado e a coluna Guia DAS de cada empresa" loading="lazy">
+        </figure>
+      </li>
+      <li class="passo">
+        <h2>Faça a declaração e gere o DAS</h2>
+        <p>No site do Simples Nacional (PGDAS-D), declare a receita da empresa e gere o DAS. Baixe o PDF da guia.</p>
+        <p>O valor certo é o do PGDAS-D: ele considera a faixa dos últimos 12 meses, o anexo de cada atividade, o fator R e receitas que não passaram pelo sistema.</p>
+      </li>
+      <li class="passo">
+        <h2>Anexe a guia</h2>
+        <p>Volte ao Fechamento e clique em <span class="botao-nome">Anexar guia</span> na linha da empresa. Escolha o <b>PDF</b> e preencha o <b>valor total</b>, o <b>vencimento</b> (já vem o dia 20 do mês seguinte) e o <b>código de barras</b> (os 48 números da guia).</p>
+        <p>Deixe marcado <b>Avisar o cliente por e-mail</b> para todas as pessoas da empresa no portal receberem o aviso. Clique em <span class="botao-nome">Anexar guia</span>.</p>
+        <figure class="print">
+          <img src="../img/admin/fechamento-03-anexar.png" alt="Janela Anexar guia DAS com PDF, valor, vencimento, código de barras e aviso por e-mail" loading="lazy">
+        </figure>
+        <p>Pronto: o cliente vê a guia em <b>Guias do Simples</b>, no portal.</p>
+      </li>
+      <li class="passo">
+        <h2>Acompanhe o pagamento</h2>
+        <p>Na coluna <b>Guia DAS</b>, a guia mostra valor e vencimento (clique para abrir o PDF). Os links abaixo dela:</p>
+        <ul>
+          <li><span class="botao-nome">Marcar paga</span>: pede a data do pagamento. O cliente também pode marcar no portal, em <b>Já paguei</b>.</li>
+          <li><span class="botao-nome">Desfazer pago</span>: volta a guia para a vencer ou vencida.</li>
+          <li><span class="botao-nome">Trocar</span>: envia outro PDF (por exemplo, uma guia refeita). A marcação de paga é apagada.</li>
+          <li><span class="botao-nome">Remover</span>: o cliente deixa de ver a guia.</li>
+        </ul>
+        <p>O sistema <b>não confere o pagamento na Receita</b>: "paga" quer dizer que alguém marcou.</p>
+      </li>
+    </ol>
+
+    <h2 style="margin-top:28px">Gerar o DAS pela Receita (SERPRO) — em teste</h2>
+    <div class="caixa caixa--alerta">
+      <p>Por enquanto só existe o <b>modo teste</b>, gratuito. Ele chama o ambiente de demonstração do SERPRO e mostra sempre a <b>mesma guia de exemplo</b> (de 2018), que <b>não é da empresa e não é salva</b>. Serve para conferir que a ligação com a Receita funciona.</p>
+    </div>
+    <ol class="passos">
+      <li class="passo">
+        <h2>Ligue o modo teste</h2>
+        <p>Em <span class="botao-nome">Sistema</span> › <b>Configurações do sistema</b>, mude <b>Gerar DAS pela Receita</b> para <b>Teste</b> e salve.</p>
+      </li>
+      <li class="passo">
+        <h2>Teste numa empresa</h2>
+        <p>No Fechamento do mês aparece o link <span class="botao-nome">Testar Receita</span> na coluna Guia DAS. Clique: se a ligação funcionar, aparece <b>Funcionou!</b> com o valor, o vencimento, o número do documento e o botão para abrir o PDF de exemplo.</p>
+        <figure class="print">
+          <img src="../img/admin/fechamento-04-testar-receita.png" alt="Resultado do Testar Receita com a guia de exemplo do SERPRO" loading="lazy">
+        </figure>
+      </li>
+    </ol>
+    <p>A guia de verdade, gerada sozinha para cada cliente, depende do contrato com o SERPRO, do certificado e-CNPJ do escritório e da procuração eletrônica de cada cliente.</p>
+
+    <h2 style="margin-top:28px">Se der errado</h2>
+    <div class="rolagem">
+      <table class="tabela-ajuda">
+        <thead><tr><th>O que aconteceu</th><th>O que fazer</th></tr></thead>
+        <tbody>
+          <tr><td>A coluna Guia DAS não aparece.</td><td>Falta atualizar o banco: <b>Sistema</b> › <span class="botao-nome">Atualizar banco</span>.</td></tr>
+          <tr><td>A empresa não aparece na lista.</td><td>A lista mostra quem teve nota no mês ou é ME/EPP. As outras estão na planilha CSV.</td></tr>
+          <tr><td>DAS estimado aparece "–".</td><td>Só ME/EPP com <b>% Simples</b> no cadastro tem estimativa. MEI paga valor fixo e não optante não tem DAS.</td></tr>
+          <tr><td>A receita está diferente do PGDAS-D.</td><td>O sistema só conhece as notas emitidas por ele. Some as receitas de fora (outros sistemas, vendas sem nota) na declaração.</td></tr>
+          <tr><td>"Código de barras" recusado.</td><td>Digite só os <b>48 números</b> da linha digitável, sem pontos nem espaços.</td></tr>
+          <tr><td>O cliente não recebeu o e-mail.</td><td>Veja <a href="../problemas/email-nao-chegou.html">O e-mail não chegou</a>. A guia fica no portal mesmo sem o e-mail.</td></tr>
+          <tr><td>Testar Receita: "O SERPRO recusou o pedido" ou "quota".</td><td>O ambiente de teste do SERPRO limita o número de chamadas. Espere alguns minutos e tente de novo.</td></tr>
+          <tr><td>Testar Receita: "Sem resposta do SERPRO".</td><td>O servidor não alcançou a internet do SERPRO. Rode o diagnóstico em <b>Sistema</b>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rodape-artigo">
+      <a href="../">← Voltar para a Central de Ajuda</a>
+      <span>Última revisão: 08/11/2026</span>
+    </div>
+  </main>
+</body>
+</html>

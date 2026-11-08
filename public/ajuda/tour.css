@@ -1,0 +1,57 @@
+/*
+ * Tour guiado (ajuda/tour.js). Usa as cores da tela onde esta:
+ * portal (--superficie, --primaria) ou painel admin (--cartao, --destaque).
+ */
+.tour { position: fixed; inset: 0; z-index: 10000; }
+
+/* Destaque: "buraco" claro em volta do elemento; a sombra gigante escurece o resto. */
+.tour__foco {
+  position: fixed; border-radius: 10px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55), 0 0 0 3px var(--primaria, var(--destaque, #1f6feb));
+  transition: left .2s, top .2s, width .2s, height .2s;
+}
+.tour__foco[hidden] { display: none; }
+/* Sem alvo (caixa no meio): escurece a tela inteira. */
+.tour:has(.tour__foco[hidden]) { background: rgba(15, 23, 42, .55); }
+
+.tour__caixa {
+  position: fixed; width: min(360px, calc(100vw - 24px)); box-sizing: border-box;
+  padding: 18px 18px 14px; border-radius: 12px;
+  background: var(--superficie, var(--cartao, #fff)); color: var(--texto, #0f172a);
+  border: 1px solid var(--borda, #e2e8f0);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .25);
+  font-family: var(--fonte, inherit); font-size: 14px; line-height: 1.5;
+}
+.tour__caixa--meio { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%); }
+
+/* Seta da caixa, apontando para o elemento. */
+.tour__caixa--embaixo::before, .tour__caixa--em-cima::before {
+  content: ""; position: absolute; left: calc(var(--tour-seta, 50%) - 8px);
+  width: 14px; height: 14px; transform: rotate(45deg);
+  background: inherit; border: inherit;
+}
+.tour__caixa--embaixo::before { top: -8px; border-right: 0; border-bottom: 0; }
+.tour__caixa--em-cima::before { bottom: -8px; border-left: 0; border-top: 0; }
+
+.tour__titulo { margin: 0 28px 6px 0; font-size: 16px; font-weight: 700; }
+.tour__texto { margin: 0 0 14px; color: var(--secundario, var(--suave, #475569)); }
+.tour__fechar {
+  position: absolute; top: 8px; right: 8px; width: 30px; height: 30px;
+  border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; font-size: 14px;
+}
+.tour__fechar:hover { background: var(--hover, var(--linha-hover, #f1f5f9)); }
+.tour__rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tour__contador { font-size: 12px; color: var(--apagado, var(--suave, #94a3b8)); }
+.tour__botoes { display: flex; gap: 8px; }
+.tour__botao {
+  min-height: 36px; padding: 0 14px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 600;
+  border: 1px solid var(--borda, #e2e8f0); background: transparent; color: inherit;
+}
+.tour__botao[hidden] { display: none; }
+.tour__botao--forte {
+  border-color: transparent; color: var(--primaria-texto, #fff);
+  background: var(--primaria, var(--destaque, #1f6feb));
+}
+.tour__botao:focus-visible, .tour__fechar:focus-visible { outline: 3px solid var(--primaria, var(--destaque, #1f6feb)); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) { .tour__foco { transition: none; } }

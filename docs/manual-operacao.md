@@ -245,7 +245,8 @@ arquivo: tempo de sessão, "lembrar de mim", senhas erradas antes de
 bloquear e tempo de bloqueio do portal; tipo de NFS-e do portal;
 tentativas e espera quando a prefeitura falha; tempo para devolver nota
 travada à fila; espera máxima e tamanho de lote da API; link de
-visualização de Salvador.
+visualização de Salvador; **Gerar DAS pela Receita** (SERPRO, por enquanto
+só Desligado ou Teste; ver "Fechamento do mês e guia DAS" na seção 12).
 
 - Cada campo mostra o **padrão do arquivo**. O valor do painel fica em
   `sistema_ajustes` (script `0009`) e substitui o do arquivo. "Voltar ao
@@ -681,6 +682,44 @@ Para planilha, acrescente `&formato=csv`.
 | `GET /v1/admin/diagnostico.php[?rede=0]` | Diagnóstico (não altera nada; `rede=0` pula a internet) |
 | `GET /v1/admin/configuracoes.php` | Configurações editáveis, valor atual e padrão do arquivo |
 | `POST /v1/admin/configuracoes.php` | `{"valores": {"portal.tentativas_login": 5, ...}}` |
+| `GET /v1/admin/fechamento.php?mes=AAAA-MM[&formato=csv]` | Fechamento do mês: receita por empresa, DAS estimado e guia anexada |
+| `POST /v1/admin/guia_das.php` | Anexar ou trocar a guia (multipart: `cnpj`, `competencia`, `valor`, `vencimento`, `linha_digitavel`, `avisar`, `arquivo`) ou JSON `{"acao": "remover" \| "pagar" \| "desfazer_pagamento", "id"}` |
+| `GET /v1/admin/guia_das.php?id=` | PDF da guia |
+| `POST /v1/admin/serpro_das.php` | Modo teste do SERPRO: `{"cnpj","competencia"}` devolve a guia de exemplo (não salva) |
+
+### Fechamento do mês e guia DAS do Simples
+
+Botão **Fechamento do mês** no topo do painel. Serve para o contador fazer a
+declaração do Simples (PGDAS-D) e entregar a guia DAS ao cliente pelo portal.
+Passo a passo com telas: Central de Ajuda › *Fechamento do mês e guia DAS*.
+
+- **Receita do mês:** NFS-e autorizadas pela **competência** + NF-e
+  autorizadas pela **data de autorização**, no ambiente atual. Canceladas não
+  entram (aparecem na coluna "Canceladas"). NF-e de entrada e de devolução
+  não entram. **12 meses anteriores** = receita dos 12 meses antes do mês.
+- **DAS estimado** = receita × "% Simples" do cadastro, só para ME/EPP. É
+  referência: o valor certo é o do PGDAS-D (faixa, anexo, fator R e receitas
+  fora do sistema). Regras em `src/Nfse/Servico/FechamentoMes.php`.
+- **Guia DAS** (script `0015`): o contador gera o DAS no site do Simples e
+  clica em **Anexar guia** (PDF, valor, vencimento e os 48 números do código de
+  barras). Uma guia por empresa e mês; **Trocar** substitui. Com "Avisar o
+  cliente", todas as pessoas ativas da empresa no portal recebem e-mail (fila
+  do worker). O cliente vê em **Guias do Simples**.
+- **Pagamento** (script `0016`): **Marcar paga** (painel) ou **Já paguei**
+  (portal) grava a data e quem marcou; **Desfazer** volta. O sistema **não
+  confere o pagamento na Receita**. Trocar a guia apaga a marcação.
+- **Gerar DAS pela Receita (SERPRO Integra Contador):** só o **modo teste**
+  está pronto. Em **Sistema > Configurações**, "Gerar DAS pela Receita" =
+  **Teste** mostra o link **Testar Receita** no Fechamento. Ele chama o
+  ambiente de demonstração gratuito do SERPRO (`IntegraContador::URL_TESTE`),
+  que só aceita o cenário da documentação (contratante, autor e contribuinte
+  `00000000000100`, período `201801`) e devolve sempre a mesma guia de
+  exemplo. Nada é salvo; a chamada fica no histórico (`SERPRO_DAS_TESTE`). O
+  ambiente de teste tem limite de chamadas ("quota"): se estourar, espere.
+  **Produção não está implementada**: exige contrato pago com o SERPRO
+  (cobrança por chamada), consumer key/secret, certificado e-CNPJ do
+  escritório (mTLS) e procuração eletrônica de cada cliente. Código em
+  `src/Nfse/Serpro/IntegraContador.php`.
 
 Assim seu sistema de cobrança consegue bloquear e liberar sozinho. Por
 exemplo, ao detectar fatura em atraso:
@@ -854,6 +893,11 @@ sessões abertas.
   Cada mês tem a referência `PORTAL-rec-<id>-<AAAAMM>`, então a mesma nota
   nunca sai duas vezes. Pausar e retomar não gera notas atrasadas: segue do
   próximo dia marcado. Apagar não mexe nas notas já emitidas.
+- **Guias do Simples** (scripts `0015` e `0016`): as guias DAS que a
+  contabilidade anexou no Fechamento do mês, mais nova primeiro. Situação
+  (a vencer, vence hoje, venceu, paga), **Abrir guia** (PDF), **Copiar código**
+  (código de barras) e **Já paguei** / **Desfazer**. Rota `/v1/portal/guias.php`;
+  só mostra guias da empresa de quem está logado.
 - **Cancelar nota** (botão no detalhe de uma nota autorizada, em "Minhas
   notas"): qualquer usuário da empresa pode cancelar. Pede o motivo (erro na
   emissão, serviço não prestado ou outro), uma explicação de 15 a 255 letras
@@ -936,6 +980,26 @@ php -S 127.0.0.1:8080 -t public
 Abra `http://127.0.0.1:8080/admin/`, `/monitor/` ou `/portal/`. Isso serve só para
 conferir a tela: o tempo real e os envios ao fisco precisam do worker e da
 configuração completa do servidor.
+
+### Central de Ajuda e tour guiado
+
+- **Central de Ajuda** (`public/ajuda/`): artigos passo a passo com prints,
+  em HTML puro. Abre pelo botão **Ajuda** do painel e pelo menu **Ajuda** do
+  portal. Lista dos artigos em `public/ajuda/index.html`; modelo e regras de
+  escrita no comentário de `public/ajuda/portal/emitir-nfse.html`. Prints em
+  `public/ajuda/img/`.
+- **Tour guiado** (`public/ajuda/tour.js` + `tour.css`, JavaScript puro, no
+  estilo do Bootstrap Tour): destaca cada parte da tela com uma explicação e
+  os botões Voltar / Próximo (setas do teclado; Esc encerra). Aparece sozinho
+  na **primeira vez** em cada navegador (fica marcado no `localStorage` como
+  `tour_visto_<nome>`); depois, pelo botão **Tour guiado** (painel) ou pelo
+  item **Tour guiado** do menu (portal).
+  - Textos dos passos: `iniciarTourPainel()` em `public/admin/admin.js` e
+    `iniciarTour()` em `public/portal/portal.js`. Cada passo tem `alvo`
+    (seletor CSS), `titulo` e `texto`. Se o alvo não estiver na tela, a
+    caixa aparece no meio.
+  - Mudou bastante a tela? Troque o nome do tour (`painel-v1` → `painel-v2`,
+    `portal-v1` → `portal-v2`) para todo mundo ver de novo.
 
 ---
 
