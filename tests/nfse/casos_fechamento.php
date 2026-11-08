@@ -48,7 +48,7 @@ function testesSerproUnidade(): void
     $corpo = json_decode((string)$req['corpo'], true);
     Apoio::igual([IntegraContador::URL_TESTE . '/Emitir', 'Bearer ' . IntegraContador::TOKEN_TESTE, IntegraContador::TOKEN_TESTE],
         [$req['url'], $req['cabecalhos']['Authorization'] ?? null, $req['cabecalhos']['jwt_token'] ?? null], 'envelope: rota /Emitir e token do ambiente de teste');
-    Apoio::igual(['PGDASD', 'GERARDAS12', '00000000000100', ['periodoApuracao' => '202101']],
+    Apoio::igual(['PGDASD', 'GERARDAS12', '00000000000100', ['periodoApuracao' => '201801']],
         [$corpo['pedidoDados']['idSistema'], $corpo['pedidoDados']['idServico'], $corpo['contribuinte']['numero'], json_decode($corpo['pedidoDados']['dados'], true)],
         'envelope: PGDASD/GERARDAS12, "dados" vai como texto JSON; no teste usa o CNPJ e o mes de exemplo');
 

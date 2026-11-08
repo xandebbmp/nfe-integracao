@@ -29,10 +29,10 @@ final class IntegraContador
     public const URL_TESTE = 'https://gateway.apiserpro.serpro.gov.br/integra-contador-trial/v1';
     /** Token publico do ambiente de demonstracao do SERPRO (o mesmo para todos). */
     public const TOKEN_TESTE = '06aef429-a981-3ec5-a1f8-71d38d86481e';
-    /** No modo teste o SERPRO so responde para os dados de exemplo dele. */
-    public const CONTRATANTE_TESTE = '00000000000191';
+    /** No modo teste o SERPRO so responde para os dados do cenario "Gerar DAS" da documentacao dele. */
+    public const CONTRATANTE_TESTE = '00000000000100';
     public const CONTRIBUINTE_TESTE = '00000000000100';
-    public const PERIODO_TESTE = '202101';
+    public const PERIODO_TESTE = '201801';
 
     private TransporteHttp $http;
 
