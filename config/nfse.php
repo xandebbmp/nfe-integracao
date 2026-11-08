@@ -204,7 +204,7 @@ $cfg = [
         'usuario' => '',              // geralmente o proprio e-mail da conta
         'senha' => '',                // so no nfse.local.php!
         'remetente' => '',            // so o endereco, ex.: contato@suaempresa.com.br
-        'nome_remetente' => 'Gestão Fiscal',
+        'nome_remetente' => 'Carimbo',
         // Endereco publico do portal (vai no link do e-mail), ex.:
         // https://fiscal.suaempresa.com.br/portal/
         'url_portal' => '',

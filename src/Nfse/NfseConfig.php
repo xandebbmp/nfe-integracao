@@ -134,7 +134,7 @@ final class NfseConfig
         }
         $padroes = [
             'host' => '', 'porta' => 465, 'seguranca' => 'ssl', 'usuario' => '', 'senha' => '',
-            'remetente' => '', 'nome_remetente' => 'Gestão Fiscal', 'url_portal' => '', 'timeout_segundos' => 20,
+            'remetente' => '', 'nome_remetente' => 'Carimbo', 'url_portal' => '', 'timeout_segundos' => 20,
         ];
         foreach ($padroes as $chave => $padrao) {
             if (!isset($email[$chave]) || ($chave === 'porta' && (int)$email[$chave] <= 0)) {

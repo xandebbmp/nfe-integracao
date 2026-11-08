@@ -402,7 +402,7 @@
       secao.hidden = !ativa;
       if (ativa) {
         achou = true;
-        document.title = secao.getAttribute('data-titulo') + ' · Portal Gestão Fiscal NFS-e';
+        document.title = secao.getAttribute('data-titulo') + ' · Carimbo';
       }
     });
     if (!achou) { window.location.hash = PAGINA_INICIAL; return; }

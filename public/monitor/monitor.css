@@ -298,3 +298,9 @@ body.em-producao .topo { border-top-color: var(--producao); }
 .tabela--status tbody tr.linha-status:hover { background: color-mix(in srgb, var(--cor) 14%, transparent); }
 .tabela--status tbody tr.linha-status td:first-child { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--cor) 55%, transparent); }
 .linha-status__aviso { font-size: 16px; color: #b7791f; vertical-align: -3px; margin-left: 6px; }
+
+/* Marca "carimbo" no topo e no login do admin e do monitor */
+.marca { display: inline-flex; align-items: center; gap: 8px; color: var(--destaque); }
+.marca__nome { font-size: 19px; font-weight: 700; letter-spacing: -.03em; color: var(--destaque); }
+.topo__nome-tela { font-size: 15px; font-weight: 500; color: var(--suave); padding-left: 12px; border-left: 1px solid var(--borda); }
+.acesso__cartao .marca { margin-bottom: 8px; }
