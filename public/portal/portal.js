@@ -2095,6 +2095,8 @@
     PAUSADA: ['Pausada', 'neutro'],
     ENCERRADA: ['Encerrada', 'neutro']
   };
+  // Cor do cartao (legenda acima da lista), igual as linhas das outras telas.
+  var COR_REC = { PENDENTE: 'rejeicao', AGENDADA: 'info', PAUSADA: 'neutro', ENCERRADA: 'cancelada' };
 
   function hojeIso() {
     var d = new Date();
@@ -2204,12 +2206,14 @@
 
     var caixa = el('recorrencias-lista');
     if (!listaRecorrencias.length) {
+      el('recorrencias-legenda').hidden = true;
       caixa.innerHTML = '<div class="cartao vazio" style="grid-column:1/-1"><i class="icone">event_repeat</i><h2>Nenhuma nota recorrente</h2>'
         + '<p class="secundario">Cadastre uma vez a mensalidade de um cliente e ela se repete todo mês: sozinha ou esperando a sua confirmação.</p>'
         + '<button type="button" class="btn btn--primario" data-nova><i class="icone icone--p">add</i> Criar a primeira</button></div>';
       caixa.querySelector('[data-nova]').addEventListener('click', function () { abrirFormRecorrencia(null); });
       return;
     }
+    el('recorrencias-legenda').hidden = false;
     caixa.innerHTML = listaRecorrencias.map(function (r) {
       var s = SITUACAO_REC[r.situacao] || [r.situacao, 'neutro'];
       var valor = Number((r.valores || {}).valor_servicos || 0);
@@ -2230,11 +2234,11 @@
         acoes += '<button type="button" class="btn btn--icone" data-acao="pausar" title="Pausar" aria-label="Pausar ' + escapar(r.nome) + '"><i class="icone">pause</i></button>';
       }
       acoes += '<button type="button" class="btn btn--icone" data-acao="remover" title="Apagar" aria-label="Apagar ' + escapar(r.nome) + '"><i class="icone">delete_outline</i></button>';
-      return '<article class="cartao servico' + (r.situacao === 'PENDENTE' ? ' recorrencia--pendente' : '') + '" data-id="' + r.id + '">'
-        + '<div class="servico__topo"><div><h3>' + escapar(r.nome) + '</h3><span class="sub secundario">' + escapar((r.tomador || {}).nome || '') + ' · ' + escapar(r.servico_nome) + '</span></div>'
+      return '<article class="cartao servico rec-cartao linha-status--' + (COR_REC[r.situacao] || 'neutro') + '" data-id="' + r.id + '" title="' + escapar(s[0]) + '">'
+        + '<div class="servico__topo"><div><h3>' + escapar(r.nome) + '<span class="so-leitor"> · ' + escapar(s[0]) + '</span></h3><span class="sub secundario">' + escapar((r.tomador || {}).nome || '') + ' · ' + escapar(r.servico_nome) + '</span></div>'
         + '<span class="servico__valor">' + reais(valor) + '</span></div>'
-        + '<div class="servico__codigos"><span class="pilula pilula--' + s[1] + '">' + s[0] + '</span>'
-        + '<span class="pilula pilula--neutro">' + (r.modo === 'AUTOMATICA' ? 'Sai sozinha' : 'Pede confirmação') + '</span>'
+        + '<div class="servico__codigos">'
+        + '<span class="pilula pilula--neutro"><i class="icone icone--p" aria-hidden="true">' + (r.modo === 'AUTOMATICA' ? 'bolt' : 'touch_app') + '</i>' + (r.modo === 'AUTOMATICA' ? 'Sai sozinha' : 'Pede confirmação') + '</span>'
         + (r.emitidas ? '<span class="pilula pilula--neutro">' + r.emitidas + (r.emitidas === 1 ? ' emitida' : ' emitidas') + '</span>' : '') + '</div>'
         + '<div class="recorrencia__quando">' + quando + '</div>'
         + (r.ultima_mensagem ? '<div class="recorrencia__erro"><b>Não saiu sozinha:</b> ' + escapar(r.ultima_mensagem) + ' Corrija e clique em "Emitir agora", ou o sistema tenta de novo amanhã.</div>' : '')

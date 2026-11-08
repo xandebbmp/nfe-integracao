@@ -8,7 +8,7 @@
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261108r12">
+  <link rel="stylesheet" href="portal.css?v=20261108r13">
   <!-- Ajuda guiada (menu "Ajuda"): o mesmo motor do painel admin -->
   <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
 </head>
@@ -535,6 +535,12 @@
                 </div>
                 <button type="button" class="btn btn--primario" id="botao-nova-recorrencia"><i class="icone icone--p">add</i> Nova recorrência</button>
               </div>
+              <ul class="legenda legenda--solta" id="recorrencias-legenda" aria-label="Legenda das cores" hidden>
+                <li><span class="legenda__cor legenda__cor--info"></span>Agendada</li>
+                <li><span class="legenda__cor legenda__cor--rejeicao"></span>Esperando você</li>
+                <li><span class="legenda__cor legenda__cor--neutro"></span>Pausada</li>
+                <li><span class="legenda__cor legenda__cor--cancelada"></span>Encerrada</li>
+              </ul>
               <div class="cartoes-servico" id="recorrencias-lista"></div>
             </div>
           </section>
@@ -887,7 +893,7 @@
   </dialog>
 
   <script src="../ajuda/tour.js?v=20261108c"></script>
-  <script src="portal.js?v=20261108r12"></script>
+  <script src="portal.js?v=20261108r13"></script>
   <script src="portal-guias.js?v=20261108a"></script>
 </body>
 </html>
