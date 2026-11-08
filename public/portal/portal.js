@@ -485,9 +485,133 @@
   var timerInicio = null;
   function pararAtualizacao() { clearTimeout(timerInicio); timerInicio = null; }
 
+  // ---- Grafico "Faturamento" (SVG desenhado aqui, sem biblioteca) ----
+  // Uma serie so (barras): valor das notas autorizadas por mes. Mes atual com o valor escrito em cima;
+  // passar o mouse (ou focar) numa coluna mostra o mes, o valor e quantas notas.
+  var ultimosMeses = [];
+  var mesesGrafico = 6;
+  var MES_CURTO = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  function mesLongo(ym) {
+    var p = ym.split('-');
+    var t = new Date(Number(p[0]), Number(p[1]) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function reaisCurto(v) {
+    if (v >= 1e6) { return 'R$ ' + (v / 1e6).toFixed(1).replace('.', ',') + ' mi'; }
+    if (v >= 1e3) { return 'R$ ' + (v / 1e3).toFixed(v >= 1e4 ? 0 : 1).replace('.', ',') + ' mil'; }
+    return 'R$ ' + Math.round(v);
+  }
+  function escalaBonita(max) {
+    if (max <= 0) { return [0, 1]; }
+    var bruto = max / 4;
+    var pot = Math.pow(10, Math.floor(Math.log10(bruto)));
+    var passo = [1, 2, 2.5, 5, 10].map(function (m) { return m * pot; }).filter(function (p) { return p >= bruto; })[0];
+    return [passo, Math.ceil(max / passo) * passo];
+  }
+  function desenharGraficoFaturamento() {
+    var area = el('grafico-fat');
+    if (!area) { return; }
+    var dados = ultimosMeses.slice(-mesesGrafico);
+    var total = dados.reduce(function (s, m) { return s + m.faturado; }, 0);
+    var notas = dados.reduce(function (s, m) { return s + m.autorizadas; }, 0);
+    el('grafico-fat-resumo').textContent = dados.length
+      ? 'Notas autorizadas · ' + mesesGrafico + ' meses: ' + reais(total) + ' em ' + notas + (notas === 1 ? ' nota' : ' notas')
+      : '';
+    el('grafico-fat-tabela').querySelector('tbody').innerHTML = dados.map(function (m) {
+      return '<tr><td>' + escapar(mesLongo(m.mes)) + '</td><td>' + reais(m.faturado) + '</td><td>' + m.autorizadas + '</td><td>' + m.canceladas + '</td></tr>';
+    }).join('');
+    if (!dados.length || total === 0) {
+      area.innerHTML = '<p class="grafico-fat__vazio">Nenhuma nota autorizada nos últimos ' + mesesGrafico + ' meses. Quando houver, o faturamento de cada mês aparece aqui.</p>';
+      return;
+    }
+    var largura = Math.max(320, area.clientWidth || 640);
+    var altura = 220;
+    var m = { topo: 22, dir: 8, base: 26, esq: 64 };
+    var w = largura - m.esq - m.dir;
+    var h = altura - m.topo - m.base;
+    var max = Math.max.apply(null, dados.map(function (d) { return d.faturado; }));
+    var esc = escalaBonita(max);
+    var passo = esc[0], topoEsc = esc[1];
+    var y = function (v) { return m.topo + h - (v / topoEsc) * h; };
+    var banda = w / dados.length;
+    var barra = Math.min(48, banda * 0.56);
+    var svg = '<svg width="' + largura + '" height="' + altura + '" role="img" aria-labelledby="grafico-fat-titulo grafico-fat-resumo">';
+    // grade e eixo y (recessivos)
+    for (var v = 0; v <= topoEsc + 1e-9; v += passo) {
+      svg += '<line class="gf-grade" x1="' + m.esq + '" x2="' + (largura - m.dir) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>'
+        + '<text class="gf-eixo" x="' + (m.esq - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + escapar(v === 0 ? 'R$ 0' : reaisCurto(v)) + '</text>';
+    }
+    var atual = dados.length - 1;
+    var maiorIdx = dados.reduce(function (iMax, d, i, arr) { return d.faturado > arr[iMax].faturado ? i : iMax; }, 0);
+    dados.forEach(function (d, i) {
+      var cx = m.esq + banda * i + banda / 2;
+      var x = cx - barra / 2;
+      var yv = y(d.faturado);
+      var alt = m.topo + h - yv;
+      var r = Math.min(4, alt / 2, barra / 2);
+      if (alt > 0.5) {
+        // topo arredondado (4px), base reta no eixo
+        svg += '<path class="gf-barra' + (i === atual ? ' gf-barra--atual' : '') + '" d="M' + x + ',' + (m.topo + h) + 'V' + (yv + r)
+          + 'Q' + x + ',' + yv + ' ' + (x + r) + ',' + yv + 'H' + (x + barra - r) + 'Q' + (x + barra) + ',' + yv + ' ' + (x + barra) + ',' + (yv + r)
+          + 'V' + (m.topo + h) + 'Z"/>';
+      }
+      // valor escrito so no mes atual e no maior mes
+      if ((i === atual || i === maiorIdx) && d.faturado > 0) {
+        svg += '<text class="gf-valor" x="' + cx + '" y="' + (yv - 6) + '" text-anchor="middle">' + escapar(reaisCurto(d.faturado)) + '</text>';
+      }
+      var p = d.mes.split('-');
+      var rotulo = MES_CURTO[Number(p[1]) - 1] + (p[1] === '01' || i === 0 ? '/' + p[0].slice(2) : '');
+      svg += '<text class="gf-mes' + (i === atual ? ' gf-mes--atual' : '') + '" x="' + cx + '" y="' + (altura - 8) + '" text-anchor="middle">' + rotulo + '</text>';
+      // area de toque da coluna inteira (maior que a barra)
+      svg += '<rect class="gf-alvo" x="' + (m.esq + banda * i) + '" y="' + m.topo + '" width="' + banda + '" height="' + h + '" tabindex="0" data-i="' + i + '"'
+        + ' aria-label="' + escapar(mesLongo(d.mes) + ': ' + reais(d.faturado) + ', ' + d.autorizadas + ' notas') + '"/>';
+    });
+    svg += '<line class="gf-base" x1="' + m.esq + '" x2="' + (largura - m.dir) + '" y1="' + (m.topo + h) + '" y2="' + (m.topo + h) + '"/></svg>';
+    area.innerHTML = svg + '<div class="gf-dica" hidden></div>';
+
+    var dica = area.querySelector('.gf-dica');
+    function mostrar(alvo) {
+      var d = dados[Number(alvo.getAttribute('data-i'))];
+      area.querySelectorAll('.gf-alvo').forEach(function (a) { a.classList.toggle('ativo', a === alvo); });
+      dica.innerHTML = '<b>' + escapar(mesLongo(d.mes)) + '</b><span class="num">' + reais(d.faturado) + '</span>'
+        + '<small>' + d.autorizadas + (d.autorizadas === 1 ? ' nota autorizada' : ' notas autorizadas')
+        + (d.canceladas ? ' · ' + d.canceladas + (d.canceladas === 1 ? ' cancelada' : ' canceladas') : '') + '</small>';
+      dica.hidden = false;
+      var cx = Number(alvo.getAttribute('x')) + Number(alvo.getAttribute('width')) / 2;
+      var esquerda = Math.max(0, Math.min(cx - dica.offsetWidth / 2, largura - dica.offsetWidth));
+      dica.style.left = esquerda + 'px';
+      dica.style.top = '0px';
+    }
+    function esconder() {
+      dica.hidden = true;
+      area.querySelectorAll('.gf-alvo.ativo').forEach(function (a) { a.classList.remove('ativo'); });
+    }
+    area.querySelectorAll('.gf-alvo').forEach(function (alvo) {
+      alvo.addEventListener('mouseenter', function () { mostrar(alvo); });
+      alvo.addEventListener('focus', function () { mostrar(alvo); });
+      alvo.addEventListener('mouseleave', esconder);
+      alvo.addEventListener('blur', esconder);
+    });
+  }
+  // Troca 6 / 12 meses
+  Array.prototype.forEach.call(document.querySelectorAll('.grafico-fat .segmento'), function (b) {
+    b.addEventListener('click', function () {
+      mesesGrafico = Number(b.getAttribute('data-meses'));
+      document.querySelectorAll('.grafico-fat .segmento').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      desenharGraficoFaturamento();
+    });
+  });
+  var redimensionarGrafico = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(redimensionarGrafico);
+    redimensionarGrafico = setTimeout(desenharGraficoFaturamento, 150);
+  });
+
   function carregarInicio() {
     api('GET', 'inicio.php').then(function (dados) {
       desenharResumo(dados.resumo);
+      ultimosMeses = (dados.resumo && dados.resumo.meses) || [];
+      desenharGraficoFaturamento();
       desenharNotas(el('inicio-notas'), dados.notas);
       // Enquanto houver nota na fila, atualiza sozinho.
       if (window.location.hash.replace('#', '') === 'inicio') {

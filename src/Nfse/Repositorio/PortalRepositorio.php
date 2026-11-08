@@ -381,6 +381,43 @@ final class PortalRepositorio
         return (float)$stmt->fetchColumn();
     }
 
+    /**
+     * Faturamento dos ultimos N meses (o atual incluido), mes a mes, para o grafico
+     * da tela inicial. Mesma regra do faturadoDoMes: notas de servico AUTORIZADAS,
+     * pelo mes em que foram criadas (horario da Bahia). Meses sem nota vem com zero.
+     *
+     * @return list<array{mes: string, faturado: float, autorizadas: int, canceladas: int}>
+     */
+    public function faturamentoPorMes(string $cnpj, int $tpAmb, int $meses = 12): array
+    {
+        $meses = max(1, min(24, $meses));
+        $stmt = $this->pdo->prepare(
+            "WITH meses AS (
+                SELECT generate_series(
+                         date_trunc('month', now() AT TIME ZONE 'America/Bahia') - make_interval(months => :n - 1),
+                         date_trunc('month', now() AT TIME ZONE 'America/Bahia'),
+                         interval '1 month')::date AS mes
+             )
+             SELECT to_char(m.mes, 'YYYY-MM') AS mes,
+                    COALESCE(sum((d.payload->'valores'->>'valor_servicos')::numeric) FILTER (WHERE d.status = 'AUTORIZADO'), 0) AS faturado,
+                    count(d.id) FILTER (WHERE d.status = 'AUTORIZADO') AS autorizadas,
+                    count(d.id) FILTER (WHERE d.status IN ('CANCELADO', 'SUBSTITUIDO')) AS canceladas
+               FROM meses m
+               LEFT JOIN nfse_documentos d
+                 ON d.emitente_cnpj = :cnpj AND d.tp_amb = :amb AND d.padrao IN ('NACIONAL', 'SALVADOR')
+                AND date_trunc('month', d.criado_em AT TIME ZONE 'America/Bahia')::date = m.mes
+              GROUP BY m.mes
+              ORDER BY m.mes"
+        );
+        $stmt->execute([':n' => $meses, ':cnpj' => $cnpj, ':amb' => $tpAmb]);
+        return array_map(static fn (array $l): array => [
+            'mes' => (string)$l['mes'],
+            'faturado' => (float)$l['faturado'],
+            'autorizadas' => (int)$l['autorizadas'],
+            'canceladas' => (int)$l['canceladas'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
     // =====================================================================
     // Cache de consultas (CNPJ / CEP)
     // =====================================================================

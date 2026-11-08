@@ -89,6 +89,8 @@ final class PortalInicio
             'por_status' => $status,
             'em_andamento' => ($status[StatusNfse::RECEBIDO] ?? 0) + ($status[StatusNfse::PROCESSANDO] ?? 0),
             'faturado_no_mes' => (new PortalRepositorio($this->pdo))->faturadoDoMes($cnpj, $this->tpAmb),
+            // Grafico "Faturamento" da tela inicial (12 meses, o atual incluido)
+            'meses' => (new PortalRepositorio($this->pdo))->faturamentoPorMes($cnpj, $this->tpAmb, 12),
             'franquia' => [
                 'usado' => $this->clientes->consumoDoMes($cnpj, $this->tpAmb),
                 'limite' => isset($cliente['limite_mensal']) ? (int)$cliente['limite_mensal'] : null,

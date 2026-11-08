@@ -8,7 +8,7 @@
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261108r13">
+  <link rel="stylesheet" href="portal.css?v=20261108r14">
   <!-- Ajuda guiada (menu "Ajuda"): o mesmo motor do painel admin -->
   <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
 </head>
@@ -276,6 +276,26 @@
                   <div class="barra" id="kpi-franquia-barra"><div class="barra__cheio" id="kpi-franquia-cheio" style="width:0%"></div></div>
                 </div>
               </div>
+
+              <!-- Grafico de faturamento (notas autorizadas por mes) -->
+              <section class="cartao bloco grafico-fat" aria-labelledby="grafico-fat-titulo">
+                <div class="bloco__cabeca">
+                  <div>
+                    <h2 id="grafico-fat-titulo">Faturamento</h2>
+                    <p class="grafico-fat__resumo" id="grafico-fat-resumo"></p>
+                  </div>
+                  <div class="segmentos" role="group" aria-label="Período do gráfico">
+                    <button type="button" class="segmento" data-meses="6" aria-pressed="true">6 meses</button>
+                    <button type="button" class="segmento" data-meses="12" aria-pressed="false">12 meses</button>
+                  </div>
+                </div>
+                <div class="grafico-fat__area" id="grafico-fat"></div>
+                <table class="so-leitor" id="grafico-fat-tabela">
+                  <caption>Faturamento por mês (notas autorizadas)</caption>
+                  <thead><tr><th>Mês</th><th>Faturado</th><th>Notas autorizadas</th><th>Canceladas</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </section>
 
               <div class="duas-colunas">
                 <div class="cartao bloco">
@@ -893,7 +913,7 @@
   </dialog>
 
   <script src="../ajuda/tour.js?v=20261108c"></script>
-  <script src="portal.js?v=20261108r13"></script>
+  <script src="portal.js?v=20261108r15"></script>
   <script src="portal-guias.js?v=20261108a"></script>
 </body>
 </html>
