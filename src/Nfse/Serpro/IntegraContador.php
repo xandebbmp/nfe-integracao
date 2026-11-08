@@ -30,11 +30,10 @@ final class IntegraContador
     /** Token publico do ambiente de demonstracao do SERPRO (o mesmo para todos). */
     public const TOKEN_TESTE = '06aef429-a981-3ec5-a1f8-71d38d86481e';
     /** No modo teste o SERPRO so responde para os dados de exemplo dele. */
-    public const CONTRATANTE_TESTE = '00000000000191';
-    /** O autor do pedido no modo teste e um CPF de exemplo (com CNPJ o SERPRO responde "Dados invalidos"). */
-    public const AUTOR_TESTE = '00000000191';
+    /** Dados do cenario "Gerar DAS" (PGDASD) da documentacao do SERPRO. Outros valores dao "Dados invalidos". */
+    public const CONTRATANTE_TESTE = '00000000000100';
     public const CONTRIBUINTE_TESTE = '00000000000100';
-    public const PERIODO_TESTE = '202101';
+    public const PERIODO_TESTE = '201801';
 
     private TransporteHttp $http;
 
@@ -93,7 +92,7 @@ final class IntegraContador
     {
         $corpo = [
             'contratante' => ['numero' => self::CONTRATANTE_TESTE, 'tipo' => self::tipo(self::CONTRATANTE_TESTE)],
-            'autorPedidoDados' => ['numero' => self::AUTOR_TESTE, 'tipo' => self::tipo(self::AUTOR_TESTE)],
+            'autorPedidoDados' => ['numero' => self::CONTRATANTE_TESTE, 'tipo' => self::tipo(self::CONTRATANTE_TESTE)],
             'contribuinte' => ['numero' => $contribuinte, 'tipo' => self::tipo($contribuinte)],
             'pedidoDados' => [
                 'idSistema' => $sistema,
