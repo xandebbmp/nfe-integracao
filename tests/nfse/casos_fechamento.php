@@ -48,9 +48,12 @@ function testesSerproUnidade(): void
     $corpo = json_decode((string)$req['corpo'], true);
     Apoio::igual([IntegraContador::URL_TESTE . '/Emitir', 'Bearer ' . IntegraContador::TOKEN_TESTE, IntegraContador::TOKEN_TESTE],
         [$req['url'], $req['cabecalhos']['Authorization'] ?? null, $req['cabecalhos']['jwt_token'] ?? null], 'envelope: rota /Emitir e token do ambiente de teste');
-    Apoio::igual(['PGDASD', 'GERARDAS12', '00000000000100', ['periodoApuracao' => '202101']],
+    Apoio::igual(['PGDASD', 'GERARDAS12', '00000000000100', ['periodoApuracao' => '201801']],
         [$corpo['pedidoDados']['idSistema'], $corpo['pedidoDados']['idServico'], $corpo['contribuinte']['numero'], json_decode($corpo['pedidoDados']['dados'], true)],
         'envelope: PGDASD/GERARDAS12, "dados" vai como texto JSON; no teste usa o CNPJ e o mes de exemplo');
+    Apoio::igual([['numero' => '00000000000100', 'tipo' => 2], ['numero' => '00000000000100', 'tipo' => 2], 2],
+        [$corpo['contratante'], $corpo['autorPedidoDados'], $corpo['contribuinte']['tipo']],
+        'envelope: no teste contratante, autor e contribuinte sao o CNPJ do cenario do SERPRO');
 
     $erro = (new IntegraContador((new TransporteFalso())->responder(400, json_encode(['status' => 400, 'mensagens' => [['codigo' => 'Erro-PGDASD-001', 'texto' => 'Nao existe declaracao']]]))))
         ->gerarDasTeste('33444555000101', '2026-11');
