@@ -33,6 +33,10 @@ const SITUACOES = {
   LIMITE_ATINGIDO: { nome: 'Limite atingido', cor: 'var(--sit-limite)' },
 };
 
+/** Cor da linha da empresa (legenda acima da tabela) e icones dos contadores. */
+const COR_SITUACAO = { LIBERADA: 'ok', VENCIDA: 'rejeicao', LIMITE_ATINGIDO: 'info', BLOQUEADA: 'cancelada' };
+const ICONE_CONTADOR = { '': 'business', LIBERADA: 'task_alt', BLOQUEADA: 'block', VENCIDA: 'event_busy', LIMITE_ATINGIDO: 'data_usage' };
+
 const TIPOS = [
   { padrao: 'NFE', nome: 'NF-e (produtos)', campo: 'nfe' },
   { padrao: 'NACIONAL', nome: 'NFS-e Nacional', campo: 'nfse_nacional' },
@@ -98,7 +102,7 @@ function dataCurta(texto) {
 
 function dataHora(texto) {
   if (!texto) return '—';
-  const d = new Date(String(texto).replace(' ', 'T').replace(/\+00$/, 'Z'));
+  const d = new Date(String(texto).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1').replace(/\+00$/, 'Z').replace(/([+-]\d{2})$/, '$1:00'));
   return isNaN(d) ? texto : d.toLocaleString('pt-BR');
 }
 
@@ -247,6 +251,7 @@ async function carregar() {
   $('selo-ambiente').textContent = producao ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
   $('selo-ambiente').className = `selo selo--${producao ? 'producao' : 'homologacao'}`;
   $('aviso-producao').hidden = !producao;
+  document.body.classList.toggle('em-producao', producao);
   const [ano, mes] = dados.mes.split('-');
   $('mes-atual').textContent = `Uso de ${mes}/${ano}`;
   desenhar();
@@ -278,9 +283,11 @@ function desenhar() {
       class: `contador cartao${estado.filtroSituacao === situacao && situacao ? ' contador--ativo' : ''}`,
       style: `--cor:${cor}`,
       onclick: () => { estado.filtroSituacao = estado.filtroSituacao === situacao ? '' : situacao; $('filtro-situacao').value = estado.filtroSituacao; desenhar(); },
-    }, el('span', { class: 'contador__valor' }, valor), el('span', { class: 'contador__nome' }, nome))),
+    }, el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, nome), el('i', { class: 'icone', 'aria-hidden': 'true' }, ICONE_CONTADOR[situacao])),
+      el('span', { class: 'contador__valor' }, valor))),
     el('div', { class: 'contador cartao', style: '--cor:var(--st-autorizado)' },
-      el('span', { class: 'contador__valor' }, totalNotas), el('span', { class: 'contador__nome' }, 'Notas autorizadas no mês')),
+      el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, 'Notas autorizadas no mês'), el('i', { class: 'icone', 'aria-hidden': 'true' }, 'receipt_long')),
+      el('span', { class: 'contador__valor' }, totalNotas)),
   );
 
   const lista = filtrados();
@@ -300,10 +307,12 @@ function linhaCliente(c) {
   else certificado = dataCurta(c.certificado_validade);
 
   const vencido = c.liberado_ate && c.situacao === 'VENCIDA';
-  return el('tr', { onclick: () => abrirCliente(c.cnpj) },
-    el('td', {}, el('div', { class: 'empresa__nome' }, c.nome_fantasia || c.razao_social), el('div', { class: 'empresa__cnpj mono' }, cnpj(c.cnpj))),
+  // A cor da linha mostra a situacao (legenda acima da tabela); o texto vai para o leitor de tela e para a dica.
+  const nomeSituacao = (SITUACOES[c.situacao] || { nome: c.situacao }).nome;
+  return el('tr', { class: `linha-status linha-status--${COR_SITUACAO[c.situacao] || 'neutro'}`, title: [nomeSituacao, c.situacao_mensagem].filter(Boolean).join(': '), onclick: () => abrirCliente(c.cnpj) },
+    el('td', {}, el('div', { class: 'empresa__nome' }, c.nome_fantasia || c.razao_social), el('div', { class: 'empresa__cnpj mono' }, cnpj(c.cnpj)),
+      el('span', { class: 'visualmente-oculto' }, ` · ${nomeSituacao}`)),
     el('td', {}, c.plano || '—'),
-    el('td', { title: c.situacao_mensagem }, seloSituacao(c.situacao)),
     ...TIPOS.map((t) => el('td', { class: 'mono' }, c.padroes_permitidos.includes(t.padrao) ? c.autorizadas_mes[t.campo] : el('span', { class: 'suave', title: 'Tipo não contratado' }, '—'))),
     el('td', {}, limite
       ? el('div', {}, `${c.consumo_mes} / ${limite}`, el('div', { class: 'barra' }, el('div', { class: 'barra__cheio', style: `width:${pct}%;--cor:${corBarra}` })))
@@ -333,6 +342,8 @@ function abrirModal(titulo, subtitulo, conteudo, opcoes = {}) {
   else if (opcoes.rodape) conteudo = [...conteudo, el('div', { class: 'acoes' }, ...opcoes.rodape)];
   $('modal-corpo').replaceChildren(...conteudo.filter((item) => item !== null && item !== undefined && item !== false)); // blocos que nao se aplicam (null) nao aparecem
   $('modal-corpo').scrollTop = 0;
+  $('modal').classList.toggle('modal--sistema', !!opcoes.sistema);
+  $('modal').dataset.tela = opcoes.tela || '';
   delete $('modal').dataset.sujo;
   if (!$('modal').open) $('modal').showModal();
 }
@@ -804,6 +815,31 @@ function secaoToken(c) {
 }
 
 // ---- Portal do cliente (usuarios que entram com e-mail e senha) ----
+/**
+ * Uma pessoa numa lista de acessos (portal do cliente ou painel): iniciais, nome, papel,
+ * e-mail, situacao e ultimo acesso; acoes em botoes compactos com dica.
+ * tom: ok | info | rejeicao | neutro (mesma legenda das listas).
+ */
+function linhaPessoa({ nome, eu, papel, email, situacao, tom, ultimo, acoes }) {
+  const iniciais = String(nome || '?').trim().split(/\s+/).filter(Boolean);
+  const sigla = ((iniciais[0] || '?')[0] + (iniciais.length > 1 ? iniciais[iniciais.length - 1][0] : '')).toUpperCase();
+  return el('li', { class: `pessoa linha-status linha-status--${tom}` },
+    el('span', { class: 'pessoa__avatar', 'aria-hidden': 'true' }, sigla),
+    el('div', { class: 'pessoa__dados' },
+      el('div', { class: 'pessoa__nome' }, el('strong', {}, nome), eu ? el('span', { class: 'suave' }, ' (você)') : null,
+        papel ? el('span', { class: 'pessoa__papel' }, papel) : null),
+      el('div', { class: 'pessoa__email' }, email),
+      el('div', { class: 'pessoa__meta' }, el('span', { class: `pessoa__situacao pessoa__situacao--${tom}` }, situacao), ' · ',
+        ultimo ? `último acesso ${dataHora(ultimo)}` : 'nunca entrou')),
+    el('div', { class: 'pessoa__acoes' }, ...acoes.filter(Boolean)));
+}
+
+/** Botao so com icone (Material Icons) e dica; rotulo vai no aria-label. */
+function botaoIcone(icone, rotulo, onclick, perigo) {
+  return el('button', { class: 'botao botao--icone' + (perigo ? ' botao--perigo' : ''), type: 'button', 'aria-label': rotulo, 'data-dica': rotulo, onclick },
+    el('i', { class: 'icone', 'aria-hidden': 'true' }, icone));
+}
+
 function secaoPortal(c) {
   const lista = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   // ids usados pela ajuda guiada (admin-guias.js)
@@ -914,25 +950,24 @@ function secaoPortal(c) {
         lista.replaceChildren(el('p', { class: 'suave' }, 'Ninguém desta empresa tem acesso ao portal ainda.'));
         return;
       }
-      lista.replaceChildren(el('table', { class: 'mini' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Papel'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
-        el('tbody', {}, ...r.usuarios.map((u) => el('tr', {},
-          el('td', {}, u.nome),
-          el('td', {}, u.email),
-          // Responsavel da empresa (campo administrador) convida e desativa colegas pela tela Usuarios do portal.
-          el('td', {}, u.administrador ? 'Responsável da empresa' : 'Emissor'),
-          el('td', {}, u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou'),
-          el('td', {}, !u.ativo ? el('span', { class: 'ruim' }, 'Desativado') : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo')),
-          el('td', {},
-            u.ativo ? el('button', { class: 'botao botao--forte', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail para a pessoa',
-              onclick: () => enviarAcessoDaLinha(u) }, '✉ Enviar acesso por e-mail') : null, ' ',
-            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`) }, 'Nova senha'), ' ',
-            el('button', { class: 'botao', type: 'button', onclick: () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id }) },
-              u.administrador ? 'Tirar responsável' : 'Tornar responsável'), ' ',
-            el('button', { class: 'botao' + (u.ativo ? ' botao--perigo' : ''), type: 'button',
-              onclick: () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null) },
-            u.ativo ? 'Desativar' : 'Reativar'))))),
-      ));
+      // Responsavel da empresa (campo administrador) convida e desativa colegas pela tela Usuarios do portal.
+      lista.replaceChildren(el('ul', { class: 'pessoas' }, ...r.usuarios.map((u) => linhaPessoa({
+        nome: u.nome,
+        papel: u.administrador ? 'Responsável' : 'Emissor',
+        email: u.email,
+        situacao: !u.ativo ? 'Desativado' : (u.trocar_senha ? 'Aguardando 1º acesso' : 'Ativo'),
+        tom: !u.ativo ? 'neutro' : (u.trocar_senha ? 'info' : 'ok'),
+        ultimo: u.ultimo_acesso,
+        acoes: [
+          u.ativo ? el('button', { class: 'botao', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail para a pessoa',
+            onclick: () => enviarAcessoDaLinha(u) }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'mail'), ' Enviar acesso') : null,
+          botaoIcone('key', 'Nova senha provisória', () => acao({ acao: 'redefinir_senha', id: u.id }, `Gerar senha provisória nova para ${u.email}? A senha atual para de funcionar.`)),
+          botaoIcone(u.administrador ? 'remove_moderator' : 'add_moderator', u.administrador ? 'Tirar responsável' : 'Tornar responsável',
+            () => acao({ acao: u.administrador ? 'remover_admin' : 'tornar_admin', id: u.id })),
+          botaoIcone(u.ativo ? 'person_off' : 'person_add', u.ativo ? 'Desativar acesso' : 'Reativar acesso',
+            () => acao({ acao: u.ativo ? 'desativar' : 'ativar', id: u.id }, u.ativo ? `Desativar o acesso de ${u.email}?` : null), u.ativo),
+        ],
+      }))));
     } catch (e) {
       lista.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
@@ -957,11 +992,14 @@ function secaoPortal(c) {
   recarregar();
   return el('section', { class: 'secao' },
     el('h3', {}, 'Portal do cliente'),
-    el('p', { class: 'suave' }, `Pessoas desta empresa que emitem NFS-e pelo formulário em ${linkPortal}`),
+    el('p', { class: 'suave' }, 'Pessoas desta empresa que emitem NFS-e em ', el('a', { href: linkPortal, target: '_blank', rel: 'noopener' }, linkPortal)),
     lista,
-    el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
-    el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
-    el('div', { class: 'acoes' }, botao, mensagem),
+    el('div', { class: 'novo-acesso' },
+      el('h4', { class: 'novo-acesso__titulo' }, 'Dar acesso a uma pessoa'),
+      el('div', { class: 'novo-acesso__linha' },
+        el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email), botao),
+      el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
+      mensagem),
     area,
   );
 }
@@ -1065,6 +1103,51 @@ function autorDoRegistro(r) {
   return el('span', { title: r.autor }, ' por ', el('strong', {}, r.autor.replace(/\s*<[^>]*>$/, '')));
 }
 
+/**
+ * Historico agrupado por dia ("Hoje · 08/11", "Ontem · 07/11"), so a hora em cada linha.
+ * Quem fez fica em texto normal; e-mail e IP aparecem ao passar o mouse (title).
+ * conteudo(r) devolve os nos da linha (acao, autor, detalhe).
+ */
+function listaHistorico(registros, conteudo) {
+  const hoje = new Date();
+  const ontem = new Date(Date.now() - 864e5);
+  const mesmoDia = (a, b) => a.toDateString() === b.toDateString();
+  const dias = [];
+  let atual = null;
+  for (const r of registros) {
+    // Postgres manda "2026-11-08 10:05:27.656624-03": o Date do navegador quer "T", ate 3 casas e fuso "-03:00".
+    const d = new Date(String(r.criado_em).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1').replace(/([+-]\d{2})$/, '$1:00'));
+    const valida = !isNaN(d);
+    const chave = valida ? d.toDateString() : '';
+    if (!atual || atual.chave !== chave) {
+      let titulo = '—';
+      if (valida) {
+        const dm = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const nome = mesmoDia(d, hoje) ? 'Hoje' : mesmoDia(d, ontem) ? 'Ontem' : d.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-')[0];
+        titulo = `${nome.charAt(0).toUpperCase()}${nome.slice(1)} · ${dm}`;
+      }
+      atual = { chave, titulo, itens: [] };
+      dias.push(atual);
+    }
+    const dica = [r.autor, r.ip ? `IP ${r.ip}` : ''].filter(Boolean).join(' · ');
+    atual.itens.push(el('li', { class: 'historico__item', title: dica || null },
+      el('time', { class: 'historico__hora', datetime: r.criado_em }, valida ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''),
+      el('div', { class: 'historico__corpo' }, ...conteudo(r))));
+  }
+  return el('div', { class: 'historico' }, ...dias.map((g) => el('section', { class: 'historico__dia' },
+    el('h4', { class: 'historico__titulo' }, g.titulo),
+    el('ul', { class: 'historico__lista' }, ...g.itens))));
+}
+
+/** "por Alexandre" ou o selo da chave de emergencia (chama atencao quando ela e usada). */
+function autorHistorico(r) {
+  if (!r.autor) return null;
+  const nome = r.autor.replace(/\s*<[^>]*>$/, '');
+  return /chave de emerg/i.test(nome)
+    ? el('span', { class: 'historico__autor' }, ' por ', el('span', { class: 'historico__selo' }, nome))
+    : el('span', { class: 'historico__autor' }, ' por ', nome);
+}
+
 function secaoHistorico(c) {
   const itens = (c.historico || []).map((h) => {
     let detalhe = '';
@@ -1079,23 +1162,35 @@ function secaoHistorico(c) {
     } else if (h.acao === 'CERTIFICADO') {
       detalhe = `${h.detalhes.titular}, válido até ${dataCurta(h.detalhes.validade)}`;
     }
-    return el('li', {}, el('time', { class: 'suave' }, dataHora(h.criado_em)), ' · ', el('strong', {}, ACOES_HISTORICO[h.acao] || h.acao),
-      autorDoRegistro(h), h.ip ? el('span', { class: 'suave' }, ` (IP ${h.ip})`) : null, detalhe ? el('div', { class: 'suave' }, detalhe) : null);
+    return { ...h, _detalhe: detalhe };
   });
   return el('section', { class: 'secao' },
     el('h3', {}, 'Histórico de alterações'),
-    itens.length ? el('ul', { class: 'linha-tempo' }, ...itens) : el('p', { class: 'suave' }, 'Sem registros.'));
+    itens.length
+      ? listaHistorico(itens, (h) => [el('strong', {}, ACOES_HISTORICO[h.acao] || h.acao), autorHistorico(h),
+        h._detalhe ? el('div', { class: 'historico__detalhe' }, h._detalhe) : null])
+      : el('p', { class: 'suave' }, 'Sem registros.'));
 }
 
 // ==========================================================================
 // Relatorio de cobranca
 // ==========================================================================
 
+/** Uso do plano de uma empresa no mes: cor da linha (legenda), percentual e texto. */
+function usoDoPlano(l) {
+  if (l.razao_social === '(fora do cadastro)') return { tom: 'neutro', pct: null, texto: 'Fora do cadastro' };
+  if (!l.limite_mensal) return { tom: 'info', pct: null, texto: l.total ? 'Sem limite' : 'Sem uso no mês' };
+  const pct = Math.round((l.total / l.limite_mensal) * 100);
+  if (pct >= 100) return { tom: 'cancelada', pct, texto: 'Limite atingido' };
+  if (pct >= 80) return { tom: 'rejeicao', pct, texto: 'Perto do limite' };
+  return { tom: 'ok', pct, texto: 'Dentro do plano' };
+}
+
 async function abrirRelatorio(mes) {
   mes = mes || estado.mes;
-  const campoMes = el('input', { type: 'month', value: mes });
-  const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
-  const baixar = el('button', { class: 'botao', type: 'button' }, 'Baixar planilha (CSV)');
+  const campoMes = el('input', { type: 'month', value: mes, 'aria-label': 'Escolher o mês' });
+  const area = el('div', { class: 'fech-area' }, el('p', { class: 'suave' }, 'Carregando...'));
+  const baixar = el('button', { class: 'botao', type: 'button' }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'download'), ' Baixar planilha (CSV)');
   campoMes.addEventListener('change', () => abrirRelatorio(campoMes.value));
   baixar.addEventListener('click', async () => {
     try {
@@ -1105,24 +1200,71 @@ async function abrirRelatorio(mes) {
     } catch (e) { alert(`Não foi possível baixar: ${e.message}`); }
   });
 
-  abrirModal('Relatório de cobrança', 'Notas autorizadas no mês, por empresa e tipo', [
-    el('div', { class: 'acoes' }, el('label', { class: 'suave' }, 'Mês ', campoMes), baixar),
-    area,
-  ]);
+  const barra = el('div', { class: 'fech-barra' },
+    el('div', { class: 'fech-mes' },
+      botaoIcone('chevron_left', 'Mês anterior', () => abrirRelatorio(mesVizinho(mes, -1))),
+      el('strong', { class: 'fech-mes__nome' }, mesExtenso(mes)),
+      botaoIcone('chevron_right', 'Próximo mês', () => abrirRelatorio(mesVizinho(mes, 1))),
+      campoMes),
+    baixar);
+
+  abrirModal('Relatório de cobrança', 'Notas autorizadas no mês por empresa, para cobrar pelo plano de cada uma', [barra, area], { tela: 'fechamento' });
 
   try {
     const r = await api(`uso.php?mes=${mes}`);
-    area.replaceChildren(
-      el('p', {}, `Ambiente: ${r.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'} · Total do mês: `, el('strong', {}, r.total), ' notas'),
-      el('table', { class: 'mini' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Empresa'), el('th', {}, 'Plano'), el('th', { class: 'num' }, 'Limite'),
-          ...TIPOS.map((t) => el('th', { class: 'num' }, t.nome)), el('th', { class: 'num' }, 'Total'))),
-        el('tbody', {}, ...r.empresas.map((l) => el('tr', {},
-          el('td', {}, l.razao_social, el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj))),
-          el('td', {}, l.plano || '—'), el('td', { class: 'num' }, l.limite_mensal || '—'),
-          el('td', { class: 'num' }, l.nfe), el('td', { class: 'num' }, l.nfse_nacional), el('td', { class: 'num' }, l.nfse_salvador),
-          el('td', { class: 'num' }, el('strong', {}, l.total)))))),
-    );
+    const empresas = [...r.empresas].sort((x, y) => y.total - x.total || String(x.razao_social).localeCompare(String(y.razao_social)));
+    // So mostra as colunas de tipo que tiveram nota no mes (as outras ficam na planilha).
+    const campos = { NFE: 'nfe', NACIONAL: 'nfse_nacional', SALVADOR: 'nfse_salvador' };
+    const tipos = TIPOS.filter((t) => empresas.some((l) => Number(l[campos[t.padrao] || t.campo] || 0) > 0));
+    const usos = empresas.map(usoDoPlano);
+    const comUso = empresas.filter((l) => l.total > 0).length;
+    const perto = usos.filter((u) => u.tom === 'rejeicao').length;
+    const noLimite = usos.filter((u) => u.tom === 'cancelada').length;
+
+    const contador = (nome, icone, valor, rodape) => el('div', { class: 'contador' },
+      el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, nome), el('i', { class: 'icone', 'aria-hidden': 'true' }, icone)),
+      el('span', { class: 'contador__valor' }, valor),
+      rodape ? el('span', { class: 'contador__rodape' }, rodape) : null);
+
+    area.replaceChildren(...[
+      r.ambiente !== 'PRODUCAO' ? el('p', { class: 'aviso' }, 'Ambiente de homologação: estas notas são de teste, sem valor fiscal.') : null,
+      el('div', { class: 'contadores fech-contadores' },
+        contador('Notas a cobrar', 'receipt_long', r.total, 'autorizadas no mês'),
+        contador('Empresas com uso', 'business', `${comUso}/${empresas.length}`, 'emitiram ao menos 1 nota'),
+        contador('Perto do limite', 'trending_up', perto, '80% ou mais do plano'),
+        contador('Limite atingido', 'block', noLimite, 'emissão pode estar travada')),
+      empresas.length === 0
+        ? el('p', { class: 'suave fech-vazio' }, 'Nenhuma empresa cadastrada.')
+        : el('section', { class: 'cartao tabela-cartao fech-lista' },
+          el('ul', { class: 'legenda', 'aria-label': 'Legenda das cores' },
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--ok' }), 'Dentro do plano'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--rejeicao' }), 'Perto do limite (80%)'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--cancelada' }), 'Limite atingido'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--info' }), 'Sem limite'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--neutro' }), 'Fora do cadastro')),
+          el('div', { class: 'tabela-rolagem' }, el('table', { class: 'tabela tabela--status' },
+            el('thead', {}, el('tr', {},
+              el('th', {}, 'Empresa'), el('th', {}, 'Plano'),
+              ...tipos.map((t) => el('th', { class: 'num' }, t.nome)),
+              el('th', {}, 'Uso do plano'),
+              el('th', { class: 'num' }, 'Total'))),
+            el('tbody', {}, ...empresas.map((l, i) => {
+              const u = usos[i];
+              return el('tr', { class: `linha-status linha-status--${u.tom}`, title: u.texto },
+                el('td', {}, el('div', { class: 'empresa__nome' }, l.razao_social), el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj)),
+                  el('span', { class: 'visualmente-oculto' }, ` · ${u.texto}`)),
+                el('td', {}, l.plano ? el('span', { class: 'fech-regime' }, l.plano) : el('span', { class: 'suave' }, '—')),
+                ...tipos.map((t) => el('td', { class: 'num' }, Number(l[campos[t.padrao] || t.campo] || 0) || el('span', { class: 'suave' }, '—'))),
+                el('td', { class: 'uso-celula' }, l.limite_mensal
+                  ? el('div', {},
+                    el('div', { class: 'uso-celula__texto' }, el('span', {}, `${l.total} de ${l.limite_mensal}`), el('span', { class: 'fech-sub' }, `${u.pct}%`)),
+                    el('div', { class: 'barra uso-celula__barra' }, el('div', { class: 'barra__cheio', style: `width:${Math.min(100, u.pct)}%` })))
+                  : el('span', { class: 'fech-sub' }, u.texto)),
+                el('td', { class: 'num' }, el('strong', { class: 'uso-total' }, l.total)));
+            })))),
+          el('div', { class: 'uso-rodape' }, el('span', {}, `${empresas.length} empresa(s)`), el('span', {}, 'Total do mês: ', el('strong', {}, r.total), ' notas'))),
+      el('p', { class: 'suave fech-nota' }, 'Conta cada nota autorizada uma vez, mesmo que tenha sido cancelada depois. Rejeitadas, denegadas e com erro não contam.'),
+    ].filter(Boolean));
   } catch (e) {
     area.replaceChildren(el('p', { class: 'erro' }, e.message));
   }
@@ -1141,11 +1283,33 @@ function moeda(valor) {
   return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/** Situacao da guia DAS de uma empresa no mes: cor da linha (legenda) e texto. */
+function situacaoGuia(l) {
+  if (l.simples === 'Não optante') return { tom: 'neutro', texto: 'Sem DAS (fora do Simples)' };
+  if (!l.guia) return { tom: 'rejeicao', texto: 'Falta anexar a guia' };
+  if (l.guia.pago_em) return { tom: 'ok', texto: `Paga em ${dataCurta(l.guia.pago_em)}` };
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (String(l.guia.vencimento).slice(0, 10) < hoje) return { tom: 'cancelada', texto: `Venceu em ${dataCurta(l.guia.vencimento)}` };
+  return { tom: 'info', texto: `A pagar até ${dataCurta(l.guia.vencimento)}` };
+}
+
+/** "2026-11" -> "novembro de 2026" */
+function mesExtenso(mes) {
+  const [a, m] = mes.split('-').map(Number);
+  const t = new Date(a, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function mesVizinho(mes, passo) {
+  const [a, m] = mes.split('-').map(Number);
+  const d = new Date(a, m - 1 + passo, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 async function abrirFechamento(mes) {
   mes = mes || estado.mes;
-  const campoMes = el('input', { type: 'month', value: mes });
-  const area = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
-  const baixar = el('button', { class: 'botao', type: 'button' }, 'Baixar planilha (CSV)');
+  const campoMes = el('input', { type: 'month', value: mes, 'aria-label': 'Escolher o mês' });
+  const area = el('div', { class: 'fech-area' }, el('p', { class: 'suave' }, 'Carregando...'));
+  const baixar = el('button', { class: 'botao', type: 'button' }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'download'), ' Baixar planilha (CSV)');
   campoMes.addEventListener('change', () => abrirFechamento(campoMes.value));
   baixar.addEventListener('click', async () => {
     try {
@@ -1155,56 +1319,93 @@ async function abrirFechamento(mes) {
     } catch (e) { alert(`Não foi possível baixar: ${e.message}`); }
   });
 
-  abrirModal('Fechamento do mês', 'Receita de cada empresa com as notas emitidas no sistema', [
-    el('div', { class: 'acoes' }, el('label', { class: 'suave' }, 'Mês ', campoMes), baixar),
-    area,
-  ]);
+  // Barra do mes: anterior / mes / proximo, e a planilha a direita
+  const barra = el('div', { class: 'fech-barra' },
+    el('div', { class: 'fech-mes' },
+      botaoIcone('chevron_left', 'Mês anterior', () => abrirFechamento(mesVizinho(mes, -1))),
+      el('strong', { class: 'fech-mes__nome' }, mesExtenso(mes)),
+      botaoIcone('chevron_right', 'Próximo mês', () => abrirFechamento(mesVizinho(mes, 1))),
+      campoMes),
+    baixar);
+
+  abrirModal('Fechamento do mês', 'Receita de cada empresa no mês, base para a declaração do Simples e a guia DAS', [barra, area], { tela: 'fechamento' });
 
   try {
     const r = await api(`fechamento.php?mes=${mes}`);
     // Aparecem: quem teve nota no mes, toda ME/EPP (paga DAS mesmo sem nota no sistema) e quem ja tem guia.
     const comNotas = r.empresas.filter((l) => l.notas > 0 || l.canceladas > 0 || l.simples === 'ME/EPP' || l.guia);
     const semNotas = r.empresas.length - comNotas.length;
+    const canceladas = comNotas.reduce((soma, l) => soma + (l.canceladas || 0), 0);
+    const precisamGuia = comNotas.filter((l) => l.simples !== 'Não optante');
+    const comGuia = precisamGuia.filter((l) => l.guia).length;
+    const pagas = precisamGuia.filter((l) => l.guia && l.guia.pago_em).length;
+
+    const contador = (nome, icone, valor, rodape) => el('div', { class: 'contador' },
+      el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, nome), el('i', { class: 'icone', 'aria-hidden': 'true' }, icone)),
+      el('span', { class: 'contador__valor' }, valor),
+      rodape ? el('span', { class: 'contador__rodape' }, rodape) : null);
+
+    const linhas = comNotas.map((l) => {
+      const sit = situacaoGuia(l);
+      const perc = l.percentual_simples === null ? null : `${String(l.percentual_simples).replace('.', ',')}%`;
+      return el('tr', { class: `linha-status linha-status--${sit.tom}`, title: sit.texto },
+        el('td', {},
+          el('div', { class: 'empresa__nome' }, l.razao_social),
+          el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj)),
+          el('span', { class: 'visualmente-oculto' }, ` · ${sit.texto}`)),
+        el('td', {}, l.simples ? el('span', { class: 'fech-regime' }, l.simples) : '—'),
+        el('td', { class: 'num', title: `NFS-e: ${l.nfse.quantidade} (${moeda(l.nfse.valor)}) · NF-e: ${l.nfe.quantidade} (${moeda(l.nfe.valor)})` },
+          el('div', {}, l.notas),
+          l.canceladas ? el('div', { class: 'fech-sub' }, `${l.canceladas} cancelada${l.canceladas > 1 ? 's' : ''}`) : null),
+        el('td', { class: 'num' }, el('strong', {}, moeda(l.receita_mes)),
+          el('div', { class: 'fech-sub', title: 'Soma dos 12 meses anteriores (só notas do sistema)' }, `12 meses: ${moeda(l.receita_12_meses)}`)),
+        el('td', { class: 'num' },
+          l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado),
+          perc ? el('div', { class: 'fech-sub', title: 'Percentual aproximado do Simples, do cadastro da empresa' }, `${perc} da receita`) : null),
+        r.guias_instalado ? el('td', { class: 'fech-guia' }, celulaGuia(l, mes, r.pagamento_instalado),
+          (r.serpro_modo === 'TESTE' || r.serpro_modo === 'PRODUCAO') && l.simples === 'ME/EPP'
+            ? el('button', { class: 'link-botao guia-serpro', type: 'button', 'data-declarar': l.cnpj,
+              title: r.serpro_modo === 'TESTE' ? 'Declaração e DAS no ambiente de teste do SERPRO (exemplo, sem custo)'
+                : 'Confere a receita, transmite a declaração do Simples e gera o DAS pela Receita',
+              onclick: () => abrirDeclaracao(l, mes, r.serpro_modo) }, r.serpro_modo === 'TESTE' ? 'Testar Receita' : 'Declarar e gerar DAS')
+            : null) : null);
+    });
+
     // filter(Boolean): tira os blocos que nao se aplicam (null), senao aparece "null" na tela.
     area.replaceChildren(...[
-      el('div', { class: 'numeros' },
-        el('div', { class: 'numero' }, el('b', {}, moeda(r.totais.receita_mes)), el('span', {}, 'receita do mês (todas as empresas)')),
-        el('div', { class: 'numero' }, el('b', {}, r.totais.notas), el('span', {}, 'notas autorizadas')),
-        el('div', { class: 'numero' }, el('b', {}, moeda(r.totais.das_estimado)), el('span', {}, 'DAS estimado (soma)'))),
       r.ambiente !== 'PRODUCAO' ? el('p', { class: 'aviso' }, 'Ambiente de homologação: estas notas são de teste, sem valor fiscal.') : null,
+      el('div', { class: 'contadores fech-contadores' },
+        contador('Receita do mês', 'payments', moeda(r.totais.receita_mes), 'todas as empresas'),
+        contador('Notas autorizadas', 'receipt_long', r.totais.notas, canceladas ? `${canceladas} cancelada(s) fora da receita` : 'nenhuma cancelada'),
+        contador('DAS estimado', 'calculate', moeda(r.totais.das_estimado), 'soma, só referência'),
+        r.guias_instalado ? contador('Guias DAS', 'request_quote', `${comGuia}/${precisamGuia.length}`, `${pagas} paga(s)`) : null),
       comNotas.length === 0
-        ? el('p', { class: 'suave' }, 'Nenhuma empresa emitiu nota neste mês.')
-        : el('div', { id: 'fechamento-tabela', class: 'tabela-rolagem' }, el('table', { class: 'mini' },
-          el('thead', {}, el('tr', {},
-            el('th', {}, 'Empresa'), el('th', {}, 'Simples'),
-            el('th', { class: 'num' }, 'Notas'), el('th', { class: 'num', title: 'Canceladas não entram na receita' }, 'Canceladas'),
-            el('th', { class: 'num' }, 'Receita do mês'), el('th', { class: 'num', title: 'Soma dos 12 meses anteriores (só notas do sistema)' }, '12 meses anteriores'),
-            el('th', { class: 'num', title: 'Percentual aproximado do Simples, do cadastro da empresa' }, '% Simples'),
-            el('th', { class: 'num' }, 'DAS estimado'),
-            r.guias_instalado ? el('th', {}, 'Guia DAS') : null)),
-          el('tbody', {}, ...comNotas.map((l) => el('tr', {},
-            el('td', {}, l.razao_social, el('div', { class: 'empresa__cnpj mono' }, cnpj(l.cnpj))),
-            el('td', {}, l.simples || '—'),
-            el('td', { class: 'num', title: `NFS-e: ${l.nfse.quantidade} (${moeda(l.nfse.valor)}) · NF-e: ${l.nfe.quantidade} (${moeda(l.nfe.valor)})` }, l.notas),
-            el('td', { class: 'num' }, l.canceladas || '—'),
-            el('td', { class: 'num' }, el('strong', {}, moeda(l.receita_mes))),
-            el('td', { class: 'num' }, moeda(l.receita_12_meses)),
-            el('td', { class: 'num' }, l.percentual_simples === null ? '—' : `${String(l.percentual_simples).replace('.', ',')}%`),
-            el('td', { class: 'num' }, l.das_estimado === null ? el('span', { class: 'suave', title: dicaSemEstimativa(l) }, '—') : moeda(l.das_estimado)),
-            r.guias_instalado ? el('td', {}, celulaGuia(l, mes, r.pagamento_instalado),
-              (r.serpro_modo === 'TESTE' || r.serpro_modo === 'PRODUCAO') && l.simples === 'ME/EPP'
-                ? el('button', { class: 'link-botao guia-serpro', type: 'button', 'data-declarar': l.cnpj,
-                  title: r.serpro_modo === 'TESTE' ? 'Declaração e DAS no ambiente de teste do SERPRO (exemplo, sem custo)'
-                    : 'Confere a receita, transmite a declaração do Simples e gera o DAS pela Receita',
-                  onclick: () => abrirDeclaracao(l, mes, r.serpro_modo) }, r.serpro_modo === 'TESTE' ? 'Testar Receita' : 'Declarar e gerar DAS')
-                : null) : null))))),
-      semNotas > 0 ? el('p', { class: 'suave' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
+        ? el('p', { class: 'suave fech-vazio' }, 'Nenhuma empresa emitiu nota neste mês.')
+        : el('section', { class: 'cartao tabela-cartao fech-lista' },
+          el('ul', { class: 'legenda', 'aria-label': 'Legenda das cores' },
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--rejeicao' }), 'Falta a guia'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--info' }), 'Guia a pagar'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--ok' }), 'Paga'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--cancelada' }), 'Venceu sem pagar'),
+            el('li', {}, el('span', { class: 'legenda__cor legenda__cor--neutro' }), 'Sem DAS')),
+          el('div', { id: 'fechamento-tabela', class: 'tabela-rolagem' }, el('table', { class: 'tabela tabela--status' },
+            el('thead', {}, el('tr', {},
+              el('th', {}, 'Empresa'), el('th', {}, 'Regime'),
+              el('th', { class: 'num' }, 'Notas'), el('th', { class: 'num' }, 'Receita do mês'),
+              el('th', { class: 'num' }, 'DAS estimado'),
+              r.guias_instalado ? el('th', {}, 'Guia DAS') : null)),
+            el('tbody', {}, ...linhas)))),
+      semNotas > 0 ? el('p', { class: 'suave fech-nota' }, `${semNotas} empresa(s) sem notas neste mês e fora do Simples (ME/EPP) não aparecem na lista (estão na planilha).`) : null,
       r.guias_instalado ? null : el('p', { class: 'aviso' }, 'Para anexar as guias DAS, falta atualizar o banco: botão Sistema > Atualizar banco.'),
-      el('p', { class: 'suave' },
-        'Como usar: confira a receita de cada empresa, faça a declaração no PGDAS-D (site do Simples Nacional), gere o DAS ',
-        'e clique em "Anexar guia". O cliente vê a guia no portal e recebe um aviso por e-mail. ',
-        'O DAS estimado é só uma referência (receita × % do Simples do cadastro). O valor certo é o do PGDAS-D, ',
-        'que considera a faixa dos últimos 12 meses, o anexo da atividade e receitas que não passaram pelo sistema.'),
+      el('details', { class: 'fech-ajuda' },
+        el('summary', {}, 'Como fazer o fechamento'),
+        el('ol', {},
+          el('li', {}, 'Confira a receita de cada empresa (canceladas não entram).'),
+          el('li', {}, 'Faça a declaração no PGDAS-D, no site do Simples Nacional, e gere o DAS.'),
+          el('li', {}, 'Clique em "Anexar guia" na linha da empresa. O cliente vê a guia no portal e recebe um aviso por e-mail.'),
+          el('li', {}, 'Quando o cliente pagar, marque a guia como paga.')),
+        el('p', { class: 'suave' }, 'O DAS estimado é só uma referência (receita × % do Simples do cadastro). O valor certo é o do PGDAS-D, ',
+          'que considera a faixa dos últimos 12 meses, o anexo da atividade e receitas que não passaram pelo sistema.')),
     ].filter(Boolean));
   } catch (e) {
     area.replaceChildren(el('p', { class: 'erro' }, e.message));
@@ -1216,25 +1417,25 @@ async function abrirFechamento(mes) {
 /** Celula "Guia DAS" de uma empresa: botao Anexar ou a guia ja anexada (paga ou nao). */
 function celulaGuia(l, mes, pagamentoInstalado) {
   if (!l.guia) {
-    return el('button', { class: 'botao botao--pequeno', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Anexar guia');
+    if (l.simples === 'Não optante') return el('span', { class: 'suave' }, 'Sem DAS');
+    return el('button', { class: 'botao botao--forte botao--pequeno', type: 'button', onclick: () => abrirAnexarGuia(l, mes) },
+      el('i', { class: 'icone', 'aria-hidden': 'true' }, 'attach_file'), ' Anexar guia');
   }
   const g = l.guia;
-  let pagamento = null;
-  if (g.pago_em) {
-    pagamento = el('span', { class: 'ok-texto', title: g.pago_marcado_por ? `Marcada por ${g.pago_marcado_por}` : '' }, `✓ Paga em ${dataCurta(g.pago_em)}`);
-  }
-  const acoes = [
-    el('button', { class: 'link-botao', type: 'button', onclick: () => abrirAnexarGuia(l, mes) }, 'Trocar'),
-    el('button', { class: 'link-botao', type: 'button', onclick: () => removerGuia(g, l, mes) }, 'Remover'),
-  ];
+  const acoes = [];
   if (pagamentoInstalado) {
-    acoes.unshift(g.pago_em
-      ? el('button', { class: 'link-botao', type: 'button', onclick: () => pagamentoGuia(g, mes, null) }, 'Desfazer pago')
-      : el('button', { class: 'link-botao', type: 'button', onclick: () => pagamentoGuia(g, mes, true) }, 'Marcar paga'));
+    acoes.push(g.pago_em
+      ? botaoIcone('undo', 'Desfazer pago', () => pagamentoGuia(g, mes, null))
+      : botaoIcone('price_check', 'Marcar como paga', () => pagamentoGuia(g, mes, true)));
   }
+  acoes.push(botaoIcone('swap_horiz', 'Trocar a guia', () => abrirAnexarGuia(l, mes)));
+  acoes.push(botaoIcone('delete_outline', 'Remover a guia', () => removerGuia(g, l, mes), true));
   return el('div', { class: 'guia-celula' },
-    el('button', { class: 'link-botao', type: 'button', title: 'Abrir o PDF', onclick: () => abrirPdfGuia(g.id) }, `${moeda(g.valor)} · vence ${dataCurta(g.vencimento)}`),
-    pagamento,
+    el('button', { class: 'guia-celula__pdf', type: 'button', title: 'Abrir o PDF da guia', onclick: () => abrirPdfGuia(g.id) },
+      el('i', { class: 'icone', 'aria-hidden': 'true' }, 'picture_as_pdf'),
+      el('span', {}, el('strong', {}, moeda(g.valor)), el('small', {}, g.pago_em
+        ? `paga em ${dataCurta(g.pago_em)}${g.pago_marcado_por ? ' · ' + g.pago_marcado_por.replace(/\s*<[^>]*>$/, '') : ''}`
+        : `vence ${dataCurta(g.vencimento)}`))),
     el('div', { class: 'guia-celula__acoes' }, ...acoes));
 }
 
@@ -1674,6 +1875,7 @@ async function atualizarPontoSistema() {
 }
 
 function abrirSistema(opcoes = {}) {
+  let navWorker = null;
   const estadoArea = el('div', {}, el('p', { class: 'suave' }, 'Carregando...'));
   const filaArea = el('div', {});
   const workersArea = el('div', {});
@@ -1757,10 +1959,14 @@ function abrirSistema(opcoes = {}) {
       : el('p', { class: 'suave' }, 'Nenhum worker dando sinal agora.'));
 
     historicoArea.replaceChildren(s.acoes_recentes.length
-      ? el('ul', { class: 'linha-tempo' }, ...s.acoes_recentes.map((a) => el('li', {},
-        el('time', { class: 'suave' }, dataHora(a.criado_em)), ' · ', el('strong', {}, ACOES_SISTEMA[a.acao] || a.acao),
-        autorDoRegistro(a), a.ip ? el('span', { class: 'suave' }, ` (IP ${a.ip})`) : null)))
+      ? listaHistorico(s.acoes_recentes, (a) => [el('strong', {}, ACOES_SISTEMA[a.acao] || a.acao), autorHistorico(a)])
       : el('p', { class: 'suave' }, 'Nenhuma ação ainda.'));
+    // Estado do worker no menu lateral da tela Sistema
+    if (navWorker) {
+      const rotulos = { PARADO: 'parado', PAUSADO: 'pausado', REINICIANDO: 'reiniciando' };
+      navWorker.textContent = rotulos[s.situacao] || '';
+      navWorker.className = `sistema-nav__estado sistema-nav__estado--${s.situacao}`;
+    }
   }
 
   async function recarregar() {
@@ -1774,12 +1980,21 @@ function abrirSistema(opcoes = {}) {
   // ---- Diagnostico ----
   const NIVEIS = { ERRO: { nome: 'Erro', ponto: 'PARADO' }, ATENCAO: { nome: 'Atenção', ponto: 'PAUSADO' }, OK: { nome: 'OK', ponto: 'LIGADO' } };
 
-  function itemDiagnostico(i, grupo) {
-    return el('li', { class: 'diag-item' },
-      el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[i.nivel].ponto}`, title: NIVEIS[i.nivel].nome }),
-      el('div', {},
-        el('div', {}, grupo ? el('span', { class: 'suave' }, `${grupo} · `) : null, i.texto),
-        i.resolver ? el('div', { class: 'diag-resolver' }, el('strong', {}, 'Como resolver: '), i.resolver) : null));
+  // "Como resolver" que da para fazer nesta mesma tela: botao que leva ate a parte certa.
+  function atalhoResolver(texto) {
+    const t = String(texto || '');
+    const destinos = [
+      [/Ligar worker|worker/i, 'secao-worker', 'Ir para Worker'],
+      [/Senha do Monitor/i, 'secao-monitor', 'Ir para Senha do Monitor'],
+      [/Atualizar banco|banco/i, 'secao-banco', 'Ir para Banco de dados'],
+      [/e-mail|SMTP/i, 'secao-email', 'Ir para E-mail'],
+      [/Configura/i, 'secao-config', 'Ir para Configurações'],
+      [/SERPRO/i, 'secao-serpro', 'Ir para SERPRO'],
+    ];
+    const d = destinos.find(([re, id]) => re.test(t) && $(id));
+    if (!d) return null;
+    return el('button', { class: 'link-botao', type: 'button',
+      onclick: () => mostrarSecao(d[1]) }, `${d[2]} →`);
   }
 
   async function rodarDiagnostico() {
@@ -1787,24 +2002,37 @@ function abrirSistema(opcoes = {}) {
     diagBotao.textContent = 'Conferindo... (até 10 s)';
     try {
       const d = await api('diagnostico.php');
-      const problemas = [];
-      const certos = [];
-      for (const g of d.grupos) {
-        for (const i of g.itens) (i.nivel === 'OK' ? certos : problemas).push([i, g.titulo]);
-      }
-      problemas.sort((a, b) => (a[0].nivel === 'ERRO' ? 0 : 1) - (b[0].nivel === 'ERRO' ? 0 : 1));
       const t = d.total;
       const resumo = d.resultado === 'OK' ? 'Tudo certo'
-        : [t.ERRO ? `${t.ERRO} erro(s)` : null, t.ATENCAO ? `${t.ATENCAO} aviso(s)` : null].filter(Boolean).join(' e ');
-      diagArea.replaceChildren(...[
-        el('div', { class: 'sistema-estado' },
-          el('span', { class: `ponto-sistema ponto-sistema--${NIVEIS[d.resultado].ponto}` }),
+        : [t.ERRO ? `${t.ERRO} erro${t.ERRO > 1 ? 's' : ''}` : null, t.ATENCAO ? `${t.ATENCAO} aviso${t.ATENCAO > 1 ? 's' : ''}` : null].filter(Boolean).join(' e ');
+      const pior = (itens) => itens.some((i) => i.nivel === 'ERRO') ? 'ERRO' : itens.some((i) => i.nivel === 'ATENCAO') ? 'ATENCAO' : 'OK';
+      const peso = { ERRO: 0, ATENCAO: 1, OK: 2 };
+      // Grupos com problema primeiro; dentro do grupo, erro antes de aviso antes de ok.
+      const grupos = d.grupos.map((g) => ({ ...g, nivel: pior(g.itens) })).sort((x, y) => peso[x.nivel] - peso[y.nivel]);
+
+      const ponto = (nivel) => el('span', { class: `diag-ponto diag-ponto--${nivel}`, 'aria-hidden': 'true' });
+      const contagem = (itens) => {
+        const n = (nv) => itens.filter((i) => i.nivel === nv).length;
+        return [n('ERRO') ? `${n('ERRO')} erro${n('ERRO') > 1 ? 's' : ''}` : null, n('ATENCAO') ? `${n('ATENCAO')} aviso${n('ATENCAO') > 1 ? 's' : ''}` : null,
+          n('OK') ? `${n('OK')} ok` : null].filter(Boolean).join(' · ');
+      };
+      const item = (i) => el('li', { class: 'diag-item2' }, ponto(i.nivel),
+        el('div', {},
+          el('div', {}, i.texto),
+          i.resolver ? el('div', { class: 'diag-item2__resolver' }, i.resolver, ' ', atalhoResolver(i.resolver)) : null));
+
+      diagArea.replaceChildren(
+        el('div', { class: 'diag-topo' }, ponto(d.resultado),
           el('strong', {}, resumo),
-          el('span', { class: 'suave' }, `${t.OK} item(ns) ok · conferido em ${dataHora(d.feito_em)}`)),
-        problemas.length ? el('ul', { class: 'diag-lista' }, ...problemas.map(([i, g]) => itemDiagnostico(i, g))) : null,
-        el('details', {}, el('summary', { class: 'suave' }, `Ver os ${certos.length} itens ok`),
-          el('ul', { class: 'diag-lista' }, ...certos.map(([i, g]) => itemDiagnostico(i, g)))),
-      ].filter(Boolean));
+          el('span', { class: 'suave' }, ` · ${t.OK} ok · conferido em ${dataHora(d.feito_em)}`)),
+        el('div', { class: 'diag-lista2' }, ...grupos.map((g) => {
+          const problemas = g.itens.filter((i) => i.nivel !== 'OK');
+          const oks = g.itens.filter((i) => i.nivel === 'OK');
+          return el('details', { class: 'diag-grupo2', open: problemas.length > 0 },
+            el('summary', {}, ponto(g.nivel), el('span', { class: 'diag-grupo2__nome' }, g.titulo), el('span', { class: 'diag-grupo2__conta' }, contagem(g.itens))),
+            problemas.length ? el('ul', { class: 'diag-itens2' }, ...problemas.map(item)) : null,
+            oks.length ? el('ul', { class: 'diag-itens2 diag-itens2--ok' }, ...oks.map(item)) : null);
+        })));
     } catch (e) {
       diagArea.replaceChildren(el('p', { class: 'erro' }, e.message));
     }
@@ -1837,12 +2065,15 @@ function abrirSistema(opcoes = {}) {
     }
     entradas[c.chave] = entrada;
     erros[c.chave] = el('span', { class: 'erro' });
-    const voltar = c.alterado ? el('button', { class: 'link-botao', type: 'button', onclick: () => { entrada.value = c.padrao ?? ''; } }, 'voltar ao padrão') : null;
+    // O padrao do arquivo so aparece quando o valor foi alterado no painel (no botao e na dica dele).
+    const voltar = c.alterado
+      ? el('button', { class: 'config-restaurar', type: 'button', title: `Alterado no painel. Padrão do arquivo: ${textoValor(c, c.padrao)}`, 'aria-label': 'Restaurar o padrão do arquivo',
+        onclick: (ev) => { ev.preventDefault(); entrada.value = c.padrao ?? ''; } }, 'Restaurar')
+      : null;
     return el('label', { class: c.tipo === 'url' ? 'largo' : null, for: id },
-      el('span', { class: 'config-rotulo' }, c.rotulo),
+      el('span', { class: 'config-rotulo' }, c.rotulo, voltar),
       entrada,
-      el('span', { class: 'config-ajuda' }, c.ajuda, ' Padrão do arquivo: ', el('strong', {}, textoValor(c, c.padrao)), '. ',
-        c.alterado ? el('span', { class: 'config-alterado' }, 'alterado no painel') : null, c.alterado ? ' ' : null, voltar),
+      c.ajuda ? el('span', { class: 'config-ajuda' }, c.ajuda) : null,
       erros[c.chave]);
   }
 
@@ -1877,7 +2108,7 @@ function abrirSistema(opcoes = {}) {
 
     configArea.replaceChildren(
       el('p', { class: 'suave' }, `Ambiente: ${dados.ambiente === 'PRODUCAO' ? 'Produção' : 'Homologação'}. `,
-        'Os tokens só mudam no arquivo config/nfse.local.php, por segurança. O ambiente e o e-mail têm blocos próprios, acima.'),
+        'Os tokens só mudam no arquivo config/nfse.local.php, por segurança. O ambiente e o e-mail têm páginas próprias neste menu.'),
       ...blocos,
       el('div', { class: 'acoes' }, salvar),
       retorno);
@@ -2046,26 +2277,61 @@ function abrirSistema(opcoes = {}) {
     }
   }
 
-  abrirModal('Sistema', 'Ambiente, worker (o programa que envia as notas), banco de dados, pessoas, e-mail e configurações', [
+  const secoes = [
     secaoAmbiente(),
-    el('section', { class: 'secao' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
-    el('section', { class: 'secao' }, el('h3', {}, 'Fila de envio'), filaArea),
-    el('section', { class: 'secao' }, el('h3', {}, 'Workers ligados'), workersArea),
+    el('section', { class: 'secao', id: 'secao-worker' }, el('h3', {}, 'Worker'), estadoArea, acoesArea, retorno),
+    el('section', { class: 'secao', id: 'secao-fila' }, el('h3', {}, 'Fila de envio'), filaArea),
+    el('section', { class: 'secao', id: 'secao-workers' }, el('h3', {}, 'Workers ligados'), workersArea),
     el('section', { class: 'secao', id: 'secao-banco' }, el('h3', {}, 'Banco de dados'), bancoArea, bancoRetorno),
-    el('section', { class: 'secao' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
+    el('section', { class: 'secao', id: 'secao-diagnostico' }, el('h3', {}, 'Diagnóstico'), diagArea, el('div', { class: 'acoes' }, diagBotao)),
     secaoPessoasPainel(),
     secaoSenhaMonitor(),
     el('section', { class: 'secao', id: 'secao-email' }, el('h3', {}, 'E-mail'), emailArea),
-    el('section', { class: 'secao' }, el('h3', {}, 'Configurações'), configArea),
+    el('section', { class: 'secao', id: 'secao-config' }, el('h3', {}, 'Configurações'), configArea),
     secaoSerpro(),
-    el('section', { class: 'secao' }, el('h3', {}, 'Últimas ações nesta tela'), historicoArea),
-  ]);
+    el('section', { class: 'secao', id: 'secao-historico' }, el('h3', {}, 'Histórico'), historicoArea),
+  ];
+  // Menu lateral: cada item e uma pagina com as suas partes (as outras ficam escondidas).
+  const paginas = [
+    ['ambiente', 'Ambiente e worker', ['secao-ambiente', 'secao-worker', 'secao-fila', 'secao-workers']],
+    ['banco', 'Banco e diagnóstico', ['secao-banco', 'secao-diagnostico']],
+    ['pessoas', 'Pessoas e acesso', ['secao-pessoas', 'secao-monitor']],
+    ['email', 'E-mail', ['secao-email']],
+    ['config', 'Configurações', ['secao-config']],
+    ['serpro', 'Integração SERPRO', ['secao-serpro']],
+    ['historico', 'Histórico', ['secao-historico']],
+  ];
+  const corpoSecoes = el('div', { class: 'sistema-secoes' }, ...secoes.filter(Boolean));
+  navWorker = el('span', { class: 'sistema-nav__estado' });
+  const nav = el('nav', { class: 'sistema-nav', 'aria-label': 'Partes da tela Sistema' },
+    ...paginas.map(([chave, nome]) => el('a', {
+      href: `#sistema-${chave}`, class: 'sistema-nav__item', 'data-pagina': chave,
+      onclick: (ev) => { ev.preventDefault(); mostrarPagina(chave); },
+    }, nome, chave === 'ambiente' ? navWorker : null)));
+  function mostrarPagina(chave, focoId) {
+    const pagina = paginas.find((p) => p[0] === chave) || paginas[0];
+    for (const s of corpoSecoes.children) s.hidden = !pagina[2].includes(s.id);
+    nav.querySelectorAll('.sistema-nav__item').forEach((a) => {
+      if (a.dataset.pagina === pagina[0]) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    $('modal-corpo').scrollTop = 0;
+    if (focoId) setTimeout(() => $(focoId)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 30);
+  }
+  /** Leva a uma parte da tela (id da secao), trocando de pagina se precisar. */
+  function mostrarSecao(id) {
+    const pagina = paginas.find((p) => p[2].includes(id));
+    if (pagina) mostrarPagina(pagina[0], id);
+  }
+  abrirModal('Sistema', 'Ambiente, worker (o programa que envia as notas), banco de dados, pessoas, e-mail e configurações', [
+    el('div', { class: 'sistema-pagina' }, nav, corpoSecoes),
+  ], { sistema: true });
+  mostrarPagina('ambiente');
   recarregar();
   carregarBanco();
   carregarConfiguracoes();
   carregarEmail();
   const focos = { monitor: 'secao-monitor', email: 'secao-email', pessoas: 'secao-pessoas', banco: 'secao-banco', serpro: 'secao-serpro' };
-  if (focos[opcoes.focar]) setTimeout(() => $(focos[opcoes.focar])?.scrollIntoView({ block: 'start' }), 50);
+  if (focos[opcoes.focar]) mostrarSecao(focos[opcoes.focar]);
   clearInterval(relogioSistema);
   relogioSistema = setInterval(() => { if ($('modal').open) recarregar(); else clearInterval(relogioSistema); }, 5000);
 }
@@ -2085,14 +2351,13 @@ function secaoAmbiente() {
   function desenhar(a, mensagem) {
     const producao = a.atual === 1;
     const retorno = el('div', { 'aria-live': 'polite' }, mensagem ? el('p', { class: 'envio-ok' }, '✓ ' + mensagem) : null);
-    const filhos = [
-      el('div', { class: 'ambiente-atual' },
-        el('span', { class: 'suave' }, 'Agora:'),
-        el('span', { class: 'ambiente-atual__nome' + (producao ? ' ambiente-atual__nome--producao' : '') },
-          producao ? '1 - Produção (notas com valor fiscal)' : '2 - Homologação (testes, sem valor fiscal)')),
-      el('p', { class: 'suave' }, 'Vale para o sistema todo: NF-e e NFS-e, API, portal das empresas e worker. '
-        + 'Homologação e produção têm numeração separada.'),
-    ];
+    const linhaAmbiente = el('div', { class: 'estado-linha' },
+      el('span', { class: `estado-ponto estado-ponto--${producao ? 'producao' : 'teste'}`, 'aria-hidden': 'true' }),
+      el('div', { class: 'estado-linha__texto' },
+        el('strong', {}, producao ? 'Produção' : 'Homologação'),
+        el('span', {}, producao ? 'Notas com valor fiscal. ' : 'Testes, sem valor fiscal. ',
+          'Vale para o sistema todo (NF-e, NFS-e, API, portal e worker). Homologação e produção têm numeração separada.')));
+    const filhos = [linhaAmbiente];
 
     if (!producao) {
       // Antes de ligar: o que ainda falta nas empresas (so avisa, nao impede).
@@ -2134,7 +2399,7 @@ function secaoAmbiente() {
           voltar.disabled = false;
         }
       });
-      filhos.push(el('div', { class: 'acoes' }, voltar));
+      linhaAmbiente.append(el('div', { class: 'estado-linha__acao' }, voltar));
     }
     filhos.push(modeloDaReceita(a, retorno));
     filhos.push(retorno);
@@ -2146,7 +2411,7 @@ function secaoAmbiente() {
   function modeloDaReceita(a, retorno) {
     const novo = a.producao_modelo_novo;
     const trocar = el('button', { class: 'botao', type: 'button' },
-      novo ? 'Voltar a produção para o modelo antigo' : 'A Receita mudou: usar o modelo novo na produção');
+      novo ? 'Voltar para o modelo antigo' : 'Usar o modelo novo');
     trocar.addEventListener('click', async () => {
       const pergunta = novo
         ? 'Voltar a PRODUÇÃO para o modelo ANTIGO (sem finNFSe)? Use só se as notas de produção estiverem sendo recusadas por causa do finNFSe.'
@@ -2161,14 +2426,14 @@ function secaoAmbiente() {
         trocar.disabled = false;
       }
     });
-    return el('div', { class: 'ambiente-modelo' },
-      el('strong', {}, 'Modelo da nota NFS-e Nacional na produção'),
-      el('p', {}, 'Agora: ', el('strong', {}, novo ? 'NOVO (de 20/10/2026, com finNFSe)' : 'ANTIGO (sem finNFSe)'),
-        '. A homologação já usa o modelo novo.'),
-      el('p', { class: 'suave' }, novo
-        ? 'Se as notas de produção voltarem com o erro E1235 recusando o finNFSe, a produção ainda está no modelo antigo: volte pelo botão abaixo.'
-        : 'Quando a Receita mudar a produção, as notas de produção voltam com o erro E1235 pedindo o finNFSe: aí é só clicar no botão abaixo e reenviar.'),
-      el('div', { class: 'acoes' }, trocar));
+    return el('div', { class: 'estado-linha' },
+      el('span', { class: 'estado-ponto estado-ponto--neutro', 'aria-hidden': 'true' }),
+      el('div', { class: 'estado-linha__texto' },
+        el('strong', {}, 'Modelo da NFS-e Nacional: ', novo ? 'novo (com finNFSe)' : 'antigo (sem finNFSe)'),
+        el('span', {}, 'A homologação já usa o modelo novo. ', novo
+          ? 'Se as notas de produção voltarem com o erro E1235 recusando o finNFSe, volte para o antigo.'
+          : 'Troque quando as notas de produção voltarem com o erro E1235 pedindo o finNFSe, e reenvie.')),
+      el('div', { class: 'estado-linha__acao' }, trocar));
   }
 
   api('ambiente.php').then((a) => desenhar(a)).catch((e) => area.replaceChildren(el('p', { class: 'erro' }, e.message)));
@@ -2238,21 +2503,23 @@ function secaoPessoasPainel() {
         lista.replaceChildren(el('p', { class: 'aviso' }, 'Ninguém cadastrado ainda: hoje só a chave de emergência entra. Cadastre você primeiro.'));
         return;
       }
-      lista.replaceChildren(el('table', { class: 'mini' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Último acesso'), el('th', {}, 'Situação'), el('th', {}, ''))),
-        el('tbody', {}, ...r.pessoas.map((p) => el('tr', {},
-          el('td', {}, p.nome, p.id === r.eu ? el('span', { class: 'suave' }, ' (você)') : null),
-          el('td', {}, p.email),
-          el('td', {}, p.ultimo_acesso ? dataHora(p.ultimo_acesso) : 'nunca entrou'),
-          el('td', {}, !p.ativo ? el('span', { class: 'ruim' }, 'Desativada') : (p.bloqueado ? el('span', { class: 'aviso' }, 'Bloqueada (senhas erradas)')
-            : (p.trocar_senha ? 'Aguardando 1º acesso' : 'Ativa'))),
-          el('td', {},
-            p.ativo && p.id !== r.eu ? el('button', { class: 'botao botao--forte', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail',
+      lista.replaceChildren(el('ul', { class: 'pessoas' }, ...r.pessoas.map((p) => linhaPessoa({
+        nome: p.nome,
+        eu: p.id === r.eu,
+        email: p.email,
+        situacao: !p.ativo ? 'Desativada' : (p.bloqueado ? 'Bloqueada (senhas erradas)' : (p.trocar_senha ? 'Aguardando 1º acesso' : 'Ativa')),
+        tom: !p.ativo ? 'neutro' : (p.bloqueado ? 'rejeicao' : (p.trocar_senha ? 'info' : 'ok')),
+        ultimo: p.ultimo_acesso,
+        acoes: p.id === r.eu
+          ? [el('button', { class: 'botao', type: 'button', onclick: () => abrirMinhaSenha() }, el('i', { class: 'icone', 'aria-hidden': 'true' }, 'key'), ' Trocar minha senha')]
+          : [
+            p.ativo ? el('button', { class: 'botao', type: 'button', title: 'Gera uma senha provisória nova e manda por e-mail',
               onclick: () => acao({ acao: 'redefinir_senha', id: p.id }, `Enviar o acesso ao painel para ${p.email}?\n\nO sistema gera uma senha provisória nova e manda por e-mail. A senha atual dessa pessoa para de funcionar.`, true) },
-            '✉ Enviar acesso por e-mail') : null, ' ',
-            p.id !== r.eu ? el('button', { class: 'botao' + (p.ativo ? ' botao--perigo' : ''), type: 'button',
-              onclick: () => acao({ acao: p.ativo ? 'desativar' : 'ativar', id: p.id }, p.ativo ? `Desativar o acesso de ${p.email} ao painel?` : null) },
-            p.ativo ? 'Desativar' : 'Reativar') : el('button', { class: 'botao', type: 'button', onclick: () => abrirMinhaSenha() }, 'Trocar minha senha')))))));
+            el('i', { class: 'icone', 'aria-hidden': 'true' }, 'mail'), ' Enviar acesso') : null,
+            botaoIcone(p.ativo ? 'person_off' : 'person_add', p.ativo ? 'Desativar acesso' : 'Reativar acesso',
+              () => acao({ acao: p.ativo ? 'desativar' : 'ativar', id: p.id }, p.ativo ? `Desativar o acesso de ${p.email} ao painel?` : null), p.ativo),
+          ],
+      }))));
     } catch (e) {
       lista.replaceChildren(el('p', { class: e.message.includes('Atualizar banco') ? 'aviso' : 'erro' }, e.message));
     }
@@ -2277,9 +2544,12 @@ function secaoPessoasPainel() {
     el('h3', {}, 'Pessoas do painel'),
     el('p', { class: 'suave' }, 'Quem entra neste painel. Cada pessoa usa o próprio e-mail e senha, e o histórico mostra quem fez cada mudança.'),
     lista,
-    el('div', { class: 'campos' }, el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email)),
-    el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
-    el('div', { class: 'acoes' }, botao, mensagem),
+    el('div', { class: 'novo-acesso' },
+      el('h4', { class: 'novo-acesso__titulo' }, 'Cadastrar uma pessoa'),
+      el('div', { class: 'novo-acesso__linha' },
+        el('label', {}, 'Nome', nome), el('label', {}, 'E-mail', email), botao),
+      el('label', { class: 'opcao-linha' }, porEmail, ' Enviar os dados de acesso por e-mail para a pessoa'),
+      mensagem),
     area);
 }
 

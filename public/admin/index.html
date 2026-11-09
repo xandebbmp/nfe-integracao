@@ -6,8 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Painel Administrativo</title>
   <!-- Mesmo visual do monitor + ajustes do painel -->
-  <link rel="stylesheet" href="../monitor/monitor.css?v=20261106n">
-  <link rel="stylesheet" href="admin.css?v=20261108e">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="../monitor/monitor.css?v=20261108r3">
+  <link rel="stylesheet" href="admin.css?v=20261108r14">
   <!-- Tour guiado (botao "Tour guiado"): o mesmo do portal -->
   <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
 </head>
@@ -97,12 +99,17 @@
       </section>
 
       <section class="cartao tabela-cartao">
-        <table class="tabela">
+        <ul class="legenda" aria-label="Legenda das cores">
+          <li><span class="legenda__cor legenda__cor--ok"></span>Liberada</li>
+          <li><span class="legenda__cor legenda__cor--rejeicao"></span>Vencida</li>
+          <li><span class="legenda__cor legenda__cor--info"></span>Limite atingido</li>
+          <li><span class="legenda__cor legenda__cor--cancelada"></span>Bloqueada</li>
+        </ul>
+        <table class="tabela tabela--status">
           <thead>
             <tr>
               <th>Empresa</th>
               <th>Plano</th>
-              <th>Situação</th>
               <th title="Notas autorizadas no mês">NF-e</th>
               <th title="Notas autorizadas no mês">NFS-e Nac.</th>
               <th title="Notas autorizadas no mês">NFS-e SSA</th>
@@ -134,7 +141,7 @@
   </dialog>
 
   <script src="../ajuda/tour.js?v=20261108c"></script>
-  <script src="admin.js?v=20261108g"></script>
+  <script src="admin.js?v=20261108r14"></script>
   <script src="admin-guias.js?v=20261108a"></script>
 </body>
 </html>

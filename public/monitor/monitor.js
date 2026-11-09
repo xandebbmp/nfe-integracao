@@ -31,6 +31,17 @@ const STATUS = {
   SUBSTITUIDO: { nome: 'Substituído', cor: 'var(--st-substituido)' },
 };
 
+/** Cor da linha (legenda acima da tabela) e icone de cada contador. */
+const COR_LINHA = {
+  AUTORIZADO: 'ok', RECEBIDO: 'info', PROCESSANDO: 'info',
+  REJEITADO: 'rejeicao', ERRO: 'rejeicao', DENEGADO: 'rejeicao',
+  CANCELADO: 'cancelada', SUBSTITUIDO: 'neutro',
+};
+const ICONE_STATUS = {
+  RECEBIDO: 'inbox', PROCESSANDO: 'sync', AUTORIZADO: 'task_alt', REJEITADO: 'error_outline',
+  DENEGADO: 'gpp_bad', ERRO: 'report_problem', CANCELADO: 'block', SUBSTITUIDO: 'swap_horiz',
+};
+
 /** Nome amigavel de cada padrao (tipo de documento). */
 const PADROES = {
   NFE: 'NF-e',
@@ -101,7 +112,8 @@ function el(tag, atributos = {}, ...filhos) {
 const formatoData = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
 function data(texto) {
   if (!texto) return '—';
-  const d = new Date(String(texto).replace(' ', 'T').replace(/\+00$/, 'Z'));
+  // Postgres manda "2026-11-08 04:15:57.695596-03": o Date do navegador quer "T", ate 3 casas e fuso "-03:00".
+  const d = new Date(String(texto).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1').replace(/\+00$/, 'Z').replace(/([+-]\d{2})$/, '$1:00'));
   return isNaN(d) ? texto : formatoData.format(d);
 }
 
@@ -281,7 +293,8 @@ function renderizar() {
 function linhaDocumento(doc) {
   const problema = temProblema(doc);
   const ultima = (doc.mensagens || [])[0];
-  const classes = [problema && 'linha--problema', estado.recentes.has(doc.id) && 'linha--nova'].filter(Boolean).join(' ');
+  // A cor da linha mostra o status (legenda acima da tabela); o nome fica para leitor de tela.
+  const classes = ['linha-status', `linha-status--${COR_LINHA[doc.status] || 'neutro'}`, estado.recentes.has(doc.id) && 'linha--nova'].filter(Boolean).join(' ');
 
   return el('tr', {
     class: classes || null,
@@ -290,13 +303,14 @@ function linhaDocumento(doc) {
     onmousemove: problema ? (e) => mostrarDica(e, doc) : null,
     onmouseleave: problema ? esconderDica : null,
   },
-    el('td', {}, data(doc.atualizado_em)),
-    el('td', { class: 'mono' }, doc.referencia),
+    el('td', {}, data(doc.atualizado_em),
+      problema ? el('i', { class: 'icone linha-status__aviso', 'aria-hidden': 'true' }, 'error_outline') : null,
+      el('span', { class: 'visualmente-oculto' }, ` · ${STATUS[doc.status]?.nome || doc.status}`)),
+    el('td', { class: 'mono celula-curta', title: doc.referencia }, doc.referencia),
     el('td', {}, PADROES[doc.padrao] || doc.padrao),
-    el('td', {}, nomeEmitente(doc.emitente_cnpj)),
+    el('td', { class: 'celula-curta', title: nomeEmitente(doc.emitente_cnpj) }, nomeEmitente(doc.emitente_cnpj)),
     el('td', { class: 'mono' }, doc.dps_rps ? `${doc.dps_rps.serie}/${doc.dps_rps.numero}` : '—'),
     el('td', { class: 'mono' }, doc.nfse?.numero || '—'),
-    el('td', {}, seloStatus(doc.status), problema ? el('span', { class: 'alerta', title: 'Passe o mouse para ver o motivo' }, '⚠') : null),
     el('td', { class: 'acao' }, textoUltimaAcao(doc, ultima), botaoReenviar(doc)),
   );
 }
@@ -327,7 +341,8 @@ function renderizarContadores(documentos) {
       $('filtro-status').value = estado.filtro.status;
       renderizar();
     },
-  }, el('span', { class: 'contador__valor' }, totais[codigo] || 0), el('span', { class: 'contador__nome' }, s.nome)));
+  }, el('span', { class: 'contador__topo' }, el('span', { class: 'contador__nome' }, s.nome), el('i', { class: 'icone', 'aria-hidden': 'true' }, ICONE_STATUS[codigo] || 'description')),
+    el('span', { class: 'contador__valor' }, totais[codigo] || 0)));
 
   $('contadores').replaceChildren(...cartoes);
 }
@@ -551,6 +566,7 @@ async function entrar(token, viaAdmin = false) {
     const selo = $('selo-ambiente');
     selo.textContent = capacidades.ambiente === 'PRODUCAO' ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
     selo.className = `selo selo--${capacidades.ambiente === 'PRODUCAO' ? 'producao' : 'homologacao'}`;
+    document.body.classList.toggle('em-producao', capacidades.ambiente === 'PRODUCAO');
 
     const { emitentes } = await api('emitentes.php');
     const filtroEmitente = $('filtro-emitente');

@@ -531,24 +531,105 @@
       }).join('');
   }
 
+  // Cor da linha em "Ultimas notas" (legenda no index.html): verde autorizada, azul na prefeitura,
+  // amarelo rejeicao, vermelho cancelada, cinza substituida.
+  var COR_LINHA = {
+    AUTORIZADO: 'ok', RECEBIDO: 'info', PROCESSANDO: 'info',
+    REJEITADO: 'rejeicao', ERRO: 'rejeicao', DENEGADO: 'rejeicao',
+    CANCELADO: 'cancelada', SUBSTITUIDO: 'neutro'
+  };
+
+  // Dica flutuante do motivo da rejeicao (uma so caixa para a pagina toda).
+  function mostrarMotivo(tr, ev) {
+    var caixa = document.querySelector('.dica-motivo');
+    if (!caixa) {
+      caixa = document.createElement('div');
+      caixa.className = 'dica-motivo';
+      caixa.setAttribute('role', 'tooltip');
+      document.body.appendChild(caixa);
+    }
+    if (caixa.dataset.linha !== tr.getAttribute('data-id')) {
+      caixa.dataset.linha = tr.getAttribute('data-id');
+      caixa.innerHTML = '<b>' + escapar(tr.getAttribute('data-titulo') || 'Rejeitada') + '</b><span>' + escapar(tr.getAttribute('data-motivo')) + '</span>'
+        + '<small>Clique na linha para ver o detalhe e reenviar.</small>';
+    }
+    caixa.hidden = false;
+    var x, y;
+    if (ev && ev.clientX !== undefined) { x = ev.clientX + 14; y = ev.clientY + 18; }
+    else { var r = tr.getBoundingClientRect(); x = r.left + 20; y = r.bottom + 6; }
+    var larg = caixa.offsetWidth, alt = caixa.offsetHeight;
+    caixa.style.left = Math.max(8, Math.min(x, window.innerWidth - larg - 8)) + 'px';
+    caixa.style.top = (y + alt > window.innerHeight - 8 ? y - alt - 30 : y) + 'px';
+  }
+  function esconderMotivo() {
+    var caixa = document.querySelector('.dica-motivo');
+    if (caixa) { caixa.hidden = true; }
+  }
+
+  // O PDF (DANFSe) so existe para nota autorizada, cancelada ou substituida.
+  var STATUS_COM_PDF = ['AUTORIZADO', 'CANCELADO', 'SUBSTITUIDO'];
+  function temPdf(n) {
+    return !!(n.links && n.links.pdf) && STATUS_COM_PDF.indexOf(n.status) >= 0;
+  }
+
+  // ---- Padrao das listas de notas (Inicio e Minhas notas) ----
+  // Linha pintada com a cor do status (legenda acima da tabela), PDF/XML em icones,
+  // e dica flutuante com o motivo nas linhas com rejeicao.
+  function arquivosIcones(n, numero) {
+    if (!n.links || !n.links.pdf) { return ''; }
+    return (temPdf(n)
+      ? '<a class="btn btn--icone" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener" data-dica="Baixar PDF" aria-label="Baixar PDF da nota ' + escapar(numero) + '"><i class="icone icone--p">picture_as_pdf</i></a>'
+      : '<span class="btn btn--icone btn--desligado" data-dica="PDF só depois de autorizada" aria-hidden="true"><i class="icone icone--p">picture_as_pdf</i></span>')
+      + '<a class="btn btn--icone" href="' + escapar(linkApi(n.links.xml)) + '" data-dica="Baixar XML" aria-label="Baixar XML da nota ' + escapar(numero) + '"><i class="icone icone--p">code</i></a>';
+  }
+  /** Abertura do <tr> e o texto da 1a celula (numero + aviso + status para leitor de tela). */
+  function linhaStatus(n, numero) {
+    var st = STATUS[n.status] || [n.status, 'neutro'];
+    var tom = COR_LINHA[n.status] || 'neutro';
+    var rejeicao = tom === 'rejeicao' && n.motivo;
+    return {
+      abre: '<tr class="linha-status linha-status--' + tom + '"' + (n.id ? ' data-id="' + escapar(n.id) + '" tabindex="0"' : '')
+        + (rejeicao ? ' data-motivo="' + escapar(n.motivo) + '" data-titulo="' + escapar(st[0]) + '"' : '') + '>',
+      numero: escapar(numero)
+        + (rejeicao ? ' <i class="icone icone--p linha-status__aviso" aria-hidden="true">error_outline</i>' : '')
+        + '<span class="so-leitor"> · ' + escapar(st[0]) + (rejeicao ? ': ' + escapar(n.motivo) : '') + '</span>'
+    };
+  }
+  function ligarMotivos(corpo) {
+    Array.prototype.forEach.call(corpo.querySelectorAll('tr[data-motivo]'), function (tr) {
+      tr.addEventListener('mouseenter', function (ev) { mostrarMotivo(tr, ev); });
+      tr.addEventListener('mousemove', function (ev) { mostrarMotivo(tr, ev); });
+      tr.addEventListener('mouseleave', esconderMotivo);
+      tr.addEventListener('focus', function () { mostrarMotivo(tr); });
+      tr.addEventListener('blur', esconderMotivo);
+    });
+  }
+
   function desenharNotas(corpoTabela, notas) {
     if (!notas || notas.length === 0) {
       corpoTabela.innerHTML = '<tr class="tabela-vazia"><td colspan="5">Nenhuma nota ainda. <a href="#emitir">Emita a primeira</a>.</td></tr>';
       return;
     }
+    // A cor da linha mostra o status (legenda acima da tabela). O nome do status continua
+    // na linha para leitor de tela e aparece ao passar o mouse, junto com o motivo, se houver.
     corpoTabela.innerHTML = notas.map(function (n) {
       var numero = n.numero || (n.dps_rps ? 'DPS ' + n.dps_rps : '—');
-      var arquivos = n.links && n.links.pdf
-        ? '<br><a class="acao-arquivo" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener">PDF</a><a class="acao-arquivo" href="' + escapar(linkApi(n.links.xml)) + '">XML</a>'
-        : '';
-      return '<tr>'
-        + '<td class="mono">' + escapar(numero) + '</td>'
+      var linha = linhaStatus(n, numero);
+      return linha.abre
+        + '<td class="mono">' + linha.numero + '</td>'
         + '<td>' + escapar(n.tomador || '—') + '</td>'
         + '<td class="num">' + escapar(dataCurta(n.criado_em)) + '</td>'
         + '<td class="direita num">' + reais(n.valor) + '</td>'
-        + '<td' + (n.motivo ? ' title="' + escapar(n.motivo) + '"' : '') + '>' + pilulaStatus(n.status) + arquivos + '</td>'
+        + '<td class="direita acoes-icone">' + arquivosIcones(n, numero) + '</td>'
         + '</tr>';
     }).join('');
+    ligarMotivos(corpoTabela);
+    // Clicar na linha (fora dos icones) abre o detalhe da nota, como em "Minhas notas".
+    Array.prototype.forEach.call(corpoTabela.querySelectorAll('tr[data-id]'), function (tr) {
+      function abrir(ev) { if (!ev.target.closest('a')) { abrirNota(tr.getAttribute('data-id')); } }
+      tr.addEventListener('click', abrir);
+      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { abrir(ev); } });
+    });
   }
 
   // ==================================================================
@@ -1079,7 +1160,7 @@
     var corpo = el('notas-linhas');
     var filtrando = filtroNotas.status || filtroNotas.busca || filtroNotas.mes;
     if (!r.notas.length) {
-      corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="6">' + (filtrando
+      corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">' + (filtrando
         ? 'Nenhuma nota com esses filtros. <a href="#notas" data-limpar>Limpar filtros</a>.'
         : 'Nenhuma nota ainda. <a href="#emitir">Emita a primeira</a>.') + '</td></tr>';
       var limpar = corpo.querySelector('[data-limpar]');
@@ -1087,18 +1168,16 @@
     } else {
       corpo.innerHTML = r.notas.map(function (n) {
         var numero = n.numero ? 'NFS-e ' + n.numero : (n.dps_rps ? 'DPS ' + n.dps_rps : '—');
-        var arquivos = n.links && n.links.pdf
-          ? '<a class="acao-arquivo" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener">PDF</a><a class="acao-arquivo" href="' + escapar(linkApi(n.links.xml)) + '">XML</a>'
-          : '';
-        return '<tr data-id="' + escapar(n.id) + '" tabindex="0">'
-          + '<td class="mono">' + escapar(numero) + '</td>'
+        var linha = linhaStatus(n, numero);
+        return linha.abre
+          + '<td class="mono">' + linha.numero + '</td>'
           + '<td>' + escapar(n.tomador || '—') + '<span class="sub mono">' + escapar(formatarDoc(n.tomador_documento || '')) + '</span></td>'
           + '<td class="num">' + escapar(dataCurta(n.criado_em)) + '</td>'
           + '<td class="direita num">' + reais(n.valor) + '</td>'
-          + '<td' + (n.motivo ? ' title="' + escapar(n.motivo) + '"' : '') + '>' + pilulaStatus(n.status) + '</td>'
-          + '<td class="acoes">' + arquivos + (PODE_REENVIAR.indexOf(n.status) >= 0 ? botaoReenviar() : '') + '</td>'
+          + '<td class="acoes acoes-icone">' + (PODE_REENVIAR.indexOf(n.status) >= 0 ? botaoReenviar() : '') + arquivosIcones(n, numero) + '</td>'
           + '</tr>';
       }).join('');
+      ligarMotivos(corpo);
     }
     el('notas-paginacao').hidden = r.total === 0;
     el('notas-contagem').textContent = r.total + (r.total === 1 ? ' nota' : ' notas') + (r.paginas > 1 ? ' · página ' + r.pagina + ' de ' + r.paginas : '');
@@ -1185,6 +1264,7 @@
   }
 
   function abrirNota(id) {
+    el('janela-nota').className = el('janela-nota').className.replace(/\s*nota-status(--\S+)?/g, '');
     el('nota-titulo').textContent = 'Carregando…';
     el('nota-subtitulo').textContent = '';
     el('nota-corpo').innerHTML = '';
@@ -1195,6 +1275,52 @@
       el('nota-titulo').textContent = 'Nota';
       el('nota-corpo').innerHTML = '<p class="erro">' + escapar(erro.message) + '</p>';
     });
+  }
+
+  // Uma linha do historico da nota (tabela nfse_monitor). Texto em linguagem do cliente.
+  var EVENTO_STATUS = {
+    RECEBIMENTO: { _: ['Recebida', 'Emitida e colocada na fila de envio.', 'neutro'] },
+    EMISSAO: {
+      PROCESSANDO: ['Enviada à prefeitura', 'Aguardando a resposta da prefeitura.', 'info'],
+      AUTORIZADO: ['Autorizada', 'NFS-e gerada pela prefeitura.', 'ok'],
+      REJEITADO: ['Rejeitada', '', 'erro'],
+      DENEGADO: ['Denegada', '', 'erro'],
+      ERRO: ['Erro no envio', '', 'erro'],
+      _: ['Envio à prefeitura', '', 'info']
+    },
+    CONSULTA: {
+      AUTORIZADO: ['Autorização confirmada', '', 'ok'],
+      _: ['Consulta à prefeitura', '', 'info']
+    },
+    EVENTO: {
+      AUTORIZADO: ['Cancelamento solicitado', '', 'alerta'],
+      RECEBIDO: ['Cancelamento solicitado', '', 'alerta'],
+      PROCESSANDO: ['Cancelamento enviado', '', 'alerta'],
+      CANCELADO: ['Cancelamento registrado', 'A nota não tem mais valor fiscal.', 'alerta'],
+      REGISTRADO: ['Cancelamento registrado', 'A nota não tem mais valor fiscal.', 'alerta'],
+      REJEITADO: ['Cancelamento recusado', '', 'erro'],
+      ERRO: ['Erro no cancelamento', '', 'erro'],
+      _: ['Cancelamento', '', 'alerta']
+    }
+  };
+  function dataHoraCurta(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(iso || ''));
+    return m ? m[3] + '/' + m[2] + '/' + m[1] + ' · ' + m[4] + ':' + m[5] : dataCurta(iso);
+  }
+  function eventoHistorico(l) {
+    var grupo = EVENTO_STATUS[l.operacao] || {};
+    var e = grupo[l.status] || grupo._ || [(STATUS[l.status] || [l.status])[0], '', 'neutro'];
+    // Texto amigavel quando existe; a mensagem tecnica do sistema so aparece em erro e recusa,
+    // onde o detalhe ajuda a resolver. "solicitado por portal:email" vira "por email".
+    var texto = e[1];
+    var pedido = /solicitado por (?:portal:)?(.+)$/i.exec(l.mensagem || '');
+    if (pedido) { texto = 'por ' + pedido[1]; }
+    else if (!texto && e[2] === 'erro') { texto = l.mensagem || ''; }
+    return '<div class="evento"><span class="evento__ponto evento__ponto--' + e[2] + '" aria-hidden="true"></span>'
+      + '<div class="evento__corpo"><div class="evento__topo"><span class="evento__titulo">' + escapar(e[0]) + '</span>'
+      + '<time class="evento__quando">' + escapar(dataHoraCurta(l.criado_em)) + '</time></div>'
+      + (texto ? '<span class="evento__texto">' + escapar(texto) + '</span>' : '')
+      + '</div></div>';
   }
 
   function desenharNota(n) {
@@ -1209,29 +1335,28 @@
     var federais = ['valor_ir', 'valor_inss', 'valor_pis', 'valor_cofins', 'valor_csll'].reduce(function (soma, campo) { return soma + Number(v[campo] || 0); }, 0);
     var retencoes = federais + (v.iss_retido ? iss : 0);
 
-    el('nota-titulo').innerHTML = escapar(n.numero ? 'NFS-e nº ' + n.numero : (n.dps_rps ? 'DPS nº ' + n.dps_rps : 'Nota')) + ' ' + pilulaStatus(n.status);
-    el('nota-subtitulo').textContent = 'Enviada em ' + dataCurta(n.criado_em) + (n.padrao === 'SALVADOR' ? ' · Prefeitura de Salvador' : ' · Padrão Nacional');
+    var liquido = Math.max(bruto - desconto - retencoes, 0);
+    // Cor do status no painel (mesma legenda das listas): faixa no topo, cabecalho tingido e selo.
+    var tomNota = COR_LINHA[n.status] || 'neutro';
+    var stNota = STATUS[n.status] || [n.status, 'neutro'];
+    var janelaNota = el('janela-nota');
+    janelaNota.className = janelaNota.className.replace(/\s*nota-status--\S+/g, '') + ' nota-status nota-status--' + tomNota;
+    el('nota-titulo').innerHTML = escapar(n.numero ? 'NFS-e ' + n.numero : (n.dps_rps ? 'DPS ' + n.dps_rps : 'Nota'))
+      + ' <span class="selo-status">' + escapar(stNota[0]) + '</span>';
+    var padraoTexto = n.padrao === 'SALVADOR' ? 'Prefeitura de Salvador' : 'Padrão Nacional';
+    var competenciaTexto = mesPorExtenso(String(n.competencia || '').slice(0, 7));
+    el('nota-subtitulo').textContent = (n.nfse && n.nfse.data_autorizacao
+      ? 'Autorizada em ' + dataCurta(n.nfse.data_autorizacao)
+      : 'Enviada em ' + dataCurta(n.criado_em))
+      + ' · ' + padraoTexto + (competenciaTexto ? ' · competência ' + competenciaTexto.toLowerCase() : '');
 
-    var html = '';
-    // O que a prefeitura disse (rejeicao, erro) vem primeiro: e o que a pessoa precisa resolver.
-    if (n.mensagens && n.mensagens.length && n.status !== 'AUTORIZADO') {
-      html += '<div class="resultado resultado--' + (n.finalizado ? 'erro' : 'andamento') + '"><b>' + (n.finalizado ? 'O que a prefeitura disse' : 'Situação') + '</b>'
-        + n.mensagens.map(function (m) {
-          return '<span>' + escapar(m.mensagem || '') + (m.correcao ? ' <b>Como corrigir:</b> ' + escapar(m.correcao) : '') + (m.codigo ? ' <span class="apagado mono">(' + escapar(m.codigo) + ')</span>' : '') + '</span>';
-        }).join('') + '</div>';
-    } else if (!n.finalizado) {
-      html += '<div class="resultado resultado--andamento"><b>Na prefeitura</b><span>A nota ainda está sendo processada. Esta lista se atualiza sozinha.</span></div>';
-    }
-
-    html += blocoCancelamento(n);
+    // Topo do painel: valor liquido, acoes e as abas "Dados da nota" / "Historico".
+    var html = '<div class="nota-valor"><b>' + reais(liquido) + '</b><span>valor líquido</span></div>';
 
     var acoes = '';
     if (n.links && n.links.pdf) {
-      acoes += '<a class="btn btn--primario" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener"><i class="icone icone--p">picture_as_pdf</i> Baixar PDF</a>'
-        + '<a class="btn btn--secundario" href="' + escapar(linkApi(n.links.xml)) + '"><i class="icone icone--p">code</i> Baixar XML</a>';
-    }
-    if (t.cpf_cnpj) {
-      acoes += '<button type="button" class="btn btn--secundario" data-emitir-para="' + escapar(t.cpf_cnpj) + '"><i class="icone icone--p">add</i> Nova nota para este tomador</button>';
+      acoes += (temPdf(n) ? '<a class="btn btn--primario" href="' + escapar(linkApi(n.links.pdf)) + '" target="_blank" rel="noopener"><i class="icone icone--p">download</i> Baixar PDF</a>' : '')
+        + '<a class="btn btn--secundario" href="' + escapar(linkApi(n.links.xml)) + '"><i class="icone icone--p">code</i> XML</a>';
     }
     if (PODE_REENVIAR.indexOf(n.status) >= 0) {
       acoes += '<span data-reenviar-lugar>' + botaoReenviar() + '</span>';
@@ -1240,35 +1365,121 @@
     if (canc.pode) {
       acoes += '<button type="button" class="btn btn--secundario btn--perigo-leve" data-cancelar><i class="icone icone--p">block</i> Cancelar nota</button>';
     }
+    if (t.cpf_cnpj) {
+      acoes += '<button type="button" class="btn btn--secundario" data-emitir-para="' + escapar(t.cpf_cnpj) + '"><i class="icone icone--p">add</i> Nova nota para este tomador</button>';
+    }
     if (acoes) { html += '<div class="detalhe__acoes">' + acoes + '</div>'; }
 
-    html += '<div class="detalhe">'
-      + '<section class="detalhe__bloco"><h3>Tomador</h3><dl>'
-      + linhaDetalhe('Nome', t.nome) + linhaDetalhe('CPF/CNPJ', formatarDoc(t.cpf_cnpj || '')) + linhaDetalhe('E-mail', t.email)
-      + linhaDetalhe('Endereço', [end.logradouro, end.numero].filter(Boolean).join(', '))
-      + linhaDetalhe('Cidade', end.uf ? (end.bairro ? end.bairro + ' · ' : '') + end.uf + (end.cep ? ' · ' + formatarCep(end.cep) : '') : '')
-      + '</dl></section>'
-      + '<section class="detalhe__bloco"><h3>Valores</h3><dl>'
-      + linhaDetalhe('Serviço', reais(bruto))
-      + (desconto ? linhaDetalhe('Desconto', '− ' + reais(desconto)) : '')
-      + linhaDetalhe('ISS ' + formatarValor(aliquota).replace(',00', '') + '%', reais(iss) + (v.iss_retido ? ' (retido)' : ''))
-      + (retencoes ? linhaDetalhe('Retenções', '− ' + reais(retencoes)) : '')
-      + '<div class="total"><dt>Líquido</dt><dd>' + reais(Math.max(bruto - desconto - retencoes, 0)) + '</dd></div>'
-      + '</dl></section>'
-      + '<section class="detalhe__bloco detalhe__bloco--largo"><h3>Serviço</h3>'
-      + '<p class="detalhe__texto">' + escapar(s.descricao || '—') + '</p><dl>'
-      + linhaDetalhe('Código nacional', s.codigo_tributacao_nacional) + linhaDetalhe('Item LC 116', s.item_lista_servico)
-      + linhaDetalhe('Código municipal', s.codigo_tributacao_municipal) + linhaDetalhe('CNAE', s.codigo_cnae)
-      + linhaDetalhe('Competência', mesPorExtenso(String(n.competencia || '').slice(0, 7)))
-      + '</dl></section>';
-    if (n.nfse) {
-      html += '<section class="detalhe__bloco detalhe__bloco--largo"><h3>Autorização</h3><dl>'
-        + linhaDetalhe('Número da NFS-e', n.nfse.numero) + linhaDetalhe('Autorizada em', dataCurta(n.nfse.data_autorizacao))
-        + linhaDetalhe('Código de verificação', n.nfse.codigo_verificacao) + linhaDetalhe('Chave de acesso', n.nfse.chave_acesso)
-        + '</dl></section>';
+    var historico = Array.isArray(n.historico) ? n.historico.slice().reverse() : [];
+    html += '<div class="nota-abas" role="tablist" aria-label="Seções da nota">'
+      + '<button type="button" class="nota-aba" role="tab" id="aba-dados" aria-controls="painel-dados" aria-selected="true">Dados da nota</button>'
+      + '<button type="button" class="nota-aba" role="tab" id="aba-historico" aria-controls="painel-historico" aria-selected="false" tabindex="-1">Histórico <small>' + historico.length + '</small></button>'
+      + '</div>';
+
+    // ---- Aba "Dados da nota" ----
+    var dados = '';
+    // O que a prefeitura disse (rejeicao, erro) vem primeiro: e o que a pessoa precisa resolver.
+    if (n.mensagens && n.mensagens.length && n.status !== 'AUTORIZADO') {
+      dados += '<div class="resultado resultado--' + (n.finalizado ? 'erro' : 'andamento') + '"><b>' + (n.finalizado ? 'O que a prefeitura disse' : 'Situação') + '</b>'
+        + n.mensagens.map(function (m) {
+          return '<span>' + escapar(m.mensagem || '') + (m.correcao ? ' <b>Como corrigir:</b> ' + escapar(m.correcao) : '') + (m.codigo ? ' <span class="apagado mono">(' + escapar(m.codigo) + ')</span>' : '') + '</span>';
+        }).join('') + '</div>';
+    } else if (!n.finalizado) {
+      dados += '<div class="resultado resultado--andamento"><b>Em processamento</b><span>A nota ainda está sendo processada. Esta lista se atualiza sozinha.</span></div>';
     }
-    html += '</div>';
+    dados += blocoCancelamento(n);
+
+    // Os blocos seguem a linguagem da emissao: Para quem, O que foi feito, Quanto custou.
+    function campo(rotulo, valor, mono) {
+      if (valor === null || valor === undefined || valor === '') { return ''; }
+      return '<div><dt>' + escapar(rotulo) + '</dt><dd' + (mono ? ' class="mono"' : '') + '>' + escapar(valor) + '</dd></div>';
+    }
+    function valorLinha(rotulo, valor, classe) {
+      return '<div' + (classe ? ' class="' + classe + '"' : '') + '><dt>' + rotulo + '</dt><dd class="num">' + valor + '</dd></div>';
+    }
+    var linhaEndereco1 = [end.logradouro, end.numero].filter(Boolean).join(', ') + (end.complemento ? ' · ' + end.complemento : '');
+    var linhaEndereco2 = [end.bairro, end.cidade, end.uf].filter(Boolean).join(' · ') + (end.cep ? (end.bairro || end.uf ? ' · ' : '') + 'CEP ' + formatarCep(end.cep) : '');
+    var aliquotaTexto = formatarValor(aliquota).replace(',00', '') + '%';
+
+    dados += '<div class="nd">'
+      // Para quem
+      + '<section class="nd-bloco"><h3 class="nd-titulo"><i class="icone icone--p" aria-hidden="true">person</i>Para quem</h3>'
+      + '<div class="nd-pessoa"><b>' + escapar(t.nome || '—') + '</b>'
+      + (t.cpf_cnpj ? '<span class="mono">' + escapar(formatarDoc(t.cpf_cnpj)) + '</span>' : '')
+      + (t.email ? '<a href="mailto:' + escapar(t.email) + '">' + escapar(t.email) + '</a>' : '')
+      + (linhaEndereco1 ? '<span class="nd-endereco">' + escapar(linhaEndereco1) + (linhaEndereco2 ? '<br>' + escapar(linhaEndereco2) : '') + '</span>' : '')
+      + '</div></section>'
+      // O que foi feito
+      + '<section class="nd-bloco"><h3 class="nd-titulo"><i class="icone icone--p" aria-hidden="true">design_services</i>O que foi feito</h3>'
+      + '<p class="nd-descricao">' + escapar(s.descricao || '—') + '</p>'
+      + '<dl class="nd-grade">'
+      + campo('Código nacional', s.codigo_tributacao_nacional, true) + campo('Item LC 116', s.item_lista_servico, true)
+      + campo('Código municipal', s.codigo_tributacao_municipal, true) + campo('CNAE', s.codigo_cnae, true)
+      + campo('Competência', mesPorExtenso(String(n.competencia || '').slice(0, 7)))
+      + '</dl></section>'
+      // Quanto custou
+      + '<section class="nd-bloco"><h3 class="nd-titulo"><i class="icone icone--p" aria-hidden="true">payments</i>Quanto custou</h3>'
+      + '<dl class="nd-valores">'
+      + valorLinha('Valor do serviço', reais(bruto))
+      + (desconto ? valorLinha('Desconto incondicionado', '− ' + reais(desconto)) : '')
+      + [['valor_ir', 'IR retido'], ['valor_inss', 'INSS retido'], ['valor_pis', 'PIS retido'], ['valor_cofins', 'COFINS retido'], ['valor_csll', 'CSLL retido']]
+        .filter(function (r) { return Number(v[r[0]] || 0) > 0; })
+        .map(function (r) { return valorLinha(r[1], '− ' + reais(Number(v[r[0]]))); }).join('')
+      + (v.iss_retido ? valorLinha('ISS ' + aliquotaTexto + ' retido pelo tomador', '− ' + reais(iss)) : '')
+      + valorLinha('Você recebe', reais(liquido), 'nd-total')
+      + '</dl>'
+      + (!v.iss_retido && iss > 0
+        ? '<p class="nd-obs">ISS ' + escapar(aliquotaTexto) + ' de <b class="num">' + reais(iss) + '</b>: você recolhe. Não sai do valor que você recebe.</p>'
+        : '')
+      + '</section>';
+    if (n.nfse) {
+      dados += '<section class="nd-bloco"><h3 class="nd-titulo"><i class="icone icone--p" aria-hidden="true">verified</i>Autorização</h3>'
+        + '<dl class="nd-grade">'
+        + campo('Número da NFS-e', n.nfse.numero, true)
+        + campo('Autorizada em', n.nfse.data_autorizacao ? dataHoraCurta(n.nfse.data_autorizacao) : '')
+        + campo('Código de verificação', n.nfse.codigo_verificacao, true)
+        + campo('Protocolo', n.nfse.protocolo, true)
+        + '</dl>'
+        + (n.nfse.chave_acesso
+          ? '<div class="nd-chave"><span class="nd-chave__rotulo">Chave de acesso</span><div class="chave"><span>' + escapar(String(n.nfse.chave_acesso).replace(/(\d{4})(?=\d)/g, '$1 ')) + '</span>'
+            + '<button type="button" class="btn btn--icone" data-copiar-chave="' + escapar(n.nfse.chave_acesso) + '" data-dica="Copiar" aria-label="Copiar chave de acesso"><i class="icone icone--p">content_copy</i></button></div></div>'
+          : '')
+        + '</section>';
+    }
+    dados += '</div>';
+    html += '<div id="painel-dados" role="tabpanel" aria-labelledby="aba-dados">' + dados + '</div>';
+
+    // ---- Aba "Historico" ----
+    html += '<div id="painel-historico" role="tabpanel" aria-labelledby="aba-historico" hidden>'
+      + (historico.length
+        ? historico.map(eventoHistorico).join('')
+        : '<p class="secundario" style="padding:20px 0">Ainda não há registros para esta nota.</p>')
+      + '</div>';
+
     el('nota-corpo').innerHTML = html;
+
+    // Abas
+    var abas = el('nota-corpo').querySelectorAll('.nota-aba');
+    Array.prototype.forEach.call(abas, function (aba) {
+      aba.addEventListener('click', function () {
+        Array.prototype.forEach.call(abas, function (outra) {
+          var ativa = outra === aba;
+          outra.setAttribute('aria-selected', ativa ? 'true' : 'false');
+          outra.tabIndex = ativa ? 0 : -1;
+          el(outra.getAttribute('aria-controls')).hidden = !ativa;
+        });
+      });
+    });
+
+    var botaoChave = el('nota-corpo').querySelector('[data-copiar-chave]');
+    if (botaoChave) {
+      botaoChave.addEventListener('click', function () {
+        var chave = this.getAttribute('data-copiar-chave');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(chave).then(function () { avisar('Chave de acesso copiada.'); });
+        }
+      });
+    }
 
     var lugarReenviar = el('nota-corpo').querySelector('[data-reenviar-lugar]');
     if (lugarReenviar) {
@@ -1753,6 +1964,7 @@
   }
 
   function desenharUsuarios(podeGerenciar) {
+    var COR_USUARIO = { ATIVO: 'ok', PRIMEIRO_ACESSO: 'info', BLOQUEADO: 'rejeicao', DESATIVADO: 'neutro' };
     el('usuarios-linhas').innerHTML = listaUsuarios.map(function (u) {
       var s = SITUACAO_USUARIO[u.situacao] || [u.situacao, 'neutro'];
       var acoes = '';
@@ -1763,10 +1975,9 @@
             ? '<button type="button" class="btn btn--icone" data-acao="ativar" title="Devolver o acesso" aria-label="Devolver o acesso de ' + escapar(u.nome) + '"><i class="icone">person_add_alt</i></button>'
             : '<button type="button" class="btn btn--icone" data-acao="desativar" title="Desativar" aria-label="Desativar ' + escapar(u.nome) + '"><i class="icone">person_off</i></button>');
       }
-      return '<tr data-id="' + u.id + '">'
-        + '<td><b>' + escapar(u.nome) + '</b>' + (u.eu ? '<span class="eu">você</span>' : '') + '<span class="sub">' + escapar(u.email) + '</span></td>'
+      return '<tr data-id="' + u.id + '" class="linha-status linha-status--' + (COR_USUARIO[u.situacao] || 'neutro') + '" title="' + escapar(s[0]) + '">'
+        + '<td><b>' + escapar(u.nome) + '</b>' + (u.eu ? '<span class="eu">você</span>' : '') + '<span class="so-leitor"> · ' + escapar(s[0]) + '</span><span class="sub">' + escapar(u.email) + '</span></td>'
         + '<td>' + (u.administrador ? '<span class="pilula pilula--info">Responsável</span>' : '<span class="pilula pilula--neutro">Emissor</span>') + '</td>'
-        + '<td>' + '<span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span></td>'
         + '<td class="num">' + escapar(dataCurta(u.ultimo_acesso) || 'nunca entrou') + '</td>'
         + '<td class="acoes">' + acoes + '</td></tr>';
     }).join('');
@@ -1900,6 +2111,8 @@
     VENCE_HOJE: ['Vence hoje', 'alerta'],
     VENCIDA: ['Venceu', 'erro']
   };
+  // Cor da linha da guia (legenda acima da tabela)
+  var COR_GUIA = { PAGA: 'ok', A_VENCER: 'info', VENCE_HOJE: 'rejeicao', VENCIDA: 'cancelada' };
 
   /** "2026-11" -> "11/2026" */
   function mesBarraAno(competencia) {
@@ -1909,11 +2122,11 @@
 
   function carregarGuias() {
     var corpo = el('guias-linhas');
-    corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">Carregando...</td></tr>';
+    corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="4">Carregando...</td></tr>';
     api('GET', 'guias.php').then(function (r) {
       var guias = r.guias || [];
       if (!guias.length) {
-        corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">Nenhuma guia ainda. Quando a contabilidade anexar a guia do mês, ela aparece aqui e você recebe um aviso por e-mail.</td></tr>';
+        corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="4">Nenhuma guia ainda. Quando a contabilidade anexar a guia do mês, ela aparece aqui e você recebe um aviso por e-mail.</td></tr>';
         return;
       }
       corpo.innerHTML = guias.map(function (g) {
@@ -1928,12 +2141,11 @@
           : (paga
             ? '<button type="button" class="btn btn--secundario" data-desfazer="' + g.id + '" title="Desfazer o pago">Desfazer</button>'
             : '<button type="button" class="btn btn--secundario" data-pagar="' + g.id + '" data-mes="' + escapar(mesBarraAno(g.competencia)) + '"><i class="icone icone--p">check_circle</i> Já paguei</button>');
-        return '<tr>'
-          + '<td><b>' + escapar(mesBarraAno(g.competencia)) + '</b><span class="sub">Simples Nacional (DAS)</span></td>'
+        return '<tr class="linha-status linha-status--' + (COR_GUIA[g.situacao] || 'neutro') + '" title="' + escapar(s[0]) + '">'
+          + '<td><b>' + escapar(mesBarraAno(g.competencia)) + '</b><span class="so-leitor"> · ' + escapar(s[0]) + '</span>'
+          + '<span class="sub">Simples Nacional (DAS)' + (paga && g.pago_em ? ' · paga em ' + escapar(dataCurta(g.pago_em)) : '') + '</span></td>'
           + '<td class="direita num">' + reais(g.valor) + '</td>'
           + '<td class="num">' + escapar(dataCurta(g.vencimento)) + '</td>'
-          + '<td><span class="pilula pilula--' + s[1] + '">' + escapar(s[0]) + '</span>'
-          + (paga && g.pago_em ? '<span class="sub">em ' + escapar(dataCurta(g.pago_em)) + '</span>' : '') + '</td>'
           + '<td class="acoes">' + pagar + copiar
           + '<a class="btn btn--primario" href="' + escapar(pdf) + '" target="_blank" rel="noopener"><i class="icone icone--p">picture_as_pdf</i> Abrir guia</a></td>'
           + '</tr>';
@@ -1954,7 +2166,7 @@
         });
       });
     }).catch(function (erro) {
-      corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="5">' + escapar(erro.message) + '</td></tr>';
+      corpo.innerHTML = '<tr class="tabela-vazia"><td colspan="4">' + escapar(erro.message) + '</td></tr>';
     });
   }
 
