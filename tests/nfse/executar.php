@@ -28,6 +28,7 @@ require __DIR__ . '/casos_portal.php';
 require __DIR__ . '/casos_sistema.php';
 require __DIR__ . '/casos_painel.php';
 require __DIR__ . '/casos_fechamento.php';
+require __DIR__ . '/casos_certificado.php';
 
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoLocal;
 use Xande\NfeIntegracao\Nfse\Armazenamento\ArmazenamentoS3;
@@ -377,6 +378,7 @@ testesNfeUnidade($cfgGeral, $raiz);
 echo "\n[5] Integracao com PostgreSQL (fila, worker, monitor, idempotencia)\n";
 // ===========================================================================
 
+testesCertificadoUnidade();
 testesClientesUnidade();
 testesPortalUnidade();
 testesFechamentoUnidade();

@@ -10,6 +10,7 @@ use Throwable;
 use Xande\NfeIntegracao\Nfse\Dominio\Documentos;
 use Xande\NfeIntegracao\Nfse\Dominio\Padrao;
 use Xande\NfeIntegracao\Nfse\Infra\CofreCertificado;
+use Xande\NfeIntegracao\Nfse\Infra\PfxCompativel;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\PortalRepositorio;
@@ -173,6 +174,8 @@ final class AdministracaoClientes
         } catch (Throwable $e) {
             return self::falha(503, 'SEM_CHAVE', $e->getMessage());
         }
+        // .pfx antigo (RC2/3DES) vira um .pfx atual com a mesma senha; e ele que fica guardado.
+        $conteudo = PfxCompativel::normalizar($conteudo, $senha);
         try {
             $certificado = Certificate::readPfx($conteudo, $senha);
         } catch (Throwable) {
