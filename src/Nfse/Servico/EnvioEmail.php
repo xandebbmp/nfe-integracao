@@ -28,7 +28,7 @@ final class EnvioEmail
     {
         $this->opcoes = ($cfg['email'] ?? []) + [
             'host' => '', 'porta' => 465, 'seguranca' => 'ssl', 'usuario' => '', 'senha' => '',
-            'remetente' => '', 'nome_remetente' => 'Gestão Fiscal', 'timeout_segundos' => 20,
+            'remetente' => '', 'nome_remetente' => 'Carimbo', 'timeout_segundos' => 20,
         ];
         $this->transporte = $transporte;
     }

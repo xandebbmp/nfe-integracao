@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="claude:viewport-fit-sides" content="cover">
-  <title>Portal Gestão Fiscal NFS-e</title>
+  <title>Carimbo · Emissão de NFS-e</title>
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261108r11">
+  <link rel="stylesheet" href="portal.css?v=20261108r14">
   <!-- Ajuda guiada (menu "Ajuda"): o mesmo motor do painel admin -->
   <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
 </head>
@@ -24,8 +24,8 @@
       <div class="logo logo--login">
         <svg class="logo__selo" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2.2"/><path d="M11.5 16.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <div>
-          <span class="logo__nome">Gestão Fiscal</span>
-          <span class="logo__sub">NFS-e Nacional · Salvador-BA</span>
+          <span class="logo__nome">carimbo</span>
+          <span class="logo__sub">Emissão de NFS-e</span>
         </div>
       </div>
 
@@ -170,10 +170,10 @@
           <i class="icone">menu</i>
         </button>
         <div class="logo">
-          <div class="logo__icone"><i class="icone">receipt_long</i></div>
+          <svg class="logo__selo" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2.2"/><path d="M11.5 16.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <div>
-            <span class="logo__nome">Gestão Fiscal</span>
-            <span class="logo__sub">NFS-e Nacional · Salvador-BA</span>
+            <span class="logo__nome">carimbo</span>
+            <span class="logo__sub">NFS-e Nacional</span>
           </div>
         </div>
       </div>
@@ -276,6 +276,26 @@
                   <div class="barra" id="kpi-franquia-barra"><div class="barra__cheio" id="kpi-franquia-cheio" style="width:0%"></div></div>
                 </div>
               </div>
+
+              <!-- Grafico de faturamento (notas autorizadas por mes) -->
+              <section class="cartao bloco grafico-fat" aria-labelledby="grafico-fat-titulo">
+                <div class="bloco__cabeca">
+                  <div>
+                    <h2 id="grafico-fat-titulo">Faturamento</h2>
+                    <p class="grafico-fat__resumo" id="grafico-fat-resumo"></p>
+                  </div>
+                  <div class="segmentos" role="group" aria-label="Período do gráfico">
+                    <button type="button" class="segmento" data-meses="6" aria-pressed="true">6 meses</button>
+                    <button type="button" class="segmento" data-meses="12" aria-pressed="false">12 meses</button>
+                  </div>
+                </div>
+                <div class="grafico-fat__area" id="grafico-fat"></div>
+                <table class="so-leitor" id="grafico-fat-tabela">
+                  <caption>Faturamento por mês (notas autorizadas)</caption>
+                  <thead><tr><th>Mês</th><th>Faturado</th><th>Notas autorizadas</th><th>Canceladas</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </section>
 
               <div class="duas-colunas">
                 <div class="cartao bloco">
@@ -535,6 +555,12 @@
                 </div>
                 <button type="button" class="btn btn--primario" id="botao-nova-recorrencia"><i class="icone icone--p">add</i> Nova recorrência</button>
               </div>
+              <ul class="legenda legenda--solta" id="recorrencias-legenda" aria-label="Legenda das cores" hidden>
+                <li><span class="legenda__cor legenda__cor--info"></span>Agendada</li>
+                <li><span class="legenda__cor legenda__cor--rejeicao"></span>Esperando você</li>
+                <li><span class="legenda__cor legenda__cor--neutro"></span>Pausada</li>
+                <li><span class="legenda__cor legenda__cor--cancelada"></span>Encerrada</li>
+              </ul>
               <div class="cartoes-servico" id="recorrencias-lista"></div>
             </div>
           </section>
@@ -887,7 +913,7 @@
   </dialog>
 
   <script src="../ajuda/tour.js?v=20261108c"></script>
-  <script src="portal.js?v=20261108r11"></script>
+  <script src="portal.js?v=20261108r15"></script>
   <script src="portal-guias.js?v=20261108a"></script>
 </body>
 </html>

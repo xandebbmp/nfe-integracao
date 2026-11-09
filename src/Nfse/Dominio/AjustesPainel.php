@@ -59,7 +59,7 @@ final class AjustesPainel
         'email.remetente' => ['grupo' => 'E-mail', 'rotulo' => 'Remetente', 'tipo' => 'email',
             'ajuda' => 'Endereço que aparece como "de". O provedor precisa autorizar.'],
         'email.nome_remetente' => ['grupo' => 'E-mail', 'rotulo' => 'Nome do remetente', 'tipo' => 'texto',
-            'ajuda' => 'Nome que aparece antes do endereço, ex.: Gestão Fiscal.'],
+            'ajuda' => 'Nome que aparece antes do endereço, ex.: Carimbo.'],
         'email.url_portal' => ['grupo' => 'E-mail', 'rotulo' => 'Endereço do portal', 'tipo' => 'url',
             'ajuda' => 'Vai no link do e-mail, ex.: https://fiscal.suaempresa.com.br/portal/. Vazio = "Esqueci a senha" desligado.'],
 

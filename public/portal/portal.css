@@ -786,3 +786,45 @@ a { color: var(--primaria); }
 #janela-nota.nota-status #painel-dados > .resultado { margin-top: 20px; border: 0; border-left: 3px solid color-mix(in srgb, var(--cor) 55%, transparent);
   border-radius: 6px; background: color-mix(in srgb, var(--cor) 8%, var(--superficie)); color: var(--texto); }
 #janela-nota.nota-status #painel-dados > .resultado .apagado { color: var(--apagado); }
+
+/* Marca "carimbo": selo + nome em minusculas (login e topo) */
+.logo__selo { flex: none; color: var(--primaria); }
+.logo--login .logo__selo { width: 30px; height: 30px; color: #17324d; }
+.logo__nome { font-weight: 700; letter-spacing: -.03em; }
+.topo .logo__nome { font-size: 19px; }
+
+/* Recorrencias: cartao na cor da situacao (translucida), legenda acima */
+.legenda--solta { padding: 0; border: 0; }
+.rec-cartao { background: color-mix(in srgb, var(--cor) 7%, var(--superficie)); border-color: color-mix(in srgb, var(--cor) 22%, var(--borda));
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--cor) 55%, transparent); }
+.rec-cartao.recorrencia--pendente { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--cor) 55%, transparent); }
+.rec-cartao .servico__acoes { border-top-color: color-mix(in srgb, var(--cor) 18%, var(--divisoria)); }
+.rec-cartao .pilula .icone { font-size: 14px; }
+.rec-cartao .recorrencia__erro { background: var(--superficie); border: 0; box-shadow: inset 3px 0 0 #d92d20; color: var(--texto); }
+
+/* Grafico de faturamento (tela inicial) */
+.grafico-fat { --gf-barra: #2f6fb0; }
+:root[data-theme="dark"] .grafico-fat { --gf-barra: #2f6fd6; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .grafico-fat { --gf-barra: #2f6fd6; } }
+.grafico-fat__resumo { margin-top: 2px; font-size: 13px; color: var(--apagado); }
+.grafico-fat__area { position: relative; padding: 12px 20px 16px; min-height: 120px; }
+.grafico-fat__area svg { display: block; overflow: visible; }
+.grafico-fat__vazio { margin: 0; padding: 36px 0; text-align: center; color: var(--apagado); font-size: 14px; }
+.segmentos { display: inline-flex; padding: 3px; gap: 2px; border-radius: 8px; background: var(--fundo); }
+.segmento { border: 0; background: transparent; padding: 6px 12px; min-height: 32px; border-radius: 6px; font: inherit; font-size: 13px; color: var(--secundario); cursor: pointer; }
+.segmento[aria-pressed="true"] { background: var(--superficie); color: var(--texto); font-weight: 500; box-shadow: 0 1px 2px rgba(20, 32, 46, .12); }
+.gf-grade { stroke: var(--divisoria); stroke-width: 1; }
+.gf-base { stroke: var(--borda); stroke-width: 1; }
+.gf-eixo, .gf-mes { fill: var(--apagado); font-size: 12px; font-family: var(--fonte); font-variant-numeric: tabular-nums; }
+.gf-mes--atual { fill: var(--texto); font-weight: 600; }
+.gf-valor { fill: var(--texto); font-size: 12px; font-weight: 600; font-family: var(--fonte); font-variant-numeric: tabular-nums; }
+.gf-barra { fill: var(--gf-barra); opacity: .55; }
+.gf-barra--atual { opacity: 1; }
+.gf-alvo { fill: transparent; cursor: default; outline: none; }
+.gf-alvo:hover, .gf-alvo.ativo { fill: color-mix(in srgb, var(--gf-barra) 8%, transparent); }
+.gf-alvo:focus-visible { stroke: var(--primaria); stroke-width: 2; }
+.gf-dica { position: absolute; z-index: 2; display: grid; gap: 2px; padding: 8px 10px; border-radius: 6px; pointer-events: none;
+  background: #14202e; color: #fff; font-size: 13px; box-shadow: 0 8px 24px rgba(20, 32, 46, .25); white-space: nowrap; transform: translateY(-8px); }
+.gf-dica b { font-weight: 600; }
+.gf-dica span { font-size: 15px; font-weight: 600; }
+.gf-dica small { color: #b9c6d3; font-size: 12px; }

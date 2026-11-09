@@ -4,11 +4,11 @@
   <!-- Ao mudar admin.js/admin.css, troque o ?v= abaixo: o navegador baixa a versao nova. -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Painel Administrativo</title>
+  <title>Administração · Carimbo</title>
   <!-- Mesmo visual do monitor + ajustes do painel -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-  <link rel="stylesheet" href="../monitor/monitor.css?v=20261108r3">
+  <link rel="stylesheet" href="../monitor/monitor.css?v=20261108r4">
   <link rel="stylesheet" href="admin.css?v=20261108r14">
   <!-- Tour guiado (botao "Tour guiado"): o mesmo do portal -->
   <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
@@ -18,7 +18,8 @@
   <!-- ===================== Acesso ===================== -->
   <section id="tela-acesso" class="acesso" hidden>
     <form id="form-acesso" class="cartao acesso__cartao">
-      <h1>Painel Administrativo</h1>
+      <div class="marca"><svg class="logo__selo" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2.2"/><path d="M11.5 16.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="marca__nome">carimbo</span></div>
+      <h1>Administração</h1>
       <p id="acesso-explica" class="suave">Entre com o seu e-mail e a sua senha.</p>
       <div id="acesso-pessoa" class="acesso__campos">
         <label for="campo-email">E-mail</label>
@@ -59,7 +60,8 @@
   <div id="tela-painel" hidden>
     <header class="topo">
       <div class="topo__titulo">
-        <h1>Painel Administrativo</h1>
+        <div class="marca"><svg class="logo__selo" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2.2"/><path d="M11.5 16.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="marca__nome">carimbo</span></div>
+        <h1 class="topo__nome-tela">Administração</h1>
         <span id="selo-ambiente" class="selo"></span>
         <span id="mes-atual" class="suave"></span>
       </div>
