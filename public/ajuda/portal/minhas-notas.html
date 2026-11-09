@@ -45,28 +45,28 @@
       <li class="passo">
         <h2>Ache a nota que você procura</h2>
         <ul>
-          <li>Clique em um filtro: <span class="botao-nome">Autorizadas</span>, <span class="botao-nome">Na prefeitura</span>, <span class="botao-nome">Com problema</span> ou <span class="botao-nome">Canceladas</span>.</li>
+          <li>Clique em um filtro: <span class="botao-nome">Autorizadas</span>, <span class="botao-nome">Em processamento</span>, <span class="botao-nome">Rejeição</span> ou <span class="botao-nome">Canceladas</span>.</li>
           <li>Ou digite na busca o <b>nome do tomador</b>, o <b>CPF/CNPJ</b> ou o <b>número da nota</b>.</li>
           <li>Para ver um mês só, escolha o mês no campo de data à direita.</li>
         </ul>
         <figure class="print">
-          <img src="../img/portal/notas-01-filtros.png" alt="Filtros da lista: Todas, Autorizadas, Na prefeitura, Com problema, Canceladas, busca e mês" loading="lazy">
+          <img src="../img/portal/notas-01-filtros.png" alt="Filtros da lista: Todas, Autorizadas, Em processamento, Rejeição, Canceladas, busca e mês" loading="lazy">
         </figure>
       </li>
 
       <li class="passo">
         <h2>Baixe o PDF ou o XML</h2>
-        <p>Na própria linha da nota, clique em <span class="botao-nome">PDF</span> ou <span class="botao-nome">XML</span>. Ou clique na linha para abrir os detalhes e use <span class="botao-nome">Baixar PDF</span> e <span class="botao-nome">Baixar XML</span>.</p>
+        <p>Na própria linha da nota, clique no ícone de <b>PDF</b> ou de <b>XML</b> (passe o mouse para ver o nome). Ou clique na linha para abrir os detalhes e use <span class="botao-nome">Baixar PDF</span> e <span class="botao-nome">XML</span>. O PDF só aparece para notas autorizadas, canceladas ou substituídas.</p>
         <p>O <b>PDF</b> é a nota para imprimir ou mandar ao cliente. O <b>XML</b> é o arquivo oficial, que o contador costuma pedir.</p>
         <figure class="print">
-          <img src="../img/portal/notas-04-detalhe.png" alt="Detalhe de uma nota autorizada com botões Baixar PDF, Baixar XML, Nova nota para este tomador e Cancelar nota" loading="lazy">
+          <img src="../img/portal/notas-04-detalhe.png" alt="Detalhe de uma nota autorizada com botões Baixar PDF, XML, Nova nota para este tomador e Cancelar nota" loading="lazy">
           <figcaption>No detalhe também dá para emitir uma <b>nova nota para o mesmo tomador</b> sem digitar tudo de novo.</figcaption>
         </figure>
       </li>
 
       <li class="passo">
         <h2>Resolva uma nota rejeitada</h2>
-        <p>Clique no filtro <span class="botao-nome">Com problema</span> e abra a nota. A caixa vermelha mostra <b>o que a prefeitura disse</b> e <b>como corrigir</b>.</p>
+        <p>Clique no filtro <span class="botao-nome">Rejeição</span> (ou passe o mouse na linha amarela para ver o motivo) e abra a nota. A caixa amarela mostra <b>o que a prefeitura disse</b> e <b>como corrigir</b>.</p>
         <figure class="print">
           <img src="../img/portal/notas-03-rejeitada-detalhe.png" alt="Detalhe de uma nota rejeitada mostrando o motivo da prefeitura e os botões Nova nota para este tomador e Reenviar" loading="lazy">
         </figure>
@@ -82,9 +82,9 @@
       <table class="tabela-ajuda">
         <thead><tr><th>Status</th><th>O que significa</th><th>Filtro</th></tr></thead>
         <tbody>
-          <tr><td><span class="pilula pilula--info">Na fila</span> <span class="pilula pilula--info">Processando</span></td><td>A prefeitura ainda está analisando.</td><td>Na prefeitura</td></tr>
+          <tr><td><span class="pilula pilula--info">Na fila</span> <span class="pilula pilula--info">Processando</span></td><td>A prefeitura ainda está analisando.</td><td>Em processamento</td></tr>
           <tr><td><span class="pilula pilula--ok">Autorizada</span></td><td>A nota vale. PDF e XML disponíveis.</td><td>Autorizadas</td></tr>
-          <tr><td><span class="pilula pilula--erro">Rejeitada</span> <span class="pilula pilula--erro">Com erro</span></td><td>Não foi autorizada. Veja o motivo no detalhe.</td><td>Com problema</td></tr>
+          <tr><td><span class="pilula pilula--erro">Rejeitada</span> <span class="pilula pilula--erro">Com erro</span></td><td>Não foi autorizada. Veja o motivo no detalhe.</td><td>Rejeição</td></tr>
           <tr><td><span class="pilula pilula--neutro">Cancelada</span></td><td>A nota foi cancelada e não vale mais.</td><td>Canceladas</td></tr>
         </tbody>
       </table>
