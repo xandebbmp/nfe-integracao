@@ -8,7 +8,7 @@
   <!-- Fontes e icones do modelo (Google Fonts). Se cair, usa a fonte do sistema. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="portal.css?v=20261108r14">
+  <link rel="stylesheet" href="portal.css?v=20261108r15">
   <!-- Ajuda guiada (menu "Ajuda"): o mesmo motor do painel admin -->
   <link rel="stylesheet" href="../ajuda/tour.css?v=20261108b">
 </head>
@@ -266,7 +266,7 @@
                   <div class="kpi__rodape">notas autorizadas no mês</div>
                 </div>
                 <div class="cartao kpi">
-                  <div class="kpi__topo">Aguardando prefeitura <i class="icone">hourglass_top</i></div>
+                  <div class="kpi__topo">Em processamento <i class="icone">hourglass_top</i></div>
                   <div class="kpi__valor" id="kpi-andamento">–</div>
                   <div class="kpi__rodape">atualiza a cada 20 segundos</div>
                 </div>
@@ -312,7 +312,7 @@
                     <li><span class="legenda__cor legenda__cor--neutro"></span>Substituída</li>
                   </ul>
                   <div class="tabela-rolagem">
-                    <table class="tabela tabela--status">
+                    <table class="tabela tabela--status tabela--notas">
                       <thead>
                         <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th class="direita"><span class="so-leitor">Arquivos</span></th></tr>
                       </thead>
@@ -529,7 +529,7 @@
                   <li><span class="legenda__cor legenda__cor--neutro"></span>Substituída</li>
                 </ul>
                 <div class="tabela-rolagem">
-                  <table class="tabela tabela--clicavel tabela--status">
+                  <table class="tabela tabela--clicavel tabela--status tabela--notas">
                     <thead>
                       <tr><th>Número</th><th>Tomador</th><th>Emissão</th><th class="direita">Valor</th><th class="direita"><span class="so-leitor">Arquivos</span></th></tr>
                     </thead>
@@ -674,7 +674,7 @@
                     <li><span class="legenda__cor legenda__cor--rejeicao"></span>Bloqueado por senha errada</li>
                     <li><span class="legenda__cor legenda__cor--neutro"></span>Desativado</li>
                   </ul>
-                  <table class="tabela tabela--status">
+                  <table class="tabela tabela--status tabela--usuarios">
                     <thead>
                       <tr><th>Nome</th><th>Papel</th><th>Último acesso</th><th class="direita"><span class="so-leitor">Ações</span></th></tr>
                     </thead>
@@ -913,7 +913,7 @@
   </dialog>
 
   <script src="../ajuda/tour.js?v=20261108c"></script>
-  <script src="portal.js?v=20261108r15"></script>
+  <script src="portal.js?v=20261108r16"></script>
   <script src="portal-guias.js?v=20261108a"></script>
 </body>
 </html>

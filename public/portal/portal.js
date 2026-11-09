@@ -524,7 +524,10 @@
       area.innerHTML = '<p class="grafico-fat__vazio">Nenhuma nota autorizada nos últimos ' + mesesGrafico + ' meses. Quando houver, o faturamento de cada mês aparece aqui.</p>';
       return;
     }
-    var largura = Math.max(320, area.clientWidth || 640);
+    // largura util da area (sem o padding), para nao passar da borda do cartao no celular
+    var estilo = window.getComputedStyle(area);
+    var util = area.clientWidth - parseFloat(estilo.paddingLeft || 0) - parseFloat(estilo.paddingRight || 0);
+    var largura = Math.max(260, util || 640);
     var altura = 220;
     var m = { topo: 22, dir: 8, base: 26, esq: 64 };
     var w = largura - m.esq - m.dir;
@@ -555,9 +558,11 @@
           + 'Q' + x + ',' + yv + ' ' + (x + r) + ',' + yv + 'H' + (x + barra - r) + 'Q' + (x + barra) + ',' + yv + ' ' + (x + barra) + ',' + (yv + r)
           + 'V' + (m.topo + h) + 'Z"/>';
       }
-      // valor escrito so no mes atual e no maior mes
-      if ((i === atual || i === maiorIdx) && d.faturado > 0) {
-        svg += '<text class="gf-valor" x="' + cx + '" y="' + (yv - 6) + '" text-anchor="middle">' + escapar(reaisCurto(d.faturado)) + '</text>';
+      // valor escrito so no mes atual e no maior mes (se nao estiver colado no atual: os textos se cruzavam)
+      if ((i === atual || (i === maiorIdx && Math.abs(i - atual) > 1)) && d.faturado > 0) {
+        // a ultima barra encosta na borda: o texto termina nela em vez de centralizar
+        var ultima = i === dados.length - 1;
+        svg += '<text class="gf-valor" x="' + (ultima ? x + barra : cx) + '" y="' + (yv - 6) + '" text-anchor="' + (ultima ? 'end' : 'middle') + '">' + escapar(reaisCurto(d.faturado)) + '</text>';
       }
       var p = d.mes.split('-');
       var rotulo = MES_CURTO[Number(p[1]) - 1] + (p[1] === '01' || i === 0 ? '/' + p[0].slice(2) : '');
@@ -633,7 +638,7 @@
     var s = r.por_status || {};
     var rejeitadas = (s.REJEITADO || 0) + (s.ERRO || 0);
     el('kpi-notas').textContent = r.notas_no_mes;
-    el('kpi-notas-detalhe').textContent = (s.AUTORIZADO || 0) + ' autorizadas · ' + rejeitadas + ' com problema · ' + (s.CANCELADO || 0) + ' canceladas';
+    el('kpi-notas-detalhe').textContent = (s.AUTORIZADO || 0) + ' autorizadas · ' + rejeitadas + (rejeitadas === 1 ? ' rejeição · ' : ' rejeições · ') + (s.CANCELADO || 0) + ' canceladas';
     el('kpi-faturado').textContent = reais(r.faturado_no_mes);
     el('kpi-andamento').textContent = r.em_andamento;
 
@@ -649,7 +654,7 @@
     var avisos = r.avisos || [];
     var icones = { NOTA_REJEITADA: 'error_outline', SEM_CERTIFICADO: 'gpp_maybe', CERTIFICADO_VENCENDO: 'verified_user', RECORRENCIA_PENDENTE: 'event_repeat' };
     el('inicio-avisos').innerHTML = avisos.length === 0
-      ? '<div class="atalho"><i class="icone">task_alt</i><div><b>Tudo certo por aqui</b><small>Nenhuma nota com problema e certificado em dia.</small></div></div>'
+      ? '<div class="atalho"><i class="icone">task_alt</i><div><b>Tudo certo por aqui</b><small>Nenhuma nota com rejeição e certificado em dia.</small></div></div>'
       : avisos.map(function (a) {
         return '<div class="atalho"><i class="icone">' + (icones[a.tipo] || 'info') + '</i><div><b>' + escapar(a.titulo) + '</b><small>' + escapar(a.texto) + '</small></div></div>';
       }).join('');
