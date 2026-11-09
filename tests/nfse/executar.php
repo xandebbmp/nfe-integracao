@@ -232,6 +232,30 @@ provedorNacional($cfgMeEpp, $http)->emitir($docComPercentual);
 $dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
 Apoio::verificar(str_contains($dps, '<pTotTribSN>6.50</pTotTribSN>'), 'ME/EPP: percentual enviado na nota vale mais que o do cadastro');
 
+// MEI (opSimpNac 2): ISS vai no DAS-MEI (sem pAliq) e o % do Simples que sobrou
+// no cadastro (empresa que era ME/EPP) nao vai na nota.
+$cfgMei = $cfg;
+$cfgMei['emitente']['opcao_simples_nacional'] = 2;
+$cfgMei['emitente']['regime_apuracao_simples'] = 1;
+$cfgMei['emitente']['percentual_tributos_simples'] = 2;
+$http = new TransporteFalso();
+$http->responder(201, respostaSefinAutorizada($chave));
+$retorno = provedorNacional($cfgMei, $http)->emitir(Apoio::documentoNacional());
+$dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
+Apoio::igual(StatusNfse::AUTORIZADO, $retorno->status, 'MEI: nota autorizada');
+Apoio::verificar(str_contains($dps, '<opSimpNac>2</opSimpNac>') && !str_contains($dps, '<regApTribSN>'), 'MEI: DPS com opSimpNac 2 e sem regApTribSN');
+Apoio::verificar(!str_contains($dps, '<pAliq>'), 'MEI sem retencao: DPS sem pAliq (ISS no DAS-MEI)');
+Apoio::verificar(!str_contains($dps, '<pTotTribSN>') && str_contains($dps, '<indTotTrib>0</indTotTrib>'), 'MEI: % do Simples antigo do cadastro nao vai na nota');
+Apoio::igual([], ValidadorXsd::validar($dps, "{$raiz}/schemas/nfse/nacional/1.01/DPS_v1.01.xsd"), 'MEI: DPS passa no XSD');
+
+$docMeiRetido = Apoio::documentoNacional();
+$docMeiRetido['payload']['valores']['iss_retido'] = true;
+$http = new TransporteFalso();
+$http->responder(201, respostaSefinAutorizada($chave));
+provedorNacional($cfgMei, $http)->emitir($docMeiRetido);
+$dps = (string)SefinNacionalCliente::descompactar(json_decode((string)$http->requisicoes[0]['corpo'], true)['dpsXmlGZipB64'] ?? null);
+Apoio::verificar(str_contains($dps, '<pAliq>5.00</pAliq>'), 'MEI com ISS retido pelo tomador: DPS envia pAliq');
+
 // ===========================================================================
 echo "\n[3] Padrao Nacional - rejeicao, falha e recuperacao\n";
 // ===========================================================================
