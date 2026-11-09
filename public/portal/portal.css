@@ -828,3 +828,54 @@ a { color: var(--primaria); }
 .gf-dica b { font-weight: 600; }
 .gf-dica span { font-size: 15px; font-weight: 600; }
 .gf-dica small { color: #b9c6d3; font-size: 12px; }
+
+/* ==========================================================================
+   Celular (nov/2026): sem rolar para o lado
+   ========================================================================== */
+/* A tabela do grafico (so para leitor de tela) nao pode alargar a pagina. */
+.grafico-fat { position: relative; overflow: hidden; }
+
+@media (max-width: 860px) {
+  .login__marca { gap: 16px; padding-block: 20px 24px; }
+  .login__miolo { gap: 8px; }
+  .login__marca h1 { font-size: 26px; margin: 0; }
+  .login { align-content: start; min-height: 100dvh; grid-template-rows: auto 1fr; }
+  .login__form-area { place-items: start center; padding-top: 28px; }
+}
+
+@media (max-width: 640px) {
+  /* Numeros do Inicio: dois por linha, mais baixos */
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis > .kpi { padding: 14px 16px; border-right: 0; border-bottom: 1px solid var(--divisoria); }
+  .kpis > .kpi:nth-child(odd) { border-right: 1px solid var(--divisoria); }
+  .kpis > .kpi:nth-last-child(-n+2) { border-bottom: 0; }
+  .kpi__valor { font-size: 22px; }
+  .kpi__rodape { font-size: 12px; }
+
+  /* Listas de notas: cada nota vira um cartao (numero e valor em cima, tomador, data e arquivos embaixo) */
+  .tabela--notas thead, .tabela--usuarios thead { display: none; }
+  .tabela--notas tbody tr:not(.tabela-vazia) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--divisoria); }
+  .tabela--notas tbody td { border: 0; padding: 0; white-space: normal; }
+  .tabela--notas tbody tr.linha-status td:first-child { box-shadow: none; }
+  .tabela--status.tabela--notas tbody tr.linha-status, .tabela--status.tabela--usuarios tbody tr.linha-status { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--cor) 55%, transparent); }
+  .tabela--notas tbody td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 500; }
+  .tabela--notas tbody td:nth-child(4) { grid-column: 2; grid-row: 1; font-weight: 600; }
+  .tabela--notas tbody td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .tabela--notas tbody td:nth-child(2) .sub { display: inline; margin-left: 6px; }
+  .tabela--notas tbody td:nth-child(3) { grid-column: 1; grid-row: 3; align-self: center; color: var(--apagado); font-size: 13px; }
+  .tabela--notas tbody td:nth-child(5) { grid-column: 2; grid-row: 3; }
+
+  /* Usuarios: nome e acoes em cima, papel e ultimo acesso embaixo */
+  .tabela--usuarios tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--divisoria); }
+  .tabela--usuarios tbody td { border: 0; padding: 0; white-space: normal; }
+  .tabela--usuarios tbody tr.linha-status td:first-child { box-shadow: none; }
+  .tabela--usuarios tbody td:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .tabela--usuarios tbody td:nth-child(4) { grid-column: 1 / -1; grid-row: 4; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+  .tabela--usuarios tbody td:nth-child(4):empty { display: none; }
+  .tabela--usuarios tbody td:nth-child(2) { grid-column: 1; grid-row: 2; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tabela--usuarios tbody td:nth-child(3) { grid-column: 1; grid-row: 3; color: var(--apagado); font-size: 13px; }
+  .tabela--usuarios tbody td:nth-child(3)::before { content: "Último acesso: "; }
+}
+@media (max-width: 640px) {
+  .grafico-fat__area { padding-inline: 12px; }
+}

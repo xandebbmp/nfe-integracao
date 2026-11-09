@@ -465,3 +465,20 @@ details summary { cursor: pointer; margin-top: 10px; }
   background: var(--destaque-suave); color: var(--destaque); font-size: 11px; font-weight: 500; text-decoration: none; }
 .config-restaurar::before { content: "restart_alt"; font-family: "Material Icons"; font-size: 13px; }
 .config-restaurar:hover { text-decoration: none; filter: brightness(.95); }
+
+/* ==========================================================================
+   Celular (nov/2026)
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* Botoes do topo numa linha so, que rola para o lado (antes quebravam em 3 linhas) */
+  .topo__acoes { flex-wrap: nowrap; overflow-x: auto; width: calc(100% + 32px); margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; }
+  .topo__acoes::-webkit-scrollbar { display: none; }
+  .topo__acoes .botao { flex: 0 0 auto; white-space: nowrap; }
+  /* Fechamento e Relatorio de cobranca: contadores dois a dois, campo do mes embaixo das setas */
+  .fech-contadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal .fech-contadores .contador__valor { font-size: 20px; }
+  .fech-mes { flex-wrap: wrap; }
+  .fech-mes__nome { min-width: 0; flex: 1; }
+  .fech-mes input[type="month"] { margin-left: 0; flex-basis: 100%; }
+  .fech-barra > .botao { width: 100%; justify-content: center; }
+}
