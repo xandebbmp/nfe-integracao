@@ -51,6 +51,11 @@
           ? { status: 'REGISTRADO', motivo: 'Erro na emissão', texto: 'Valor errado, foi emitida outra nota.', por: 'mariana@exemplo.com.br', criado_em: '2026-10-29T10:00:00', mensagens: [] }
           : null)
       },
+      historico: [{ operacao: 'RECEBIMENTO', status: 'RECEBIDO', mensagem: 'Documento recebido e enfileirado', criado_em: n.criado_em.slice(0, 10) + ' 09:00:00-03' }]
+        .concat(n.status === 'PROCESSANDO' ? [{ operacao: 'EMISSAO', status: 'PROCESSANDO', mensagem: 'Enviando ao fisco', criado_em: n.criado_em.slice(0, 10) + ' 09:01:00-03' }] : [])
+        .concat(n.status === 'REJEITADO' ? [{ operacao: 'EMISSAO', status: 'PROCESSANDO', mensagem: 'Enviando ao fisco', criado_em: n.criado_em.slice(0, 10) + ' 09:01:00-03' }, { operacao: 'EMISSAO', status: 'REJEITADO', mensagem: 'E0312 - CEP do tomador não encontrado.', criado_em: n.criado_em.slice(0, 10) + ' 09:01:30-03' }] : [])
+        .concat(['AUTORIZADO', 'CANCELADO'].indexOf(n.status) >= 0 ? [{ operacao: 'EMISSAO', status: 'PROCESSANDO', mensagem: 'Enviando ao fisco', criado_em: n.criado_em.slice(0, 10) + ' 09:01:00-03' }, { operacao: 'EMISSAO', status: 'AUTORIZADO', mensagem: null, criado_em: n.criado_em.slice(0, 10) + ' 09:01:20-03' }] : [])
+        .concat(n.status === 'CANCELADO' ? [{ operacao: 'EVENTO', status: 'AUTORIZADO', mensagem: 'Evento 101101 solicitado por portal:mariana@exemplo.com.br', criado_em: '2026-10-29 10:00:00-03' }, { operacao: 'EVENTO', status: 'CANCELADO', mensagem: 'Cancelamento registrado', criado_em: '2026-10-29 10:00:40-03' }] : []),
       mensagens: n.status === 'REJEITADO' ? [{ codigo: 'E0312', mensagem: 'CEP do tomador não encontrado.', correcao: 'Confira o CEP no cadastro do tomador e emita de novo.' }] : []
     });
   }
@@ -118,6 +123,14 @@
           resumo: { mes: '2026-11', notas_no_mes: 37, por_status: { AUTORIZADO: 35, REJEITADO: 1, CANCELADO: 1 }, em_andamento: 1, faturado_no_mes: 48320, franquia: { usado: 37, limite: 100 },
             avisos: [{ tipo: 'RECORRENCIA_PENDENTE', titulo: '1 nota recorrente esperando você', texto: 'Abra Recorrências para emitir ou pular o mês.' }, { tipo: 'NOTA_REJEITADA', titulo: 'Nota para Construtora Atlântico não foi autorizada', texto: 'CEP do tomador não encontrado. Corrija e emita de novo.' }] },
           notas: notas.slice(0, 5)
+        }).then(function (r) {
+          // Grafico "Faturamento": 12 meses de exemplo (o ultimo e o mes atual)
+          var vals = [21400, 26900, 24800, 31200, 29700, 35100, 33800, 39300, 37900, 44200, 51100, 48320];
+          r.resumo.meses = vals.map(function (v, i) {
+            var d = new Date(2026, 10 - 11 + i, 1);
+            return { mes: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), faturado: v, autorizadas: Math.round(v / 1300), canceladas: i % 4 === 0 ? 1 : 0 };
+          });
+          return r;
         });
       }
       var q = parametros(busca);
