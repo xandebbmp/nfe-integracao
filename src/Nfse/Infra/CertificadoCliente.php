@@ -59,7 +59,8 @@ final class CertificadoCliente
 
     public static function doConteudo(string $conteudo, string $senha): self
     {
-        $certificado = Certificate::readPfx($conteudo, $senha);
+        // .pfx antigo (RC2/3DES) e convertido para o PHP com OpenSSL 3 conseguir abrir.
+        $certificado = Certificate::readPfx(PfxCompativel::normalizar($conteudo, $senha), $senha);
         if ($certificado->isExpired()) {
             throw new RuntimeException('Certificado digital vencido em ' . $certificado->getValidTo()->format('d/m/Y') . '.');
         }

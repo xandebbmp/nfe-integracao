@@ -9,6 +9,7 @@ use RuntimeException;
 use Throwable;
 use Xande\NfeIntegracao\Nfse\Infra\CertificadoCliente;
 use Xande\NfeIntegracao\Nfse\Infra\CofreCertificado;
+use Xande\NfeIntegracao\Nfse\Infra\PfxCompativel;
 use Xande\NfeIntegracao\Nfse\NfseConfig;
 use Xande\NfeIntegracao\Nfse\Repositorio\ClienteRepositorio;
 use Xande\NfeIntegracao\Nfse\Repositorio\SistemaRepositorio;
@@ -72,6 +73,7 @@ final class AcessoSerpro
     /** Confere e grava o e-CNPJ do escritorio (quem contratou o SERPRO). */
     public function salvarCertificado(string $pfx, string $senha, ?string $ip): array
     {
+        $pfx = PfxCompativel::normalizar($pfx, $senha);
         try {
             $certificado = Certificate::readPfx($pfx, $senha);
         } catch (Throwable) {
