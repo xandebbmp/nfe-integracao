@@ -110,23 +110,32 @@ final class DpsXmlBuilder
     }
 
     /**
-     * ME/EPP (opSimpNac 3) com o ISS apurado no Simples (regApTribSN 1) e sem
-     * retencao: o Sefin recusa pAliq (o ISS vai no DAS). A aliquota fica so
-     * nos dados da nota, para mostrar na tela.
+     * ISS pago no DAS e sem retencao: o Sefin recusa pAliq. A aliquota fica
+     * so nos dados da nota, para mostrar na tela. Vale para:
+     *   - MEI (opSimpNac 2): o ISS vai no valor fixo do DAS-MEI;
+     *   - ME/EPP (opSimpNac 3) com o ISS apurado no Simples (regApTribSN 1).
      */
     public static function issPeloSimplesSemRetencao(array $valores, array $emitente): bool
     {
-        return (int)($emitente['opcao_simples_nacional'] ?? 1) === 3
-            && (int)($emitente['regime_apuracao_simples'] ?? 0) === 1
-            && empty($valores['iss_retido']);
+        if (!empty($valores['iss_retido'])) {
+            return false;
+        }
+        $opcao = (int)($emitente['opcao_simples_nacional'] ?? 1);
+        return $opcao === 2
+            || ($opcao === 3 && (int)($emitente['regime_apuracao_simples'] ?? 0) === 1);
     }
 
     /**
      * Percentual de tributos do Simples (pTotTribSN): vale o da nota; se a
      * nota nao trouxer, usa o do cadastro da empresa (informado pelo contador).
+     * So para ME/EPP: se a empresa mudou para MEI ou nao optante, o percentual
+     * antigo pode continuar salvo no cadastro e nao deve ir na nota.
      */
     public static function valoresComPadraoDoEmitente(array $valores, array $emitente): array
     {
+        if ((int)($emitente['opcao_simples_nacional'] ?? 1) !== 3) {
+            return $valores;
+        }
         $daNota = $valores['percentual_tributos_simples'] ?? null;
         $doCadastro = $emitente['percentual_tributos_simples'] ?? null;
         if (($daNota === null || $daNota === '') && $doCadastro !== null && $doCadastro !== '') {
